@@ -119,6 +119,9 @@ func TestValidateDealPaymentSession(t *testing.T) {
 		return &paypb.PaymentSession{
 			PaymentCoin:    req.PaymentCoin,
 			ExpectedAmount: "49",
+			PaymentReadiness: paypb.PaymentReadinessView{
+				Status: paypb.PaymentReadinessReadyToPay,
+			},
 			FundingTarget: paypb.FundingTargetView{
 				AssetID:         req.PaymentCoin,
 				Amount:          "49",
@@ -130,6 +133,9 @@ func TestValidateDealPaymentSession(t *testing.T) {
 
 	require.NoError(t, validateDealPaymentSession(open, req, nil, valid()),
 		"advisory network fee hints must not change the signed order amount")
+	require.NoError(t, validateDealPaymentSession(open, req, nil, &paypb.PaymentSession{
+		PaymentReadiness: paypb.PaymentReadinessView{Status: paypb.PaymentReadinessAwaitingSellerReceipt},
+	}), "non-actionable ceremony drafts are validated when they become ready")
 
 	tests := []struct {
 		name   string
@@ -169,8 +175,9 @@ func TestValidateDealSessionProvisioning_AcceptsBoundCrossCurrencyQuote(t *testi
 	expected := paypb.FormatSessionAmount(quote.BuyerPaymentTotal, req.PaymentCoin)
 	session := &paypb.PaymentSession{
 		PaymentCoin: req.PaymentCoin, ExpectedAmount: expected,
-		FundingTarget:   paypb.FundingTargetView{AssetID: req.PaymentCoin, Amount: expected},
-		PaymentProgress: paypb.PaymentProgressView{RequiredAmount: expected},
+		PaymentReadiness: paypb.PaymentReadinessView{Status: paypb.PaymentReadinessReadyToPay},
+		FundingTarget:    paypb.FundingTargetView{AssetID: req.PaymentCoin, Amount: expected},
+		PaymentProgress:  paypb.PaymentProgressView{RequiredAmount: expected},
 	}
 	require.NoError(t, validateDealPaymentSession(open, req, quote, session))
 }

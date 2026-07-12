@@ -99,6 +99,14 @@ func validateDealPaymentSession(
 	if session == nil {
 		return fmt.Errorf("%w: payment session is nil", ErrDealPaymentAmountIntegrity)
 	}
+	// Settlement authorization is asynchronous. While the buyer is waiting for
+	// the seller receipt, the readiness gate deliberately strips the actionable
+	// target (including PaymentCoin-derived address data). Validate the immutable
+	// quote before starting the ceremony, then defer projection equality checks
+	// until the session is ready to pay.
+	if session.PaymentReadiness.Status == paypb.PaymentReadinessAwaitingSellerReceipt {
+		return nil
+	}
 
 	expectedAmount := orderOpen.GetAmount()
 	if selectionQuote != nil {

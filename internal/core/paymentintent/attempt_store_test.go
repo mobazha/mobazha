@@ -19,6 +19,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/identity"
 	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/payment"
 )
 
 type settlementKeyOfferSignerStub struct {
@@ -258,6 +259,37 @@ func TestCreateCryptoPaymentAttemptDraft_ReusesDurableContextOnRetry(t *testing.
 	require.NoError(t, err)
 	require.Equal(t, first.AuthorizationContextID, retry.AuthorizationContextID)
 	require.Equal(t, models.PaymentAttemptAuthorizationDraft, retry.State)
+}
+
+func TestPrepareCryptoPaymentAttemptDraft_BindsAuthorizedRouteIdempotently(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-prepare-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
+	route := payment.RouteIdentity{
+		ContributionID: "managed-evm.eip155-1", ModuleID: "managed-evm",
+		ImplementationGeneration: "v1", RailKind: "escrow", NetworkID: "eip155:1",
+		AssetID: "crypto:eip155:1:native", ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	request := CryptoPaymentAttemptDraftRequest{
+		TenantID: "tenant-a", AttemptID: "attempt-route-1", OrderID: "order-route-1",
+		AmountAtomic: "1000", RailID: route.AssetID,
+	}
+
+	first, firstBinding, err := PrepareCryptoPaymentAttemptDraft(db, request, route)
+	require.NoError(t, err)
+	retry, retryBinding, err := PrepareCryptoPaymentAttemptDraft(db, request, route)
+	require.NoError(t, err)
+	require.Equal(t, models.PaymentAttemptAuthorizationDraft, first.State)
+	require.Equal(t, first.AuthorizationContextID, retry.AuthorizationContextID)
+	require.Equal(t, firstBinding.RouteBindingID, retryBinding.RouteBindingID)
+	require.Equal(t, route.ContributionID, firstBinding.ContributionID)
+	require.Equal(t, route.ImplementationGeneration, firstBinding.ImplementationGeneration)
+	require.Len(t, firstBinding.RouteBindingID, 64)
+
+	mismatched := route
+	mismatched.AssetID = "crypto:eip155:56:native"
+	_, _, err = PrepareCryptoPaymentAttemptDraft(db, request, mismatched)
+	require.ErrorContains(t, err, "route asset does not match rail")
 }
 
 func TestStoreCryptoPaymentAttemptSettlementKeyOffer_RetainsVerifiedDraftOffers(t *testing.T) {

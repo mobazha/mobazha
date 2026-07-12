@@ -4,8 +4,10 @@ package distribution
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
@@ -123,6 +125,30 @@ func (m *TrustedPaymentModuleManager) DecidePaymentCapability(
 		Code:     PaymentCapabilityAllowed,
 		ModuleID: contribution.ModuleID, ContributionID: contribution.ContributionID,
 	}
+}
+
+// ResolveAllowedPaymentRouteIdentity converts the exact contribution selected
+// by an allowed tenant capability decision into durable route identity. It
+// rechecks current module readiness and contribution ownership so callers
+// cannot turn a denied, stale, or fabricated decision into persisted work.
+func (m *TrustedPaymentModuleManager) ResolveAllowedPaymentRouteIdentity(
+	request PaymentCapabilityRequest,
+	decision PaymentCapabilityDecision,
+) (payment.RouteIdentity, error) {
+	if m == nil || !validPaymentCapabilityRequest(request) || !decision.Allowed() {
+		return payment.RouteIdentity{}, fmt.Errorf("payment route identity requires an allowed capability decision")
+	}
+	health, contribution, matched, ambiguous := selectPaymentCapabilityContribution(m.Health(), request)
+	if ambiguous || !matched {
+		return payment.RouteIdentity{}, fmt.Errorf("payment route identity contribution is unavailable or ambiguous")
+	}
+	if !health.Active || health.State != PaymentModuleReady {
+		return payment.RouteIdentity{}, fmt.Errorf("payment route identity implementation is not ready")
+	}
+	if decision.ModuleID != contribution.ModuleID || decision.ContributionID != contribution.ContributionID {
+		return payment.RouteIdentity{}, fmt.Errorf("payment route identity does not match capability decision")
+	}
+	return BuildPaymentRouteIdentity(health.Descriptor, contribution, request.Asset)
 }
 
 func validPaymentCapabilityRequest(request PaymentCapabilityRequest) bool {

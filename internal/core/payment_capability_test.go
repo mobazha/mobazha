@@ -40,6 +40,14 @@ func TestMobazhaNodeDecidePaymentCapability_AllowsEscrowFromSignedSellerTerms(t 
 		Asset: native, Operation: distribution.PaymentOperationSetup,
 	})
 	assert.True(t, nativeDecision.Allowed())
+	nativeRoute, err := node.ResolveNewPaymentRouteIdentity(context.Background(), distribution.PaymentCapabilityRequest{
+		Rail: distribution.PaymentRailEscrow, Network: iwallet.ChainBSC,
+		Asset: native, Operation: distribution.PaymentOperationSetup,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, nativeDecision.ModuleID, nativeRoute.ModuleID)
+	assert.Equal(t, nativeDecision.ContributionID, nativeRoute.ContributionID)
+	assert.Equal(t, string(native), nativeRoute.AssetID)
 
 	tokenDecision := node.DecidePaymentCapability(context.Background(), distribution.PaymentCapabilityRequest{
 		Rail: distribution.PaymentRailEscrow, Network: iwallet.ChainBSC,

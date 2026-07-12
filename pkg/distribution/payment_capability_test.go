@@ -67,6 +67,28 @@ func TestDecidePaymentCapability_AllowsOnlyDerivedIntersection(t *testing.T) {
 	assert.NotEmpty(t, decision.ContributionID)
 }
 
+func TestResolveAllowedPaymentRouteIdentity_BindsCapabilityContribution(t *testing.T) {
+	manager := readyPaymentCapabilityManager(t)
+	request := directCapabilityRequest()
+	decision := manager.DecidePaymentCapability(
+		context.Background(), "tenant-a", request, allowTenantCapabilityResolver(),
+	)
+	require.True(t, decision.Allowed())
+
+	route, err := manager.ResolveAllowedPaymentRouteIdentity(request, decision)
+	require.NoError(t, err)
+	assert.Equal(t, decision.ModuleID, route.ModuleID)
+	assert.Equal(t, decision.ContributionID, route.ContributionID)
+	assert.Equal(t, string(request.Network), route.NetworkID)
+	assert.Equal(t, string(request.Asset), route.AssetID)
+	require.NoError(t, route.Validate())
+
+	fabricated := decision
+	fabricated.ContributionID = "different"
+	_, err = manager.ResolveAllowedPaymentRouteIdentity(request, fabricated)
+	require.ErrorContains(t, err, "does not match capability decision")
+}
+
 func TestDecidePaymentCapability_FailsClosedWithoutTenantGate(t *testing.T) {
 	decision := readyPaymentCapabilityManager(t).DecidePaymentCapability(
 		context.Background(), "tenant-a", directCapabilityRequest(), nil,

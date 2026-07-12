@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/distribution"
+	"github.com/mobazha/mobazha/pkg/payment"
 	"gorm.io/gorm"
 )
 
@@ -24,6 +26,26 @@ func (n *MobazhaNode) DecidePaymentCapability(
 	return n.paymentModuleManager.DecidePaymentCapability(
 		ctx, n.nodeID, request, nodePaymentTenantCapabilityResolver{node: n},
 	)
+}
+
+// ResolveNewPaymentRouteIdentity admits one exact new-work request and returns
+// the immutable module route that must be persisted with the attempt.
+func (n *MobazhaNode) ResolveNewPaymentRouteIdentity(
+	ctx context.Context,
+	request distribution.PaymentCapabilityRequest,
+) (payment.RouteIdentity, error) {
+	if n == nil || n.paymentModuleManager == nil {
+		return payment.RouteIdentity{}, fmt.Errorf("%w: payment route manager is unavailable", contracts.ErrCoinUnavailable)
+	}
+	decision := n.DecidePaymentCapability(ctx, request)
+	if !decision.Allowed() {
+		return payment.RouteIdentity{}, fmt.Errorf("%w: payment capability denied (%s)", contracts.ErrCoinUnavailable, decision.Code)
+	}
+	route, err := n.paymentModuleManager.ResolveAllowedPaymentRouteIdentity(request, decision)
+	if err != nil {
+		return payment.RouteIdentity{}, fmt.Errorf("resolve payment route identity: %w", err)
+	}
+	return route, nil
 }
 
 type nodePaymentTenantCapabilityResolver struct {

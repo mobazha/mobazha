@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -452,10 +453,25 @@ func (n *MobazhaNode) AdoptStandardOrderSettlementAuthorization(
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("standard order settlement adoption requires matching order authorization")
 	}
 	var order models.Order
-	if err := n.db.View(func(tx database.Tx) error {
+	loadOrderErr := n.db.View(func(tx database.Tx) error {
 		return tx.Read().Where("id = ?", orderID).First(&order).Error
-	}); err != nil {
-		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load buyer order for settlement adoption: %w", err)
+	})
+	if loadOrderErr != nil {
+		if !errors.Is(loadOrderErr, gorm.ErrRecordNotFound) || n.signer.PeerID().String() != authorization.Terms.ModeratorPeerID {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load participant order for settlement adoption: %w", loadOrderErr)
+		}
+		var draft models.PaymentAttempt
+		if err := n.db.View(func(tx database.Tx) error {
+			return tx.Read().Where(
+				"order_id = ? AND attempt_id = ?", orderID, authorization.Terms.AttemptID,
+			).First(&draft).Error
+		}); err != nil {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load moderator settlement authorization draft: %w", err)
+		}
+		order = models.Order{
+			TenantMixin: models.TenantMixin{TenantID: draft.TenantID},
+			ID:          models.OrderID(orderID),
+		}
 	}
 	rawProvider, ok := n.db.(rawSettlementAuthorizationDB)
 	if !ok || rawProvider.RawDB() == nil {
@@ -535,28 +551,30 @@ func adoptBuyerSettlementAuthorization(
 	if db == nil || order == nil || identitySigner == nil || targetProjector == nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("buyer settlement adoption dependencies are required")
 	}
-	if order.Role() != models.RoleBuyer {
-		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("settlement adoption requires the local buyer order")
-	}
 	if err := authorization.Validate(); err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
-	orderOpen, err := order.OrderOpenMessage()
-	if err != nil {
-		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load signed order for settlement adoption: %w", err)
-	}
-	buyerPeerID, sellerPeerID, err := standardOrderSettlementParticipants(orderOpen)
-	if err != nil {
-		return StandardOrderSettlementAuthorizationFinalization{}, err
-	}
-	if identitySigner.PeerID().String() != buyerPeerID || authorization.Terms.BuyerPeerID != buyerPeerID ||
-		authorization.Terms.SellerPeerID != sellerPeerID {
-		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("settlement authorization participants do not match signed order")
-	}
-	paymentCurrency, err := iwallet.CoinType(authorization.Terms.AssetID).PricingCurrencyCode()
-	if err != nil || !strings.EqualFold(strings.TrimSpace(paymentCurrency), strings.TrimSpace(orderOpen.PricingCoin)) ||
-		authorization.Terms.FundingAmount != strings.TrimSpace(orderOpen.Amount) {
-		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("buyer settlement adoption requires same-currency signed order amount")
+	localPeerID := identitySigner.PeerID().String()
+	if order.Role() == models.RoleBuyer {
+		orderOpen, err := order.OrderOpenMessage()
+		if err != nil {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load signed order for settlement adoption: %w", err)
+		}
+		buyerPeerID, sellerPeerID, err := standardOrderSettlementParticipants(orderOpen)
+		if err != nil {
+			return StandardOrderSettlementAuthorizationFinalization{}, err
+		}
+		if localPeerID != buyerPeerID || authorization.Terms.BuyerPeerID != buyerPeerID ||
+			authorization.Terms.SellerPeerID != sellerPeerID {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("settlement authorization participants do not match signed order")
+		}
+		paymentCurrency, err := iwallet.CoinType(authorization.Terms.AssetID).PricingCurrencyCode()
+		if err != nil || !strings.EqualFold(strings.TrimSpace(paymentCurrency), strings.TrimSpace(orderOpen.PricingCoin)) ||
+			authorization.Terms.FundingAmount != strings.TrimSpace(orderOpen.Amount) {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("buyer settlement adoption requires same-currency signed order amount")
+		}
+	} else if localPeerID == "" || localPeerID != authorization.Terms.ModeratorPeerID {
+		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("settlement adoption requires the local buyer or moderator")
 	}
 	tenantID := strings.TrimSpace(order.TenantID)
 	var attempt models.PaymentAttempt

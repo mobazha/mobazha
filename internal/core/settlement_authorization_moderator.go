@@ -168,49 +168,70 @@ func (n *MobazhaNode) adoptModeratorSettlementAuthorization(
 	if err := authorization.Validate(); err != nil {
 		return err
 	}
-	if n == nil || n.db == nil || n.multiwallet == nil || authorization.Terms.ModeratorPeerID != n.Identity().String() {
+	if n == nil || n.db == nil || n.signer == nil || authorization.Terms.ModeratorPeerID != n.Identity().String() {
 		return fmt.Errorf("moderator settlement adoption is not configured for selected moderator")
 	}
 	rawProvider, ok := n.db.(rawSettlementAuthorizationDB)
 	if !ok || rawProvider.RawDB() == nil {
 		return fmt.Errorf("moderator settlement adoption database is unavailable")
 	}
-	db := rawProvider.RawDB()
 	tenantID := strings.TrimSpace(n.nodeID)
+	targetProjector, err := n.standardOrderFundingTargetProjectorForRail(authorization.Terms.AssetID)
+	if err != nil {
+		return err
+	}
+	finalization, err := adoptModeratorSettlementAuthorizationSnapshot(
+		ctx, rawProvider.RawDB(), tenantID, targetProjector, authorization,
+	)
+	if err != nil {
+		return err
+	}
+	return n.activateFrozenStandardOrderSettlementAttempt(ctx, finalization)
+}
+
+func adoptModeratorSettlementAuthorizationSnapshot(
+	ctx context.Context,
+	db *gorm.DB,
+	tenantID string,
+	targetProjector standardOrderFundingTargetProjector,
+	authorization models.PaymentAttemptSettlementAuthorization,
+) (StandardOrderSettlementAuthorizationFinalization, error) {
+	if db == nil || strings.TrimSpace(tenantID) == "" || targetProjector == nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("moderator settlement adoption dependencies are required")
+	}
 	var attempt models.PaymentAttempt
 	if err := db.Where("tenant_id = ? AND attempt_id = ?", tenantID, authorization.Terms.AttemptID).First(&attempt).Error; err != nil {
-		return fmt.Errorf("load moderator settlement draft: %w", err)
+		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load moderator settlement draft: %w", err)
 	}
 	var route models.PaymentRouteBinding
 	if err := db.Where("tenant_id = ? AND route_binding_id = ?", tenantID, attempt.RouteBindingID).First(&route).Error; err != nil {
-		return fmt.Errorf("load moderator settlement route: %w", err)
+		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load moderator settlement route: %w", err)
 	}
 	if attempt.State == models.PaymentAttemptFundingTargetReady {
-		_, err := loadMatchingFrozenSettlementFinalization(attempt, route, authorization)
-		return err
+		return loadMatchingFrozenSettlementFinalization(attempt, route, authorization)
 	}
 	if attempt.State != models.PaymentAttemptAuthorizationDraft || attempt.OrderID != authorization.Terms.OrderID ||
 		attempt.ExpectedModeratorPeerID != authorization.Terms.ModeratorPeerID ||
 		attempt.AuthorizationContextID != authorization.Authorization.AuthorizationContextID ||
 		attempt.Currency != authorization.Terms.AssetID || attempt.AmountValue != authorization.Terms.FundingAmount ||
 		route.RouteBindingID != authorization.Terms.RouteBindingID {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+		return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	offers, err := paymentintent.ListCryptoPaymentAttemptSettlementKeyOffers(db, tenantID, attempt.AttemptID)
 	if err != nil {
-		return err
+		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
-	projected, err := (standardOrderUTXOFundingTargetProjector{wallets: n.multiwallet}).ProjectStandardOrderFundingTarget(ctx, attempt, route, offers)
+	projected, err := targetProjector.ProjectStandardOrderFundingTarget(ctx, attempt, route, offers)
 	if err != nil {
-		return err
+		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
 	projectedBytes, _, err := projected.CanonicalBytesAndHash()
 	if err != nil {
-		return err
+		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
 	receivedTargetBytes, _, err := authorization.Target.CanonicalBytesAndHash()
 	if err != nil || !bytes.Equal(projectedBytes, receivedTargetBytes) {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+		return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	localBundle, err := paymentintent.BuildCryptoPaymentAttemptAuthorizationBundle(
 		db, tenantID, attempt.AttemptID, authorization.Terms,
@@ -219,15 +240,15 @@ func (n *MobazhaNode) adoptModeratorSettlementAuthorization(
 		authorization.Target,
 	)
 	if err != nil {
-		return err
+		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
 	localBytes, _, err := localBundle.CanonicalBytesAndHash()
 	if err != nil {
-		return err
+		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
 	receivedBytes, _, err := authorization.Authorization.CanonicalBytesAndHash()
 	if err != nil || !bytes.Equal(localBytes, receivedBytes) {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+		return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	if err := paymentintent.FreezeCryptoPaymentAttempt(
 		db, attempt, route, authorization.Terms,
@@ -235,9 +256,16 @@ func (n *MobazhaNode) adoptModeratorSettlementAuthorization(
 		authorization.Authorization.SellerTermsSignature,
 		authorization.Authorization, authorization.Target,
 	); err != nil {
-		return err
+		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
-	return n.watchFrozenStandardOrderUTXOAttempt(ctx, tenantID, attempt.AttemptID)
+	if err := db.Where("tenant_id = ? AND attempt_id = ?", tenantID, attempt.AttemptID).First(&attempt).Error; err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("reload frozen moderator settlement attempt: %w", err)
+	}
+	return StandardOrderSettlementAuthorizationFinalization{
+		Attempt: attempt, Route: route, Terms: authorization.Terms, Target: authorization.Target,
+		Authorization: authorization.Authorization, SettlementAuthorization: authorization,
+		SellerSignature: append([]byte(nil), authorization.Authorization.SellerTermsSignature...),
+	}, nil
 }
 
 func verifyDetachedOrderMessage(message *npb.OrderMessage) error {

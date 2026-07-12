@@ -205,6 +205,26 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	require.NotNil(t, payout)
 	assert.Equal(t, payoutAddress, payout.Address)
 	assert.Equal(t, "125", payout.Amount)
+	hasTerms, err := service.HasSettlementTerms(ctx, "order-frozen-payout")
+	require.NoError(t, err)
+	assert.True(t, hasTerms)
+	hasTerms, err = service.HasSettlementTerms(ctx, "order-without-affiliate")
+	require.NoError(t, err)
+	assert.False(t, hasTerms)
+	zeroResult, err := service.AttributeOrder(ctx, models.AffiliateOrderFacts{
+		OrderID: "order-zero-commission", SellerPeerID: sellerPeerID, BuyerPeerID: buyerPeerID,
+		ReferralSessionID: session.ID, AttributedAt: issuedAt.Add(2 * time.Minute),
+		Lines: []models.AffiliateOrderLineFact{{OrderLineID: "order-zero-commission:0", NetMerchandiseAtomic: "1", Currency: "USDT"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, zeroResult)
+	assert.Equal(t, "0", zeroResult.Lines[0].CommissionAtomic)
+	zeroPayout, err := service.SettlementPayout(ctx, "order-zero-commission", "USDT")
+	require.NoError(t, err)
+	assert.Nil(t, zeroPayout)
+	hasTerms, err = service.HasSettlementTerms(ctx, "order-zero-commission")
+	require.NoError(t, err)
+	assert.True(t, hasTerms)
 	_, err = service.SettlementPayout(ctx, "order-frozen-payout", "ETH")
 	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
 

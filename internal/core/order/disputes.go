@@ -666,7 +666,11 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 	if err := requireInterimAffiliateDisputePayout(orderOpen, &moderatedEscrowRelease, affiliatePayout); err != nil {
 		return fmt.Errorf("seller-signed dispute affiliate payout is required: %w", err)
 	}
-	buildAffiliatePayout := affiliatePayout
+	executionPayout, err := executableAffiliatePayout(affiliatePayout)
+	if err != nil {
+		return fmt.Errorf("validate seller-signed dispute affiliate payout: %w", err)
+	}
+	buildAffiliatePayout := executionPayout
 	if coinInfo, coinErr := iwallet.CoinInfoFromCoinType(coinType); coinErr != nil || !coinInfo.Chain.IsUTXOChain() {
 		buildAffiliatePayout = nil
 	}
@@ -687,7 +691,7 @@ func (s *OrderAppService) CloseDispute(orderID models.OrderID, buyerPercentage, 
 		Script:          paymentSent.Script,
 		OrderData:       orderData,
 		ReleaseInfo:     &moderatedEscrowRelease,
-		AffiliatePayout: affiliatePayout,
+		AffiliatePayout: executionPayout,
 	}); handled {
 		if err != nil {
 			return fmt.Errorf("failed to sign settlement dispute release action: %w", err)
@@ -987,7 +991,11 @@ func (s *OrderAppService) ReleaseFunds(orderID models.OrderID, txid iwallet.Tran
 	if err := requireInterimAffiliateDisputePayout(orderOpen, disputeClose.ReleaseInfo, affiliatePayout); err != nil {
 		return fmt.Errorf("seller-signed dispute affiliate payout is required: %w", err)
 	}
-	releaseTx, err := s.BuildDisputeReleaseTransaction(disputeClose.ReleaseInfo, paymentSent, affiliatePayout)
+	executionPayout, err := executableAffiliatePayout(affiliatePayout)
+	if err != nil {
+		return fmt.Errorf("validate seller-signed dispute affiliate payout: %w", err)
+	}
+	releaseTx, err := s.BuildDisputeReleaseTransaction(disputeClose.ReleaseInfo, paymentSent, executionPayout)
 	if err != nil {
 		return fmt.Errorf("build dispute release tx: %w", err)
 	}

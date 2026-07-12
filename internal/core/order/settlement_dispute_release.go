@@ -111,13 +111,6 @@ func (s *OrderAppService) runMonitoredSettlementDisputeRelease(
 	if err != nil {
 		return nil, nil, true, err
 	}
-	if spec.UsesUTXOScript() {
-		return s.runUTXOSyncSettlementDisputeRelease(order, coinType, paymentSent, releaseInfo)
-	}
-	if !ordersettlement.EscrowUsesRelayRelease(spec) {
-		return nil, nil, false, nil
-	}
-
 	release := ordersettlement.CloneDisputeRelease(releaseInfo)
 	if release == nil {
 		return nil, nil, true, fmt.Errorf("settlement dispute release info is nil")
@@ -126,7 +119,7 @@ func (s *OrderAppService) runMonitoredSettlementDisputeRelease(
 	if err != nil && !models.IsMessageNotExistError(err) {
 		return nil, nil, true, fmt.Errorf("read seller-signed shipment release: %w", err)
 	}
-	affiliatePayout, err := affiliatePayoutFromDisputeRelease(shipments, release)
+	affiliatePayout, err := affiliatePayoutForDisputeSettlement(coinType, shipments, release)
 	if err != nil {
 		return nil, nil, true, fmt.Errorf("read seller-signed dispute affiliate payout: %w", err)
 	}
@@ -137,6 +130,16 @@ func (s *OrderAppService) runMonitoredSettlementDisputeRelease(
 	if err := requireInterimAffiliateDisputePayout(orderOpen, release, affiliatePayout); err != nil {
 		return nil, nil, true, fmt.Errorf("seller-signed dispute affiliate payout is required: %w", err)
 	}
+	executionPayout, err := executableAffiliatePayout(affiliatePayout)
+	if err != nil {
+		return nil, nil, true, fmt.Errorf("validate seller-signed dispute affiliate payout: %w", err)
+	}
+	if spec.UsesUTXOScript() {
+		return s.runUTXOSyncSettlementDisputeRelease(order, coinType, paymentSent, release, executionPayout)
+	}
+	if !ordersettlement.EscrowUsesRelayRelease(spec) {
+		return nil, nil, false, nil
+	}
 
 	result, err := strategy.DisputeRelease(ctx, payment.ActionParams{
 		OrderID:         order.ID.String(),
@@ -146,7 +149,7 @@ func (s *OrderAppService) runMonitoredSettlementDisputeRelease(
 		Script:          paymentSent.Script,
 		OrderData:       order,
 		ReleaseInfo:     release,
-		AffiliatePayout: affiliatePayout,
+		AffiliatePayout: executionPayout,
 	})
 	if err != nil {
 		return nil, nil, true, err
@@ -165,6 +168,7 @@ func (s *OrderAppService) runUTXOSyncSettlementDisputeRelease(
 	coinType iwallet.CoinType,
 	paymentSent *pb.PaymentSent,
 	releaseInfo *pb.DisputeClose_ModeratedEscrowRelease,
+	affiliatePayout *models.AffiliateSettlementPayout,
 ) (*payment.ActionResult, *iwallet.Transaction, bool, error) {
 	orderID := order.ID.String()
 	actionID, existingTxHash, err := s.beginSyncBackendSettlementAction(
@@ -182,7 +186,7 @@ func (s *OrderAppService) runUTXOSyncSettlementDisputeRelease(
 		}, tx, true, nil
 	}
 
-	releaseTx, err := s.BuildDisputeReleaseTransaction(releaseInfo, paymentSent)
+	releaseTx, err := s.BuildDisputeReleaseTransaction(releaseInfo, paymentSent, affiliatePayout)
 	if err != nil {
 		s.failSyncBackendSettlementAction(actionID, err.Error())
 		return nil, nil, true, err

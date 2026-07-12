@@ -17,11 +17,12 @@ import (
 )
 
 type recordingSellerAffiliateService struct {
-	attribution *models.AffiliateAttribution
-	payout      *models.AffiliateSettlementPayout
-	facts       []models.AffiliateOrderFacts
-	status      models.AffiliateCommissionStatus
-	reason      models.AffiliateCommissionReversalReason
+	attribution  *models.AffiliateAttribution
+	payout       *models.AffiliateSettlementPayout
+	termsPresent bool
+	facts        []models.AffiliateOrderFacts
+	status       models.AffiliateCommissionStatus
+	reason       models.AffiliateCommissionReversalReason
 }
 
 func (*recordingSellerAffiliateService) PutProgram(context.Context, *models.AffiliateProgram) (*models.AffiliateProgram, error) {
@@ -85,6 +86,9 @@ func (*recordingSellerAffiliateService) ListPendingCommissionOrderIDs(context.Co
 }
 func (s *recordingSellerAffiliateService) SettlementPayout(context.Context, string, string) (*models.AffiliateSettlementPayout, error) {
 	return s.payout, nil
+}
+func (s *recordingSellerAffiliateService) HasSettlementTerms(context.Context, string) (bool, error) {
+	return s.termsPresent, nil
 }
 
 func TestReconcileSellerAffiliateOrder_DerivesPendingCommissionFromSignedOrder(t *testing.T) {

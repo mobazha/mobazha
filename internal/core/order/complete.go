@@ -538,9 +538,13 @@ func (s *OrderAppService) executeUTXOSyncModeratedCompleteRelease(order *models.
 	if err := requireInterimAffiliatePayout(orderOpen, affiliatePayout); err != nil {
 		return nil, nil, fmt.Errorf("seller-signed affiliate UTXO payout is required: %w", err)
 	}
-	if affiliatePayout != nil {
-		available := iwallet.NewAmount(releaseInfo.ToAmount).Add(iwallet.NewAmount(affiliatePayout.Amount))
-		spend, err := affiliateUTXOSpend(wallet, coinType, affiliatePayout, available)
+	executionPayout, err := executableAffiliatePayout(affiliatePayout)
+	if err != nil {
+		return nil, nil, fmt.Errorf("validate seller-signed affiliate UTXO payout: %w", err)
+	}
+	if executionPayout != nil {
+		available := iwallet.NewAmount(releaseInfo.ToAmount).Add(iwallet.NewAmount(executionPayout.Amount))
+		spend, err := affiliateUTXOSpend(wallet, coinType, executionPayout, available)
 		if err != nil {
 			return nil, nil, err
 		}

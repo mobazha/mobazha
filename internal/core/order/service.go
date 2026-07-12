@@ -2006,10 +2006,17 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	}
 	usesBalanceEscrow := releaseUsesBalanceEscrow(order, paymentSent, strategyV2)
 	var affiliatePayout *models.AffiliateSettlementPayout
+	var affiliateTermsPresent bool
 	if includeAffiliate {
 		affiliatePayout, err = s.sellerAffiliateSettlementPayout(context.Background(), order.ID, coinType)
 		if err != nil {
 			return nil, fmt.Errorf("resolve affiliate settlement payout: %w", err)
+		}
+		if affiliatePayout == nil {
+			affiliateTermsPresent, err = s.sellerAffiliateSettlementTermsPresent(context.Background(), order.ID)
+			if err != nil {
+				return nil, fmt.Errorf("resolve affiliate settlement terms: %w", err)
+			}
 		}
 	}
 
@@ -2074,6 +2081,10 @@ func (s *OrderAppService) buildEscrowRelease(order *models.Order, wallet iwallet
 	if affiliatePayout != nil {
 		release.AffiliateAddress = affiliatePayout.Address
 		release.AffiliateAmount = affiliatePayout.Amount
+	} else if affiliateTermsPresent {
+		// An explicit zero is seller-signed evidence that affiliate terms exist
+		// but round to no executable output. Empty remains "terms missing".
+		release.AffiliateAmount = "0"
 	}
 	if settlementSigs, handled, err := s.signSettlementActionRelease(context.Background(), coinType, "complete", payment.ActionParams{
 		OrderID:         order.ID.String(),

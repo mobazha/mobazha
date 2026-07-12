@@ -570,6 +570,30 @@ func (s *SellerAffiliateAppService) SettlementPayout(ctx context.Context, orderI
 	return &models.AffiliateSettlementPayout{Address: address, Amount: amount.String()}, nil
 }
 
+// HasSettlementTerms reports whether immutable affiliate attribution exists
+// for an order. A true result with a nil SettlementPayout means the frozen
+// commission legitimately rounds to zero atomic units.
+func (s *SellerAffiliateAppService) HasSettlementTerms(ctx context.Context, orderID string) (bool, error) {
+	if s == nil || s.store == nil {
+		return false, errors.New("seller affiliate store not configured")
+	}
+	orderID = strings.TrimSpace(orderID)
+	if orderID == "" {
+		return false, models.ErrInvalidSellerAffiliate
+	}
+	attribution, err := s.store.GetAffiliateAttributionByOrder(ctx, orderID)
+	if errors.Is(err, models.ErrSellerAffiliateNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if attribution == nil {
+		return false, models.ErrInvalidSellerAffiliate
+	}
+	return true, nil
+}
+
 func sameAffiliateSettlementCoin(lineCurrency, settlementCoin string) bool {
 	lineCurrency = strings.TrimSpace(lineCurrency)
 	settlementCoin = strings.TrimSpace(settlementCoin)

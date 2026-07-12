@@ -32,6 +32,17 @@ func TestAffiliatePayoutFromEscrowRelease_RejectsIncompleteTerms(t *testing.T) {
 	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
 }
 
+func TestAffiliatePayoutFromEscrowRelease_AcceptsExplicitZeroTerms(t *testing.T) {
+	payout, err := affiliatePayoutFromEscrowRelease(&pb.EscrowRelease{AffiliateAmount: "0"})
+	require.NoError(t, err)
+	require.NotNil(t, payout)
+	require.Equal(t, "0", payout.Amount)
+
+	executionPayout, err := executableAffiliatePayout(payout)
+	require.NoError(t, err)
+	require.Nil(t, executionPayout)
+}
+
 func TestAffiliatePayoutFromDisputeRelease_ScalesSellerSignedTerms(t *testing.T) {
 	payout, err := affiliatePayoutFromDisputeRelease([]*pb.OrderShipment{{
 		ReleaseInfo: &pb.EscrowRelease{
@@ -82,6 +93,33 @@ func TestAffiliatePayoutForDisputeSettlement_UsesUTXOGrossSellerRatio(t *testing
 	require.NotNil(t, payout)
 	require.Equal(t, "bitcoincash:qaffiliate", payout.Address)
 	require.Equal(t, "8", payout.Amount)
+}
+
+func TestAffiliatePayoutForDisputeSettlement_UTXORetainsTermsWhenScaledToZero(t *testing.T) {
+	coinType, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBitcoinCash)
+	require.NoError(t, err)
+	payout, err := affiliatePayoutForDisputeSettlement(coinType, []*pb.OrderShipment{{
+		ReleaseInfo: &pb.EscrowRelease{
+			ToAddress:        "bitcoincash:qvendor",
+			ToAmount:         "999",
+			AffiliateAddress: "bitcoincash:qaffiliate",
+			AffiliateAmount:  "1",
+		},
+	}}, &pb.DisputeClose_ModeratedEscrowRelease{
+		VendorAddress: "bitcoincash:qvendor",
+		VendorAmount:  "1",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, payout)
+	require.Equal(t, "0", payout.Amount)
+	require.NoError(t, requireInterimAffiliateDisputePayout(
+		&pb.OrderOpen{AffiliateReferralSessionID: "referral-session"},
+		&pb.DisputeClose_ModeratedEscrowRelease{VendorAmount: "1"},
+		payout,
+	))
+	executionPayout, err := executableAffiliatePayout(payout)
+	require.NoError(t, err)
+	require.Nil(t, executionPayout)
 }
 
 func TestRequiresInterimAffiliateDisputeTerms(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/internal/orders"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -113,6 +114,17 @@ func (s *OrderAppService) sellerAffiliateSettlementPayout(ctx context.Context, o
 		return nil, nil
 	}
 	return s.sellerAffiliate.SettlementPayout(ctx, orderID.String(), string(coinType))
+}
+
+func (s *OrderAppService) sellerAffiliateSettlementTermsPresent(ctx context.Context, orderID models.OrderID) (bool, error) {
+	if s == nil || s.sellerAffiliate == nil {
+		return false, nil
+	}
+	provider, ok := s.sellerAffiliate.(contracts.SellerAffiliateSettlementTermsProvider)
+	if !ok {
+		return false, nil
+	}
+	return provider.HasSettlementTerms(ctx, orderID.String())
 }
 
 func (s *OrderAppService) sellerAffiliateOrderFacts(orderID models.OrderID, orderOpen *pb.OrderOpen, referralSessionID string) (models.AffiliateOrderFacts, error) {

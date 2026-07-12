@@ -26,6 +26,9 @@ func affiliatePayoutFromEscrowRelease(release *pb.EscrowRelease) (*models.Affili
 	if address == "" && amount == "" {
 		return nil, nil
 	}
+	if address == "" && amount == "0" {
+		return &models.AffiliateSettlementPayout{Amount: "0"}, nil
+	}
 	if address == "" || amount == "" || !common.IsHexAddress(address) {
 		return nil, models.ErrInvalidSellerAffiliate
 	}
@@ -57,6 +60,9 @@ func affiliateUTXOPayoutFromEscrowRelease(release *pb.EscrowRelease) (*models.Af
 	amount := strings.TrimSpace(release.GetAffiliateAmount())
 	if address == "" && amount == "" {
 		return nil, nil
+	}
+	if address == "" && amount == "0" {
+		return &models.AffiliateSettlementPayout{Amount: "0"}, nil
 	}
 	if address == "" || amount == "" {
 		return nil, models.ErrInvalidSellerAffiliate
@@ -115,7 +121,7 @@ func affiliatePayoutFromDisputeRelease(
 		scaledAmount := new(big.Int).Mul(affiliateAmount, vendorAmount)
 		scaledAmount.Div(scaledAmount, originalSellerAmount)
 		if scaledAmount.Sign() == 0 {
-			return nil, nil
+			return &models.AffiliateSettlementPayout{Amount: "0"}, nil
 		}
 		return &models.AffiliateSettlementPayout{
 			Address: payout.Address,
@@ -211,9 +217,26 @@ func affiliateUTXOPayoutFromDisputeRelease(shipments []*pb.OrderShipment, releas
 		scaledAmount := new(big.Int).Mul(originalAffiliateAmount, vendorAmount)
 		scaledAmount.Div(scaledAmount, grossSellerAmount)
 		if scaledAmount.Sign() == 0 {
-			return nil, nil
+			return &models.AffiliateSettlementPayout{Amount: "0"}, nil
 		}
 		return &models.AffiliateSettlementPayout{Address: payout.Address, Amount: scaledAmount.String()}, nil
 	}
 	return nil, nil
+}
+
+func executableAffiliatePayout(payout *models.AffiliateSettlementPayout) (*models.AffiliateSettlementPayout, error) {
+	if payout == nil {
+		return nil, nil
+	}
+	amount, ok := new(big.Int).SetString(strings.TrimSpace(payout.Amount), 10)
+	if !ok || amount.Sign() < 0 {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	if amount.Sign() == 0 {
+		return nil, nil
+	}
+	if strings.TrimSpace(payout.Address) == "" {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	return payout, nil
 }

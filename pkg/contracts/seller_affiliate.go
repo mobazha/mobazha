@@ -34,6 +34,12 @@ type SellerAffiliateSettlementPayoutProvider interface {
 	SettlementPayout(ctx context.Context, orderID, settlementCoin string) (*models.AffiliateSettlementPayout, error)
 }
 
+// SellerAffiliateSettlementTermsProvider reports whether an order has frozen
+// affiliate terms even when the commission rounds to zero atomic units.
+type SellerAffiliateSettlementTermsProvider interface {
+	HasSettlementTerms(ctx context.Context, orderID string) (bool, error)
+}
+
 // AffiliateSettlementActionReader provides the immutable settlement-action
 // facts needed to project promoter outputs into affiliate statements.
 type AffiliateSettlementActionReader interface {

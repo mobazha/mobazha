@@ -848,18 +848,7 @@ func frozenStandardOrderAggregatedPaymentIntent(
 }
 
 func sameFrozenFundingTargetAddress(assetID, left, right string) bool {
-	left = strings.TrimSpace(left)
-	right = strings.TrimSpace(right)
-	if left == "" || right == "" {
-		return false
-	}
-	if strings.HasPrefix(strings.TrimSpace(assetID), "crypto:eip155:") {
-		return strings.EqualFold(left, right)
-	}
-	if strings.HasPrefix(strings.TrimSpace(assetID), "crypto:solana:") {
-		return left == right
-	}
-	return paymentmetrics.SameUTXOAddress(left, right)
+	return paymentmetrics.SameCryptoAddress(assetID, left, right)
 }
 
 func paymentSentConfirmationPolicy(order *models.Order) string {

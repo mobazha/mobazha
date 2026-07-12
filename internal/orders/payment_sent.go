@@ -57,7 +57,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	frozenAttempt, err := validateFrozenStandardOrderUTXOPaymentSent(dbtx, order, paymentSent)
+	frozenAttempt, err := validateFrozenStandardOrderPaymentSent(dbtx, order, paymentSent)
 	if err != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Failed to validate frozen payment sent message: %s", err)
 		return nil, err
@@ -119,7 +119,7 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 	}, nil
 }
 
-func validateFrozenStandardOrderUTXOPaymentSent(
+func validateFrozenStandardOrderPaymentSent(
 	dbtx database.Tx,
 	order *models.Order,
 	paymentSent *pb.PaymentSent,
@@ -164,8 +164,8 @@ func validateFrozenStandardOrderUTXOPaymentSent(
 		}
 		if target.AssetID != strings.TrimSpace(paymentSent.Coin) ||
 			target.AmountAtomic != strings.TrimSpace(paymentSent.Amount) ||
-			!payment.SameUTXOAddress(target.Address, paymentSent.ToAddress) ||
-			!strings.EqualFold(target.RedeemScriptHex, strings.TrimSpace(paymentSent.Script)) ||
+			!payment.SameCryptoAddress(target.AssetID, target.Address, paymentSent.ToAddress) ||
+			!frozenPaymentSentScriptMatches(target, paymentSent) ||
 			terms.AttemptID != target.AttemptID || bundle.AttemptID != target.AttemptID ||
 			!specOK || payment.MethodIsModerated(spec.Method) != moderated ||
 			strings.TrimSpace(paymentSent.Moderator) != strings.TrimSpace(terms.ModeratorPeerID) ||
@@ -182,6 +182,19 @@ func validateFrozenStandardOrderUTXOPaymentSent(
 		return false, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	return true, nil
+}
+
+func frozenPaymentSentScriptMatches(target *models.PaymentAttemptFundingTarget, paymentSent *pb.PaymentSent) bool {
+	if target == nil || paymentSent == nil {
+		return false
+	}
+	assetID := strings.TrimSpace(target.AssetID)
+	if strings.HasPrefix(assetID, "crypto:eip155:") || strings.HasPrefix(assetID, "crypto:solana:") {
+		// Managed-rail contract/program metadata is not a UTXO redeem script.
+		// The frozen target address and authorization bundle are authoritative.
+		return strings.TrimSpace(target.RedeemScriptHex) == ""
+	}
+	return strings.EqualFold(strings.TrimSpace(target.RedeemScriptHex), strings.TrimSpace(paymentSent.Script))
 }
 
 func isDuplicatePaymentSent(incoming *pb.PaymentSent, serialized []byte) (bool, *pb.PaymentSent, error) {

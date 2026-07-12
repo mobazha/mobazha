@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateFrozenStandardOrderUTXOPaymentSent_IsolatesTenantAttempts(t *testing.T) {
+func TestValidateFrozenStandardOrderPaymentSent_IsolatesTenantAttempts(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
@@ -47,7 +47,7 @@ func TestValidateFrozenStandardOrderUTXOPaymentSent_IsolatesTenantAttempts(t *te
 	var frozen bool
 	require.NoError(t, db.View(func(tx database.Tx) error {
 		var validateErr error
-		frozen, validateErr = validateFrozenStandardOrderUTXOPaymentSent(tx, order, paymentSent)
+		frozen, validateErr = validateFrozenStandardOrderPaymentSent(tx, order, paymentSent)
 		return validateErr
 	}))
 	require.False(t, frozen)
@@ -61,7 +61,30 @@ func TestValidateFrozenStandardOrderUTXOPaymentSent_IsolatesTenantAttempts(t *te
 		})
 	}))
 	require.ErrorIs(t, db.View(func(tx database.Tx) error {
-		_, validateErr := validateFrozenStandardOrderUTXOPaymentSent(tx, order, paymentSent)
+		_, validateErr := validateFrozenStandardOrderPaymentSent(tx, order, paymentSent)
 		return validateErr
 	}), models.ErrPaymentAttemptSettlementTermsConflict)
+}
+
+func TestFrozenPaymentSentScriptMatches_UsesRedeemScriptOnlyForUTXO(t *testing.T) {
+	require.True(t, frozenPaymentSentScriptMatches(
+		&models.PaymentAttemptFundingTarget{AssetID: "crypto:solana:mainnet:native"},
+		&pb.PaymentSent{Script: "configured-solana-program"},
+	))
+	require.True(t, frozenPaymentSentScriptMatches(
+		&models.PaymentAttemptFundingTarget{AssetID: "crypto:eip155:1:native"},
+		&pb.PaymentSent{Script: "configured-safe-factory"},
+	))
+	require.False(t, frozenPaymentSentScriptMatches(
+		&models.PaymentAttemptFundingTarget{AssetID: "crypto:solana:mainnet:native", RedeemScriptHex: "unexpected"},
+		&pb.PaymentSent{Script: "configured-solana-program"},
+	))
+	require.True(t, frozenPaymentSentScriptMatches(
+		&models.PaymentAttemptFundingTarget{AssetID: "crypto:bip122:000000000019d6689c085ae165831e93:native", RedeemScriptHex: "AABB"},
+		&pb.PaymentSent{Script: "aabb"},
+	))
+	require.False(t, frozenPaymentSentScriptMatches(
+		&models.PaymentAttemptFundingTarget{AssetID: "crypto:bip122:000000000019d6689c085ae165831e93:native", RedeemScriptHex: "AABB"},
+		&pb.PaymentSent{Script: "ccdd"},
+	))
 }

@@ -30,6 +30,7 @@ func signedSettlementAttempt(t *testing.T) (*PaymentAttempt, PaymentAttemptSettl
 	terms := validPaymentAttemptSettlementTerms()
 	terms.BuyerPeerID = buyerPeerID.String()
 	terms.SellerPeerID = sellerPeerID.String()
+	terms.Affiliate.BuyerPeerID = buyerPeerID.String()
 	terms.FundingTargetAddress = "0xescrow"
 	require.NoError(t, attempt.SetSettlementTerms(terms))
 	payload, err := terms.SellerSigningPayload()
@@ -144,5 +145,14 @@ func TestPaymentAttempt_GetFundingTargetRejectsTampering(t *testing.T) {
 	attempt.FundingTarget = append([]byte(nil), attempt.FundingTarget...)
 	attempt.FundingTarget[len(attempt.FundingTarget)-2] = 'x'
 	_, err := attempt.GetFundingTarget()
+	require.Error(t, err)
+}
+
+func TestPaymentAttempt_GetAuthorizationBundleRejectsWrongAttemptContext(t *testing.T) {
+	attempt, _ := signedSettlementAttempt(t)
+	otherContextID, err := NewSettlementAuthorizationContextID()
+	require.NoError(t, err)
+	attempt.AuthorizationContextID = otherContextID
+	_, err = attempt.GetAuthorizationBundle()
 	require.Error(t, err)
 }

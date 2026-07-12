@@ -91,6 +91,14 @@ func TestPaymentAttempt_GetSettlementTermsRejectsTampering(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestPaymentAttempt_GetSettlementTermsRejectsAnotherAttemptTerms(t *testing.T) {
+	attempt := PaymentAttempt{AttemptID: "attempt-1", OrderID: "order-1"}
+	require.NoError(t, attempt.SetSettlementTerms(validPaymentAttemptSettlementTerms()))
+	attempt.AttemptID = "attempt-2"
+	_, err := attempt.GetSettlementTerms()
+	require.ErrorIs(t, err, ErrPaymentAttemptSettlementTermsConflict)
+}
+
 func TestPaymentAttemptSettlementTerms_PersistRoundTrip(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:payment-attempt-terms-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)
@@ -115,6 +123,24 @@ func TestPaymentAttemptSettlementTerms_PersistRoundTrip(t *testing.T) {
 	require.Equal(t, validPaymentAttemptSettlementTerms(), *terms)
 }
 
+func TestPaymentAttempt_AuthorizationContextUniqueOnlyWhenPresent(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:payment-attempt-context-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&PaymentAttempt{}))
+
+	firstWithoutContext := PaymentAttempt{TenantID: "tenant-1", AttemptID: "attempt-1", IdempotencyKey: "idempotency-1"}
+	secondWithoutContext := PaymentAttempt{TenantID: "tenant-1", AttemptID: "attempt-2", IdempotencyKey: "idempotency-2"}
+	require.NoError(t, db.Create(&firstWithoutContext).Error)
+	require.NoError(t, db.Create(&secondWithoutContext).Error)
+
+	contextID, err := NewSettlementAuthorizationContextID()
+	require.NoError(t, err)
+	firstWithContext := PaymentAttempt{TenantID: "tenant-1", AttemptID: "attempt-3", IdempotencyKey: "idempotency-3", AuthorizationContextID: contextID}
+	secondWithContext := PaymentAttempt{TenantID: "tenant-1", AttemptID: "attempt-4", IdempotencyKey: "idempotency-4", AuthorizationContextID: contextID}
+	require.NoError(t, db.Create(&firstWithContext).Error)
+	require.Error(t, db.Create(&secondWithContext).Error)
+}
+
 func TestPaymentAttemptSettlementTerms_RejectsNonCanonicalOrUnsafeAmounts(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -126,6 +152,9 @@ func TestPaymentAttemptSettlementTerms_RejectsNonCanonicalOrUnsafeAmounts(t *tes
 		{name: "cancel fee consumes funding", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.BuyerCancellationFee.Amount = "1000" }},
 		{name: "affiliate line rate mismatch", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.Affiliate.Lines[0].CommissionAtomic = "99" }},
 		{name: "affiliate line basis mismatch", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.Affiliate.Lines[0].NetMerchandiseAtomic = "999" }},
+		{name: "buyer equals seller", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.BuyerPeerID = terms.SellerPeerID }},
+		{name: "moderator equals seller", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.ModeratorPeerID = terms.SellerPeerID }},
+		{name: "affiliate buyer mismatch", mutate: func(terms *PaymentAttemptSettlementTerms) { terms.Affiliate.BuyerPeerID = terms.SellerPeerID }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

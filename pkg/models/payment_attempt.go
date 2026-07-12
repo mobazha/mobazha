@@ -51,7 +51,7 @@ type PaymentAttempt struct {
 	FundingTargetHash string `gorm:"column:funding_target_hash;size:64;not null;default:'';index"`
 	// AuthorizationContextID is the non-secret, immutable key-locating input
 	// for attempt-scoped Settlement participant keys.
-	AuthorizationContextID  string `gorm:"column:authorization_context_id;size:64;not null;default:'';uniqueIndex:idx_payment_attempt_authorization_context,priority:2"`
+	AuthorizationContextID  string `gorm:"column:authorization_context_id;size:64;not null;default:'';uniqueIndex:idx_payment_attempt_authorization_context,priority:2,where:authorization_context_id <> ''"`
 	AuthorizationBundle     []byte `gorm:"column:authorization_bundle;type:text"`
 	AuthorizationBundleHash string `gorm:"column:authorization_bundle_hash;size:64;not null;default:'';index"`
 	// SettlementTerms is the canonical, immutable economic allocation owned by
@@ -87,37 +87,12 @@ func (a *PaymentAttempt) SetAuthorizationBundle(bundle PaymentAttemptAuthorizati
 	if a == nil || a.Kind != PaymentAttemptKindCryptoFundingTarget {
 		return fmt.Errorf("authorization bundles require a crypto payment attempt")
 	}
-	terms, err := a.GetSettlementTerms()
-	if err != nil {
-		return err
-	}
-	if terms == nil || a.AuthorizationContextID == "" || a.SellerTermsSigner == "" || len(a.SellerTermsSignature) == 0 {
-		return fmt.Errorf("authorization context, terms, and seller authorization are required before authorization bundle")
-	}
 	canonical, hash, err := bundle.CanonicalBytesAndHash()
 	if err != nil {
 		return err
 	}
-	if bundle.AuthorizationContextID != a.AuthorizationContextID || bundle.OrderID != a.OrderID ||
-		bundle.AttemptID != a.AttemptID || bundle.RailID != a.Currency ||
-		bundle.SettlementTermsHash != a.SettlementTermsHash || bundle.SellerTermsSigner != a.SellerTermsSigner ||
-		string(bundle.SellerTermsSignature) != string(a.SellerTermsSignature) {
-		return fmt.Errorf("authorization bundle does not match payment attempt")
-	}
-	expectedOfferPeers := map[SettlementParticipantRole]string{
-		SettlementParticipantBuyer:  terms.BuyerPeerID,
-		SettlementParticipantSeller: terms.SellerPeerID,
-	}
-	if terms.ModeratorPeerID != "" {
-		expectedOfferPeers[SettlementParticipantModerator] = terms.ModeratorPeerID
-	}
-	if len(bundle.RequiredRoles) != len(expectedOfferPeers) {
-		return fmt.Errorf("authorization bundle roles do not match settlement terms")
-	}
-	for _, offer := range bundle.Offers {
-		if expectedPeerID, ok := expectedOfferPeers[offer.ParticipantRole]; !ok || offer.ParticipantPeerID != expectedPeerID {
-			return fmt.Errorf("authorization bundle offer does not match settlement terms")
-		}
+	if err := a.validateAuthorizationBundle(bundle); err != nil {
+		return err
 	}
 	if len(a.AuthorizationBundle) > 0 || a.AuthorizationBundleHash != "" {
 		if string(a.AuthorizationBundle) != string(canonical) || a.AuthorizationBundleHash != hash {
@@ -146,7 +121,45 @@ func (a *PaymentAttempt) GetAuthorizationBundle() (*PaymentAttemptAuthorizationB
 	if string(canonical) != string(a.AuthorizationBundle) || hash != strings.TrimSpace(a.AuthorizationBundleHash) {
 		return nil, ErrPaymentAttemptSettlementTermsConflict
 	}
+	if err := a.validateAuthorizationBundle(bundle); err != nil {
+		return nil, err
+	}
 	return &bundle, nil
+}
+
+func (a *PaymentAttempt) validateAuthorizationBundle(bundle PaymentAttemptAuthorizationBundle) error {
+	terms, err := a.GetSettlementTerms()
+	if err != nil {
+		return err
+	}
+	if terms == nil || a.AuthorizationContextID == "" || a.SellerTermsSigner == "" || len(a.SellerTermsSignature) == 0 {
+		return fmt.Errorf("authorization context, terms, and seller authorization are required before authorization bundle")
+	}
+	if err := terms.VerifySellerAuthorization(a.SellerTermsSigner, a.SellerTermsSignature); err != nil {
+		return err
+	}
+	if bundle.AuthorizationContextID != a.AuthorizationContextID || bundle.OrderID != a.OrderID ||
+		bundle.AttemptID != a.AttemptID || bundle.RailID != a.Currency ||
+		bundle.SettlementTermsHash != a.SettlementTermsHash || bundle.SellerTermsSigner != a.SellerTermsSigner ||
+		string(bundle.SellerTermsSignature) != string(a.SellerTermsSignature) {
+		return fmt.Errorf("authorization bundle does not match payment attempt")
+	}
+	expectedOfferPeers := map[SettlementParticipantRole]string{
+		SettlementParticipantBuyer:  terms.BuyerPeerID,
+		SettlementParticipantSeller: terms.SellerPeerID,
+	}
+	if terms.ModeratorPeerID != "" {
+		expectedOfferPeers[SettlementParticipantModerator] = terms.ModeratorPeerID
+	}
+	if len(bundle.RequiredRoles) != len(expectedOfferPeers) {
+		return fmt.Errorf("authorization bundle roles do not match settlement terms")
+	}
+	for _, offer := range bundle.Offers {
+		if expectedPeerID, ok := expectedOfferPeers[offer.ParticipantRole]; !ok || offer.ParticipantPeerID != expectedPeerID {
+			return fmt.Errorf("authorization bundle offer does not match settlement terms")
+		}
+	}
+	return nil
 }
 
 func (PaymentAttempt) TableName() string { return "payment_attempts" }
@@ -193,6 +206,9 @@ func (a *PaymentAttempt) GetSettlementTerms() (*PaymentAttemptSettlementTerms, e
 		return nil, err
 	}
 	if string(canonical) != string(a.SettlementTerms) || hash != strings.TrimSpace(a.SettlementTermsHash) {
+		return nil, ErrPaymentAttemptSettlementTermsConflict
+	}
+	if terms.AttemptID != a.AttemptID || terms.OrderID != a.OrderID {
 		return nil, ErrPaymentAttemptSettlementTermsConflict
 	}
 	return &terms, nil
@@ -285,6 +301,23 @@ func (a *PaymentAttempt) GetFundingTarget() (*PaymentAttemptFundingTarget, error
 	}
 	if string(canonical) != string(a.FundingTarget) || hash != strings.TrimSpace(a.FundingTargetHash) {
 		return nil, ErrPaymentAttemptSettlementTermsConflict
+	}
+	terms, err := a.GetSettlementTerms()
+	if err != nil {
+		return nil, err
+	}
+	if terms == nil || target.AttemptID != a.AttemptID || target.AssetID != terms.AssetID ||
+		target.AmountAtomic != terms.FundingAmount || target.Address != terms.FundingTargetAddress {
+		return nil, ErrPaymentAttemptSettlementTermsConflict
+	}
+	if a.Kind == PaymentAttemptKindCryptoFundingTarget {
+		bundle, err := a.GetAuthorizationBundle()
+		if err != nil {
+			return nil, err
+		}
+		if bundle == nil || bundle.FundingTargetHash != hash {
+			return nil, ErrPaymentAttemptSettlementTermsConflict
+		}
 	}
 	return &target, nil
 }

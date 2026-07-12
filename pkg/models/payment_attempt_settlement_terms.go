@@ -89,14 +89,23 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 		strings.TrimSpace(t.DisputePolicy) != DisputeScalingSellerAwardProRataFloor {
 		return fmt.Errorf("invalid payment attempt settlement terms identity")
 	}
-	for role, peerID := range map[string]string{"buyer": t.BuyerPeerID, "seller": t.SellerPeerID} {
+	buyerPeerID := strings.TrimSpace(t.BuyerPeerID)
+	sellerPeerID := strings.TrimSpace(t.SellerPeerID)
+	for role, peerID := range map[string]string{"buyer": buyerPeerID, "seller": sellerPeerID} {
 		if _, err := peer.Decode(strings.TrimSpace(peerID)); err != nil {
 			return fmt.Errorf("invalid %s peer ID", role)
 		}
 	}
-	if strings.TrimSpace(t.ModeratorPeerID) != "" {
-		if _, err := peer.Decode(strings.TrimSpace(t.ModeratorPeerID)); err != nil {
+	if buyerPeerID == sellerPeerID {
+		return fmt.Errorf("buyer and seller settlement participants must differ")
+	}
+	moderatorPeerID := strings.TrimSpace(t.ModeratorPeerID)
+	if moderatorPeerID != "" {
+		if _, err := peer.Decode(moderatorPeerID); err != nil {
 			return fmt.Errorf("invalid moderator peer ID")
+		}
+		if moderatorPeerID == buyerPeerID || moderatorPeerID == sellerPeerID {
+			return fmt.Errorf("moderator settlement participant must differ from buyer and seller")
 		}
 	}
 	funding, err := settlementAtomicAmount(t.FundingAmount, true)
@@ -120,6 +129,9 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 	}
 	deductions := new(big.Int).Set(platform)
 	if t.Affiliate != nil {
+		if strings.TrimSpace(t.Affiliate.BuyerPeerID) != buyerPeerID {
+			return fmt.Errorf("affiliate buyer does not match settlement buyer")
+		}
 		affiliate, _, err := validatePaymentAttemptAffiliateTerm(t.Affiliate, sellerGross)
 		if err != nil {
 			return err

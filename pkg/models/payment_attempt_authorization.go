@@ -169,6 +169,10 @@ func (b PaymentAttemptAuthorizationBundle) CanonicalBytesAndHash() ([]byte, stri
 	if err := b.Validate(); err != nil {
 		return nil, "", err
 	}
+	b.RequiredRoles = append([]SettlementParticipantRole(nil), b.RequiredRoles...)
+	sort.Slice(b.RequiredRoles, func(i, j int) bool {
+		return b.RequiredRoles[i] < b.RequiredRoles[j]
+	})
 	b.Offers = append([]SettlementKeyOffer(nil), b.Offers...)
 	sort.Slice(b.Offers, func(i, j int) bool {
 		return b.Offers[i].ParticipantRole < b.Offers[j].ParticipantRole

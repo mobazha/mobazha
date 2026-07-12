@@ -92,6 +92,11 @@ func TestPaymentAttemptAuthorizationBundle_CanonicalizesAndRequiresCompleteOffer
 	require.NoError(t, err)
 	require.Equal(t, first, second)
 	require.Equal(t, firstHash, secondHash)
+	reversedRoles := bundle
+	reversedRoles.RequiredRoles = []SettlementParticipantRole{SettlementParticipantSeller, SettlementParticipantBuyer}
+	_, reversedHash, err := reversedRoles.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	require.Equal(t, firstHash, reversedHash)
 
 	duplicateKey := bundle
 	duplicateKey.Offers = append([]SettlementKeyOffer(nil), bundle.Offers...)

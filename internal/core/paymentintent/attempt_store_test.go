@@ -86,7 +86,7 @@ func cryptoAttemptFixture(t *testing.T) (
 		Affiliate: &models.PaymentAttemptAffiliateTerm{
 			ReferralSessionID: "referral-1", ProgramID: "program-1",
 			PromoterPeerID:    "12D3KooWSsoZBMiQjvPctdqckrAGukta3q7kAZS7cQRwfwbet7zG",
-			BuyerPeerID:       "12D3KooWLSei5eJ8o8mWoS8SsEj5ymL93kFYvNgHA4PpdVhhZyuu",
+			BuyerPeerID:       buyerPeerID.String(),
 			CommissionRateBPS: 500, Address: "0x2222222222222222222222222222222222222222",
 			Amount: "50", SellerGrossBasis: "1000",
 			Lines: []models.PaymentAttemptAffiliateLineTerm{{

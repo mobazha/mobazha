@@ -79,6 +79,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 			return nil, fmt.Errorf("payment session projector: frozen attempt target conflicts with order payment address")
 		}
 		paymentCoin = frozenCoin
+		productMode = payment.ProductModeCancelable
 	}
 
 	// ── Expected amount ───────────────────────────────────────────────────

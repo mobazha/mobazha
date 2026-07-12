@@ -25,13 +25,14 @@ import (
 // It implements contracts.EscrowOperations — the port through which
 // OrderAppService delegates fund release without coupling to chain details.
 type SettlementService struct {
-	db              database.Database
-	paymentRegistry *payment.Registry
-	multiwallet     contracts.WalletOperator
-	keys            contracts.KeyProvider
-	eventBus        events.Bus
-	nodeID          string
-	orderLocker     OrderLocker
+	db               database.Database
+	paymentRegistry  *payment.Registry
+	multiwallet      contracts.WalletOperator
+	keys             contracts.KeyProvider
+	settlementSigner contracts.SettlementSigner
+	eventBus         events.Bus
+	nodeID           string
+	orderLocker      OrderLocker
 
 	// UTXO escrow
 	monitorService     utxo.UTXOMonitorService
@@ -65,12 +66,13 @@ type OrderLocker interface {
 
 // SettlementServiceConfig groups the dependencies for constructing SettlementService.
 type SettlementServiceConfig struct {
-	DB          database.Database
-	Multiwallet contracts.WalletOperator
-	Keys        contracts.KeyProvider
-	EventBus    events.Bus
-	NodeID      string
-	OrderLocker OrderLocker
+	DB               database.Database
+	Multiwallet      contracts.WalletOperator
+	Keys             contracts.KeyProvider
+	SettlementSigner contracts.SettlementSigner
+	EventBus         events.Bus
+	NodeID           string
+	OrderLocker      OrderLocker
 
 	MonitorService     utxo.UTXOMonitorService
 	EscrowMasterPubKey *btcec.PublicKey
@@ -89,6 +91,7 @@ func NewSettlementService(cfg SettlementServiceConfig) *SettlementService {
 		db:                 cfg.DB,
 		multiwallet:        cfg.Multiwallet,
 		keys:               cfg.Keys,
+		settlementSigner:   cfg.SettlementSigner,
 		eventBus:           cfg.EventBus,
 		nodeID:             cfg.NodeID,
 		orderLocker:        cfg.OrderLocker,

@@ -1566,13 +1566,29 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 	// provider is nil.  Cross-currency orders will fail with an informative error
 	// if no rate service is configured, rather than panicking.
 	if obNode.db != nil && obNode.Order() != nil && obNode.paymentService != nil {
-		svc.SetCryptoFacade(corePmt.NewCryptoPaymentFacade(
+		cryptoFacade := corePmt.NewCryptoPaymentFacade(
 			obNode.db,
 			obNode.Order(),
 			obNode.paymentService,
 			obNode.ExchangeRate(),
 			obNode.StorePolicy(),
-		))
+		)
+		if _, ok := obNode.settlementSigner.(pkgcontracts.UTXOSettlementSigner); ok {
+			cryptoFacade.SetStandardOrderSettlementAuthorizationStarter(func(
+				ctx context.Context,
+				request corePmt.StandardOrderSettlementAuthorizationStartRequest,
+			) error {
+				_, err := obNode.BeginStandardOrderSettlementAuthorization(
+					ctx,
+					StandardOrderSettlementAuthorizationRequest{
+						OrderID: request.OrderID, PaymentSelectionQuoteID: request.PaymentSelectionQuoteID,
+						RailID: request.RailID, AmountAtomic: request.AmountAtomic,
+					},
+				)
+				return err
+			})
+		}
+		svc.SetCryptoFacade(cryptoFacade)
 		logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession: CryptoPaymentFacade wired")
 	}
 

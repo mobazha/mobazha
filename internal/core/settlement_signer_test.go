@@ -4,6 +4,7 @@
 package core
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -15,7 +16,54 @@ import (
 
 	"github.com/mobazha/mobazha/internal/core/guest"
 	"github.com/mobazha/mobazha/pkg/contracts"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
+
+type settlementSigningWallet struct {
+	iwallet.Wallet
+	capturedKey    []byte
+	capturedScript []byte
+	signatures     []iwallet.EscrowSignature
+}
+
+func (*settlementSigningWallet) EstimateEscrowFee(int, int, int, iwallet.FeeLevel) (iwallet.Amount, error) {
+	return iwallet.NewAmount(1), nil
+}
+
+func (*settlementSigningWallet) CreateMultisigAddress(
+	[]btcec.PublicKey, []byte, int,
+) (iwallet.Address, []byte, error) {
+	return iwallet.Address{}, nil, nil
+}
+
+func (w *settlementSigningWallet) SignMultisigTransaction(
+	_ iwallet.Transaction,
+	key btcec.PrivateKey,
+	redeemScript []byte,
+) ([]iwallet.EscrowSignature, error) {
+	w.capturedKey = append([]byte(nil), key.Serialize()...)
+	w.capturedScript = append([]byte(nil), redeemScript...)
+	return w.signatures, nil
+}
+
+func (*settlementSigningWallet) BuildAndSend(
+	iwallet.Tx,
+	iwallet.Transaction,
+	[][]iwallet.EscrowSignature,
+	[]byte,
+	iwallet.OrderFinishType,
+) (iwallet.TransactionID, error) {
+	return "", nil
+}
+
+type settlementSigningWalletOperator struct {
+	contracts.WalletOperator
+	wallet iwallet.Wallet
+}
+
+func (o settlementSigningWalletOperator) WalletForCurrencyCode(string) (iwallet.Wallet, error) {
+	return o.wallet, nil
+}
 
 func TestLocalSettlementSigner_DeterministicAndStableContextSeparated(t *testing.T) {
 	root := settlementTestPrivateKey(t, 1)
@@ -120,6 +168,46 @@ func TestLocalSettlementSigner_SignatureBindsDomainPayloadAndReference(t *testin
 	tampered.AttemptID = "attempt-2"
 	tamperedDigest = settlementSignatureDigest(tampered)
 	assert.False(t, parsedSignature.Verify(tamperedDigest[:], parsedKey))
+}
+
+func TestLocalSettlementSigner_SignsUTXOMultisigWithoutExposingDerivedKey(t *testing.T) {
+	wallet := &settlementSigningWallet{
+		signatures: []iwallet.EscrowSignature{{Index: 0, Signature: []byte("chain-signature")}},
+	}
+	signer := newLocalSettlementSigner(
+		newFileKeyProvider(nil, settlementTestPrivateKey(t, 1), nil, nil, nil),
+		settlementSigningWalletOperator{wallet: wallet},
+	)
+	utxoSigner, ok := signer.(contracts.UTXOSettlementSigner)
+	require.True(t, ok)
+	keyRef := contracts.SettlementKeyRef{
+		TenantID: "tenant-a", RailID: "BTC",
+		Purpose: "standard-order-participant:buyer", ReferenceID: "authorization-context-1",
+	}
+	publicKey, err := signer.PublicKey(t.Context(), keyRef)
+	require.NoError(t, err)
+	request := contracts.UTXOMultisigSettlementSignRequest{
+		KeyRef: keyRef, OrderID: "order-1", AttemptID: "attempt-1", Action: "cancel", Sequence: 1,
+		TermsHash: strings.Repeat("a", 64), CoinCode: "BTC",
+		Transaction: iwallet.Transaction{
+			From: []iwallet.SpendInfo{{ID: []byte{1}}},
+			To:   []iwallet.SpendInfo{{ID: []byte{2}}},
+		},
+		RedeemScript: []byte{3, 4, 5},
+	}
+	signatures, err := utxoSigner.SignUTXOMultisig(t.Context(), request)
+	require.NoError(t, err)
+	require.Equal(t, wallet.signatures, signatures)
+	require.Equal(t, request.RedeemScript, wallet.capturedScript)
+	derivedKey, _ := btcec.PrivKeyFromBytes(wallet.capturedKey)
+	require.Equal(t, publicKey, derivedKey.PubKey().SerializeCompressed())
+}
+
+func TestLocalSettlementSigner_RejectsUTXOSigningWithoutWalletCapability(t *testing.T) {
+	signer := newLocalSettlementSigner(newFileKeyProvider(nil, settlementTestPrivateKey(t, 1), nil, nil, nil))
+	utxoSigner := signer.(contracts.UTXOSettlementSigner)
+	_, err := utxoSigner.SignUTXOMultisig(context.Background(), contracts.UTXOMultisigSettlementSignRequest{})
+	require.Error(t, err)
 }
 
 func TestGuestManagedEscrowOwner_UsesSettlementSignerNotEVMProfileKey(t *testing.T) {

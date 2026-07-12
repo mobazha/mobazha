@@ -1,6 +1,7 @@
 package settlement
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -19,6 +20,14 @@ import (
 	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
+
+type frozenStandardOrderUTXOReleaseAuthorization struct {
+	attempt models.PaymentAttempt
+	target  models.PaymentAttemptFundingTarget
+	offer   models.SettlementKeyOffer
+	role    models.SettlementParticipantRole
+	action  string
+}
 
 // ── EscrowOperations port: ReleaseFromCancelableAddressWithParams ───────
 
@@ -82,29 +91,69 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 		txn.To = append(txn.To, *affiliateSpend)
 	}
 
-	script, err := hex.DecodeString(params.ScriptHex)
+	frozenAuthorization, err := s.frozenStandardOrderUTXOReleaseAuthorization(order, params)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	chainCode, err := hex.DecodeString(params.ChaincodeHex)
+	if frozenAuthorization != nil && totalOut.String() != frozenAuthorization.target.AmountAtomic {
+		return nil, nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	scriptHex := params.ScriptHex
+	if frozenAuthorization != nil {
+		scriptHex = frozenAuthorization.target.RedeemScriptHex
+	}
+	script, err := hex.DecodeString(scriptHex)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	escrowMasterKey, err := s.keys.EscrowMasterKey()
-	if err != nil {
-		return nil, nil, fmt.Errorf("get escrow master key: %w", err)
-	}
-
-	key, err := utils.GenerateEscrowPrivateKey(escrowMasterKey, chainCode)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sigs, err := escrowWallet.SignMultisigTransaction(txn, *key, script)
-	if err != nil {
-		return nil, nil, err
+	var sigs []iwallet.EscrowSignature
+	if frozenAuthorization != nil {
+		utxoSigner, ok := s.settlementSigner.(contracts.UTXOSettlementSigner)
+		if !ok || s.settlementSigner == nil {
+			return nil, nil, fmt.Errorf("attempt-scoped UTXO settlement signer is not configured")
+		}
+		keyRef := contracts.SettlementKeyRef{
+			TenantID:    frozenAuthorization.attempt.TenantID,
+			RailID:      frozenAuthorization.attempt.Currency,
+			Purpose:     contracts.StandardOrderSettlementKeyPurpose + ":" + string(frozenAuthorization.role),
+			ReferenceID: frozenAuthorization.attempt.AuthorizationContextID,
+		}
+		publicKey, err := s.settlementSigner.PublicKey(context.Background(), keyRef)
+		if err != nil {
+			return nil, nil, fmt.Errorf("resolve local attempt-scoped UTXO settlement public key: %w", err)
+		}
+		if !bytes.Equal(publicKey, frozenAuthorization.offer.PublicKey) {
+			return nil, nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		sigs, err = utxoSigner.SignUTXOMultisig(
+			context.Background(),
+			contracts.UTXOMultisigSettlementSignRequest{
+				KeyRef: keyRef, OrderID: order.ID.String(), AttemptID: frozenAuthorization.attempt.AttemptID,
+				Action: frozenAuthorization.action, Sequence: 1,
+				TermsHash: frozenAuthorization.attempt.SettlementTermsHash,
+				CoinCode:  params.CoinCode, Transaction: txn, RedeemScript: script,
+			},
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		chainCode, err := hex.DecodeString(params.ChaincodeHex)
+		if err != nil {
+			return nil, nil, err
+		}
+		escrowMasterKey, err := s.keys.EscrowMasterKey()
+		if err != nil {
+			return nil, nil, fmt.Errorf("get escrow master key: %w", err)
+		}
+		key, err := utils.GenerateEscrowPrivateKey(escrowMasterKey, chainCode)
+		if err != nil {
+			return nil, nil, err
+		}
+		sigs, err = escrowWallet.SignMultisigTransaction(txn, *key, script)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	dbTx, err := wallet.Begin()
@@ -124,6 +173,87 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 		txid, params.ToAddress, sellerAmount.String())
 
 	return dbTx, &txn, nil
+}
+
+func (s *SettlementService) frozenStandardOrderUTXOReleaseAuthorization(
+	order *models.Order,
+	params contracts.ReleaseFromCancelableParams,
+) (*frozenStandardOrderUTXOReleaseAuthorization, error) {
+	if s == nil || s.db == nil || order == nil {
+		return nil, nil
+	}
+	var attempts []models.PaymentAttempt
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+			strings.TrimSpace(order.TenantID), order.ID.String(),
+			models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptFundingTargetReady,
+		).Find(&attempts).Error
+	}); err != nil {
+		return nil, fmt.Errorf("load frozen standard order UTXO release attempt: %w", err)
+	}
+	if len(attempts) == 0 {
+		return nil, nil
+	}
+	var matched *models.PaymentAttempt
+	var target *models.PaymentAttemptFundingTarget
+	for i := range attempts {
+		candidate, err := attempts[i].GetFundingTarget()
+		if err != nil {
+			return nil, err
+		}
+		if candidate == nil || !payment.SameUTXOAddress(candidate.Address, params.PaymentAddress) {
+			continue
+		}
+		if matched != nil {
+			return nil, fmt.Errorf("multiple frozen attempts match UTXO release target")
+		}
+		matched = &attempts[i]
+		target = candidate
+	}
+	if matched == nil || target == nil {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	if matched.Currency != strings.TrimSpace(params.CoinCode) || target.RedeemScriptHex == "" ||
+		(strings.TrimSpace(params.ScriptHex) != "" && !strings.EqualFold(params.ScriptHex, target.RedeemScriptHex)) ||
+		params.AffiliatePayout != nil {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	terms, err := matched.GetSettlementTerms()
+	if err != nil || terms == nil || terms.ModeratorPeerID != "" || terms.Affiliate != nil ||
+		terms.PlatformReleaseFee.Amount != "0" || terms.BuyerCancellationFee.Amount != "0" ||
+		terms.SellerGrossBasis != terms.FundingAmount {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	bundle, err := matched.GetAuthorizationBundle()
+	if err != nil || bundle == nil {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	role := models.SettlementParticipantBuyer
+	action := payment.SettlementActionCancel
+	if order.Role() == models.RoleVendor {
+		role = models.SettlementParticipantSeller
+		action = payment.SettlementActionComplete
+		if params.FinishType != iwallet.ORDER_FINISH_COMPLETE ||
+			!payment.SameUTXOAddress(params.ToAddress.String(), terms.SellerAddress) {
+			return nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+	} else if order.Role() != models.RoleBuyer || params.FinishType != iwallet.ORDER_FINISH_CANCEL {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	var offer *models.SettlementKeyOffer
+	for i := range bundle.Offers {
+		if bundle.Offers[i].ParticipantRole == role {
+			offer = &bundle.Offers[i]
+			break
+		}
+	}
+	if offer == nil || offer.Purpose != contracts.StandardOrderSettlementKeyPurpose+":"+string(role) {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	return &frozenStandardOrderUTXOReleaseAuthorization{
+		attempt: *matched, target: *target, offer: *offer, role: role, action: action,
+	}, nil
 }
 
 type cancelableAffiliateUTXODustChecker interface {

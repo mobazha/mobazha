@@ -22,7 +22,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const standardOrderSettlementKeyPurpose = "standard-order-participant"
+const standardOrderSettlementKeyPurpose = contracts.StandardOrderSettlementKeyPurpose
 
 // StandardOrderSettlementAuthorizationRequest starts the non-actionable buyer
 // half of one standard-order authorization ceremony. AmountAtomic must already

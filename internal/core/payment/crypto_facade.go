@@ -54,8 +54,8 @@ type CryptoPaymentFacade struct {
 	settlementStarter    standardOrderSettlementAuthorizationStarter
 }
 
-// SetStandardOrderSettlementAuthorizationStarter wires the development
-// cutover callback for eligible native UTXO standard orders.
+// SetStandardOrderSettlementAuthorizationStarter wires the fail-closed
+// authorization cutover for eligible native UTXO standard orders.
 func (c *CryptoPaymentFacade) SetStandardOrderSettlementAuthorizationStarter(
 	starter func(context.Context, StandardOrderSettlementAuthorizationStartRequest) error,
 ) {

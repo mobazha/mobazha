@@ -6,6 +6,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -84,6 +85,10 @@ func watchFrozenStandardOrderUTXOAttempt(
 	}
 	storedBytes, _, err := target.CanonicalBytesAndHash()
 	if err != nil || !bytes.Equal(projectedBytes, storedBytes) {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	redeemScript, err := hex.DecodeString(target.RedeemScriptHex)
+	if err != nil || len(redeemScript) == 0 || !bytes.Equal(redeemScript, projection.RedeemScript) {
 		return models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(attempt.Currency))

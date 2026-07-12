@@ -213,7 +213,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 		}
 	}
 	if n.settlementSigner == nil {
-		n.settlementSigner = newLocalSettlementSigner(n.keyProvider)
+		n.settlementSigner = newLocalSettlementSigner(n.keyProvider, n.multiwallet)
 	}
 	if n.walletAccountService == nil && n.db != nil && n.bip44Key != nil {
 		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet)
@@ -807,6 +807,7 @@ func (n *MobazhaNode) initSettlementService() {
 		DB:                 n.db,
 		Multiwallet:        n.multiwallet,
 		Keys:               n.keyProvider,
+		SettlementSigner:   n.settlementSigner,
 		EventBus:           n.eventBus,
 		NodeID:             n.nodeID,
 		OrderLocker:        n.orderLockManager,

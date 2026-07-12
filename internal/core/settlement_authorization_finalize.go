@@ -6,6 +6,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -132,6 +133,7 @@ func (p standardOrderUTXOFundingTargetProjector) project(
 		Version: models.PaymentAttemptFundingTargetVersion, AttemptID: attempt.AttemptID,
 		Type: models.PaymentAttemptFundingTargetAddress, AssetID: attempt.Currency,
 		AmountAtomic: attempt.AmountValue, Address: strings.TrimSpace(address.String()),
+		RedeemScriptHex: hex.EncodeToString(redeemScript),
 	}
 	if _, _, err := target.CanonicalBytesAndHash(); err != nil {
 		return standardOrderUTXOProjection{}, err

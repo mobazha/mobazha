@@ -2,9 +2,11 @@ package payment
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	paymentmetrics "github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
@@ -328,7 +331,13 @@ func (v *AggregatingVerifier) aggregateWithGorm(
 			break
 		}
 
-		ps, err := buildAggregatedPaymentSent(orderOpen, deduped, total, &order, sharedRefund, v.clock())
+		frozenIntent, err := frozenStandardOrderUTXOAggregatedPaymentIntent(gdb, &order, deduped)
+		if err != nil {
+			return fmt.Errorf("aggregating verifier: load frozen payment intent for %s: %w", orderID, err)
+		}
+		ps, err := buildAggregatedPaymentSent(
+			orderOpen, deduped, total, &order, sharedRefund, v.clock(), frozenIntent,
+		)
 		if err != nil {
 			return fmt.Errorf("aggregating verifier: build PaymentSent for %s: %w", orderID, err)
 		}
@@ -650,6 +659,7 @@ func buildAggregatedPaymentSent(
 	order *models.Order,
 	sharedRefund string,
 	now time.Time,
+	frozenIntent ...*aggregatedPaymentIntent,
 ) (*pb.PaymentSent, error) {
 	if len(rows) == 0 {
 		return nil, errors.New("buildAggregatedPaymentSent: rows must be non-empty")
@@ -692,6 +702,9 @@ func buildAggregatedPaymentSent(
 	refundAddr := aggregatedRefundAddress(order, sharedRefund)
 
 	intent := resolveAggregatedPaymentIntent(order, rows)
+	if len(frozenIntent) > 0 && frozenIntent[0] != nil {
+		intent = *frozenIntent[0]
+	}
 	if !intent.settlementSpecOK {
 		return nil, fmt.Errorf("missing settlement spec for pending escrow payment intent")
 	}
@@ -728,6 +741,82 @@ func buildAggregatedPaymentSent(
 		ConfirmationPolicy:  paymentSentConfirmationPolicy(order),
 	}
 	return ps, nil
+}
+
+func frozenStandardOrderUTXOAggregatedPaymentIntent(
+	db *gorm.DB,
+	order *models.Order,
+	rows []models.PaymentObservation,
+) (*aggregatedPaymentIntent, error) {
+	if db == nil || order == nil || len(rows) == 0 {
+		return nil, nil
+	}
+	if !db.Migrator().HasTable(&models.PaymentAttempt{}) {
+		return nil, nil
+	}
+	var attempts []models.PaymentAttempt
+	if err := db.Where(
+		"tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+		strings.TrimSpace(order.TenantID), order.ID.String(),
+		models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptFundingTargetReady,
+	).Find(&attempts).Error; err != nil {
+		return nil, err
+	}
+	if len(attempts) == 0 {
+		return nil, nil
+	}
+	address := strings.TrimSpace(rows[0].ToAddress)
+	if address == "" {
+		return nil, nil
+	}
+	for i := 1; i < len(rows); i++ {
+		if !paymentmetrics.SameUTXOAddress(address, rows[i].ToAddress) {
+			return nil, fmt.Errorf("confirmed UTXO observations use multiple funding targets")
+		}
+	}
+	var matched *models.PaymentAttempt
+	var target *models.PaymentAttemptFundingTarget
+	for i := range attempts {
+		candidate, err := attempts[i].GetFundingTarget()
+		if err != nil {
+			return nil, err
+		}
+		if candidate == nil || !paymentmetrics.SameUTXOAddress(candidate.Address, address) {
+			continue
+		}
+		if matched != nil {
+			return nil, fmt.Errorf("multiple frozen payment attempts match UTXO funding target")
+		}
+		matched = &attempts[i]
+		target = candidate
+	}
+	if matched == nil || target == nil {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	terms, err := matched.GetSettlementTerms()
+	if err != nil || terms == nil {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	bundle, err := matched.GetAuthorizationBundle()
+	if err != nil || bundle == nil || terms.ModeratorPeerID != "" {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	script, err := hex.DecodeString(target.RedeemScriptHex)
+	if err != nil || len(script) == 0 {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	amount, err := strconv.ParseUint(target.AmountAtomic, 10, 64)
+	if err != nil || amount == 0 {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(target.AssetID))
+	if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	return &aggregatedPaymentIntent{
+		settlementSpec: paymentmetrics.NewUTXOSpec(false), settlementSpecOK: true,
+		script: target.RedeemScriptHex,
+	}, nil
 }
 
 func paymentSentConfirmationPolicy(order *models.Order) string {

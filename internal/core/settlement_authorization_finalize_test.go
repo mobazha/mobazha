@@ -159,6 +159,7 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 
 	require.Equal(t, models.PaymentAttemptFundingTargetReady, first.Attempt.State)
 	require.NotEmpty(t, first.Target.Address)
+	require.NotEmpty(t, first.Target.RedeemScriptHex)
 	require.Equal(t, attempt.AmountValue, first.Target.AmountAtomic)
 	require.Equal(t, payoutAddress, first.Terms.SellerAddress)
 	require.Equal(t, attempt.AmountValue, first.Terms.SellerGrossBasis)

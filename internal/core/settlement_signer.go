@@ -16,23 +16,33 @@ import (
 	"golang.org/x/crypto/hkdf"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 var _ contracts.SettlementSigner = (*localSettlementSigner)(nil)
+var _ contracts.UTXOSettlementSigner = (*localSettlementSigner)(nil)
 
 // localSettlementSigner is the standalone opaque Settlement Domain adapter.
 // The legacy escrow root is used only as input key material inside this
 // adapter; callers can obtain public keys and signatures but never child or
 // root private keys.
 type localSettlementSigner struct {
-	keys contracts.KeyProvider
+	keys    contracts.KeyProvider
+	wallets contracts.WalletOperator
 }
 
-func newLocalSettlementSigner(keys contracts.KeyProvider) contracts.SettlementSigner {
+func newLocalSettlementSigner(
+	keys contracts.KeyProvider,
+	wallets ...contracts.WalletOperator,
+) contracts.SettlementSigner {
 	if keys == nil {
 		return nil
 	}
-	return &localSettlementSigner{keys: keys}
+	var walletOperator contracts.WalletOperator
+	if len(wallets) > 0 {
+		walletOperator = wallets[0]
+	}
+	return &localSettlementSigner{keys: keys, wallets: walletOperator}
 }
 
 func (s *localSettlementSigner) PublicKey(ctx context.Context, keyRef contracts.SettlementKeyRef) ([]byte, error) {
@@ -59,6 +69,40 @@ func (s *localSettlementSigner) Sign(ctx context.Context, request contracts.Sett
 	}
 	digest := settlementSignatureDigest(request)
 	return btcecdsa.Sign(key, digest[:]).Serialize(), nil
+}
+
+func (s *localSettlementSigner) SignUTXOMultisig(
+	ctx context.Context,
+	request contracts.UTXOMultisigSettlementSignRequest,
+) ([]iwallet.EscrowSignature, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := request.Validate(); err != nil {
+		return nil, err
+	}
+	if s == nil || s.wallets == nil {
+		return nil, fmt.Errorf("UTXO settlement signer wallet operator is not configured")
+	}
+	wallet, err := s.wallets.WalletForCurrencyCode(request.CoinCode)
+	if err != nil {
+		return nil, fmt.Errorf("load UTXO settlement signer wallet: %w", err)
+	}
+	escrowWallet, ok := wallet.(iwallet.UTXOEscrow)
+	if !ok {
+		return nil, fmt.Errorf("wallet for %s does not support UTXO escrow signing", request.CoinCode)
+	}
+	key, err := s.deriveKey(request.KeyRef)
+	if err != nil {
+		return nil, err
+	}
+	signatures, err := escrowWallet.SignMultisigTransaction(
+		request.Transaction, *key, append([]byte(nil), request.RedeemScript...),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("sign attempt-scoped UTXO multisig transaction: %w", err)
+	}
+	return signatures, nil
 }
 
 func (s *localSettlementSigner) deriveKey(keyRef contracts.SettlementKeyRef) (*btcec.PrivateKey, error) {

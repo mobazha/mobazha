@@ -20,13 +20,14 @@ const (
 // funding target owned by one PaymentAttempt. Display-only instructions and
 // provider secrets do not belong in this value.
 type PaymentAttemptFundingTarget struct {
-	Version      uint32 `json:"version"`
-	AttemptID    string `json:"attemptID"`
-	Type         string `json:"type"`
-	AssetID      string `json:"assetID"`
-	AmountAtomic string `json:"amountAtomic"`
-	Address      string `json:"address"`
-	MemoOrTag    string `json:"memoOrTag,omitempty"`
+	Version         uint32 `json:"version"`
+	AttemptID       string `json:"attemptID"`
+	Type            string `json:"type"`
+	AssetID         string `json:"assetID"`
+	AmountAtomic    string `json:"amountAtomic"`
+	Address         string `json:"address"`
+	MemoOrTag       string `json:"memoOrTag,omitempty"`
+	RedeemScriptHex string `json:"redeemScriptHex,omitempty"`
 }
 
 // CanonicalBytesAndHash validates and canonically encodes the target.
@@ -52,6 +53,12 @@ func (t PaymentAttemptFundingTarget) Validate() error {
 	}
 	if _, err := settlementAtomicAmount(t.AmountAtomic, true); err != nil {
 		return fmt.Errorf("invalid funding target amount: %w", err)
+	}
+	if script := strings.TrimSpace(t.RedeemScriptHex); script != "" {
+		decoded, err := hex.DecodeString(script)
+		if err != nil || len(decoded) == 0 || strings.ToLower(script) != script {
+			return fmt.Errorf("invalid funding target redeem script")
+		}
 	}
 	return nil
 }

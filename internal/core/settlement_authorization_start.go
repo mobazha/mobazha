@@ -22,6 +22,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const standardOrderSettlementKeyPurpose = "standard-order-participant"
+
 // StandardOrderSettlementAuthorizationRequest starts the non-actionable buyer
 // half of one standard-order authorization ceremony. AmountAtomic must already
 // come from the accepted order or immutable payment-selection quote.
@@ -216,7 +218,7 @@ func beginBuyerSettlementAuthorization(
 		ctx, identitySigner, settlementSigner,
 		contracts.SettlementKeyRef{
 			TenantID: tenantID, RailID: request.RailID,
-			Purpose: "standard-order-participant", ReferenceID: attempt.AuthorizationContextID,
+			Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
 		},
 		request.OrderID, attempt.AttemptID, models.SettlementParticipantBuyer,
 	)
@@ -250,6 +252,9 @@ func respondSellerSettlementAuthorization(
 	}
 	if err := buyerOffer.Verify(); err != nil {
 		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	if buyerOffer.Purpose != standardOrderSettlementKeyPurpose+":"+string(models.SettlementParticipantBuyer) {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("buyer settlement key offer purpose does not match standard order protocol")
 	}
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(buyerOffer.RailID))
 	if err != nil || !coinInfo.IsNative {
@@ -307,7 +312,7 @@ func respondSellerSettlementAuthorization(
 		ctx, identitySigner, settlementSigner,
 		contracts.SettlementKeyRef{
 			TenantID: tenantID, RailID: buyerOffer.RailID,
-			Purpose: "standard-order-participant", ReferenceID: attempt.AuthorizationContextID,
+			Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
 		},
 		order.ID.String(), attempt.AttemptID, models.SettlementParticipantSeller,
 	)

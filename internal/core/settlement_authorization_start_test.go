@@ -347,3 +347,37 @@ func TestRespondSellerSettlementAuthorization_RejectsCrossCurrencyBeforeDraft(t 
 	require.NoError(t, db.Model(&models.PaymentAttempt{}).Count(&attempts).Error)
 	require.Zero(t, attempts)
 }
+
+func TestRespondSellerSettlementAuthorization_RejectsOtherKeyPurpose(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:seller-authorization-purpose-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	buyerKeys, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	buyerPeerID, err := identity.PeerIDFromPublicKey(buyerKeys.PubKey)
+	require.NoError(t, err)
+	sellerKeys, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	sellerPeerID, err := identity.PeerIDFromPublicKey(sellerKeys.PubKey)
+	require.NoError(t, err)
+	contextID, err := models.NewSettlementAuthorizationContextID()
+	require.NoError(t, err)
+	buyerOffer := models.SettlementKeyOffer{
+		Version: models.SettlementAuthorizationVersion, AuthorizationContextID: contextID,
+		OrderID: "order-other-purpose", AttemptID: "attempt-other-purpose",
+		ParticipantPeerID: buyerPeerID.String(), ParticipantRole: models.SettlementParticipantBuyer,
+		RailID: "crypto:eip155:1:native", Purpose: "other-settlement-protocol:buyer",
+		PublicKey: []byte("other-purpose-settlement-key"),
+	}
+	payload, err := buyerOffer.SigningPayload()
+	require.NoError(t, err)
+	buyerOffer.Signature, err = contracts.NewKeyPairSigner(buyerKeys, buyerPeerID).Sign(payload)
+	require.NoError(t, err)
+
+	_, err = respondSellerSettlementAuthorization(
+		t.Context(), db,
+		&models.Order{ID: models.OrderID(buyerOffer.OrderID), MyRole: string(models.RoleVendor)},
+		buyerOffer, contracts.NewKeyPairSigner(sellerKeys, sellerPeerID), new(buyerStartSettlementSigner),
+		&retainingSettlementOfferPublisher{db: db}, payment.RouteIdentity{AssetID: buyerOffer.RailID},
+	)
+	require.ErrorContains(t, err, "purpose does not match standard order protocol")
+}

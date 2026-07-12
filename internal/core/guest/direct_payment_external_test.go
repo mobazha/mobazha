@@ -81,7 +81,7 @@ func (s *directPaymentExternalRuntimeStub) reapedSnapshot() []uint32 {
 func TestDirectPaymentService_ExternalRuntimeAllocatesAddress(t *testing.T) {
 	db := newGuestTestDB(t)
 	runtime := &directPaymentExternalRuntimeStub{}
-	service := NewDirectPaymentService(db, nil)
+	service := NewDirectPaymentService(db)
 	route := payment.RouteIdentity{
 		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
 		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
@@ -131,7 +131,7 @@ func TestDirectPaymentService_ExternalRuntimeAllocatesAddress(t *testing.T) {
 func TestDirectPaymentService_OrderLinkIsAtomicWithGuestOrder(t *testing.T) {
 	db := newGuestTestDB(t)
 	runtime := &directPaymentExternalRuntimeStub{}
-	service := NewDirectPaymentService(db, nil)
+	service := NewDirectPaymentService(db)
 	route := payment.RouteIdentity{
 		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
 		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
@@ -170,7 +170,7 @@ func TestDirectPaymentService_OrderLinkIsAtomicWithGuestOrder(t *testing.T) {
 func TestDirectPaymentService_RolledBackOrderLeavesExpiredAddressForAbandonment(t *testing.T) {
 	db := newGuestTestDB(t)
 	runtime := &directPaymentExternalRuntimeStub{}
-	service := NewDirectPaymentService(db, nil)
+	service := NewDirectPaymentService(db)
 	route := payment.RouteIdentity{
 		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
 		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
@@ -223,7 +223,7 @@ func TestDirectPaymentService_RolledBackOrderLeavesExpiredAddressForAbandonment(
 func TestDirectPaymentService_AbandoningCleanupReplaysAfterRestart(t *testing.T) {
 	db := newGuestTestDB(t)
 	runtime := &directPaymentExternalRuntimeStub{}
-	service := NewDirectPaymentService(db, nil)
+	service := NewDirectPaymentService(db)
 	route := payment.RouteIdentity{
 		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
 		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
@@ -257,7 +257,7 @@ func TestDirectPaymentService_AbandoningCleanupReplaysAfterRestart(t *testing.T)
 func TestDirectPaymentService_ExternalRuntimeRecoversWithStableIdempotencyKey(t *testing.T) {
 	db := newGuestTestDB(t)
 	runtime := &directPaymentExternalRuntimeStub{failures: 1}
-	service := NewDirectPaymentService(db, nil)
+	service := NewDirectPaymentService(db)
 	route := payment.RouteIdentity{
 		ContributionID: "test.direct.mainnet", ModuleID: "test.direct",
 		ImplementationGeneration: "v1", RailKind: string(distribution.PaymentRailDirectObserved),
@@ -298,7 +298,7 @@ func TestDirectPaymentService_RecoveryUsesHistoricalRuntime(t *testing.T) {
 	db := newGuestTestDB(t)
 	oldRuntime := &directPaymentExternalRuntimeStub{address: distribution.ExternalPaymentAddress{Address: "historical-address", Index: 41}}
 	newRuntime := &directPaymentExternalRuntimeStub{address: distribution.ExternalPaymentAddress{Address: "current-address", Index: 42}}
-	service := NewDirectPaymentService(db, nil)
+	service := NewDirectPaymentService(db)
 	oldRoute := payment.RouteIdentity{
 		ContributionID: "test.direct.mainnet", ModuleID: "test.direct", ImplementationGeneration: "v1",
 		RailKind: string(distribution.PaymentRailDirectObserved), NetworkID: "TEST",
@@ -337,7 +337,7 @@ func TestDirectPaymentService_RecoveryUsesHistoricalRuntime(t *testing.T) {
 func TestDirectPaymentService_RecoveryDoesNotAllocateExpiredAttempt(t *testing.T) {
 	db := newGuestTestDB(t)
 	runtime := &directPaymentExternalRuntimeStub{}
-	service := NewDirectPaymentService(db, nil)
+	service := NewDirectPaymentService(db)
 	route := payment.RouteIdentity{
 		ContributionID: "test.direct.mainnet", ModuleID: "test.direct", ImplementationGeneration: "v1",
 		RailKind: string(distribution.PaymentRailDirectObserved), NetworkID: "TEST",
@@ -376,7 +376,7 @@ func TestDirectPaymentService_RecoveryReapsExpiredDispatchedAttempt(t *testing.T
 	runtime := &directPaymentExternalRuntimeStub{
 		address: distribution.ExternalPaymentAddress{Address: "ambiguous-address", Index: 19, RequiredConfirmations: 2},
 	}
-	service := NewDirectPaymentService(db, nil)
+	service := NewDirectPaymentService(db)
 	route := payment.RouteIdentity{
 		ContributionID: "test.direct.mainnet", ModuleID: "test.direct", ImplementationGeneration: "v1",
 		RailKind: string(distribution.PaymentRailDirectObserved), NetworkID: "TEST",
@@ -415,7 +415,7 @@ func TestDirectPaymentService_RecoveryReapsExpiredDispatchedAttempt(t *testing.T
 func TestDirectPaymentService_ConcurrentRetriesShareDurableAttempt(t *testing.T) {
 	db := newGuestTestDB(t)
 	runtime := &directPaymentExternalRuntimeStub{}
-	service := NewDirectPaymentService(db, nil)
+	service := NewDirectPaymentService(db)
 	route := payment.RouteIdentity{
 		ContributionID: "test.direct.mainnet", ModuleID: "test.direct", ImplementationGeneration: "v1",
 		RailKind: string(distribution.PaymentRailDirectObserved), NetworkID: "TEST",

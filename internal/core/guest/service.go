@@ -64,7 +64,7 @@ type GuestOrderAppServiceConfig struct {
 	Context                 context.Context
 	DB                      database.Database
 	DirectPayment           *DirectPaymentService
-	SweepService            *AutoSweepService
+	WalletAccounts          contracts.WalletAccountService
 	EventBus                events.Bus
 	NodeID                  string
 	PeerID                  string
@@ -100,7 +100,7 @@ type GuestOrderAppService struct {
 	db                            database.Database
 	runtimeCtx                    context.Context
 	directPayment                 *DirectPaymentService
-	sweepService                  *AutoSweepService
+	walletAccounts                contracts.WalletAccountService
 	eventBus                      events.Bus
 	nodeID                        string
 	peerID                        string
@@ -169,7 +169,7 @@ func NewGuestOrderAppService(cfg GuestOrderAppServiceConfig) *GuestOrderAppServi
 		db:                      cfg.DB,
 		runtimeCtx:              runtimeCtx,
 		directPayment:           cfg.DirectPayment,
-		sweepService:            cfg.SweepService,
+		walletAccounts:          cfg.WalletAccounts,
 		eventBus:                cfg.EventBus,
 		nodeID:                  cfg.NodeID,
 		peerID:                  cfg.PeerID,
@@ -576,6 +576,7 @@ func (s *GuestOrderAppService) CreateGuestOrder(ctx context.Context, req contrac
 		BuyerPortalTokenHash:       hashBuyerPortalToken(buyerPortalToken),
 		BuyerPortalTokenExpiresAt:  &buyerPortalExpiresAt,
 		BuyerPortalTokenVersion:    1,
+		SettlementOwnerVersion:     payResult.SettlementOwnerVersion,
 	}
 	setGuestOrderPaymentRoute(&order, payResult.Route, payResult.GracePeriod)
 	if allDigitalGoods {
@@ -844,11 +845,6 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 				return err
 			}
 
-			if shouldCreateGuestSweepTask(&order) && s.sweepService != nil {
-				if err := s.sweepService.CreateSweepTask(tx, &order); err != nil {
-					log.Warningf("create sweep task for %s (non-blocking): %v", redact.Token(orderToken), err)
-				}
-			}
 		}
 
 		return tx.Save(&order)
@@ -857,15 +853,6 @@ func (s *GuestOrderAppService) HandlePaymentDetected(orderToken, txHash string, 
 		s.afterGuestOrderFunded(orderToken)
 	}
 	return err
-}
-
-// shouldCreateGuestSweepTask returns false for managed escrow funding targets;
-// settlement is owned by the bound provider rather than the HD sweep worker.
-func shouldCreateGuestSweepTask(order *models.GuestOrder) bool {
-	if order == nil || order.HasManagedEscrowGuestFundingTarget() {
-		return false
-	}
-	return order.SweepToAddress != ""
 }
 
 // HandlePoolPayment records a mempool-only payment observation.
@@ -948,11 +935,6 @@ func (s *GuestOrderAppService) HandleConfirmationUpdate(orderToken string, confs
 				return err
 			}
 
-			if shouldCreateGuestSweepTask(&order) && s.sweepService != nil {
-				if err := s.sweepService.CreateSweepTask(tx, &order); err != nil {
-					log.Warningf("create sweep task for %s (non-blocking): %v", redact.Token(orderToken), err)
-				}
-			}
 		}
 		return tx.Save(&order)
 	})
@@ -985,6 +967,23 @@ func (s *GuestOrderAppService) afterGuestOrderFunded(orderToken string) {
 			}
 		}(s.runtimeCtx, orderToken)
 		return
+	}
+	var order models.GuestOrder
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("order_token = ?", orderToken).First(&order).Error
+	}); err != nil {
+		log.Errorf("guest wallet affiliate settlement load for %s: %v; withholding entitlement", redact.Token(orderToken), err)
+		return
+	}
+	if isGuestWalletAffiliateOrder(&order) {
+		confirmed, err := s.settleGuestWalletAffiliate(s.runtimeCtx, order)
+		if err != nil {
+			log.Warningf("guest wallet affiliate settlement for %s: %v; withholding entitlement", redact.Token(orderToken), err)
+			return
+		}
+		if !confirmed {
+			return
+		}
 	}
 	s.emitGuestOrderFunded(orderToken)
 }
@@ -1190,9 +1189,7 @@ func (s *GuestOrderAppService) RunGuestCleanupOnce() {
 	s.CleanupExpiredOrders(ctx)
 	s.AutoCompleteOrders(ctx)
 	s.releaseExpiredReservations(ctx)
-	if s.sweepService != nil {
-		s.sweepService.ProcessPendingSweeps(ctx)
-	}
+	s.RecoverGuestWalletAffiliateTransfers(ctx)
 }
 
 // --- State machine ---

@@ -170,13 +170,15 @@ type GuestEVMChainReadiness struct {
 
 // GuestCheckoutReadiness summarizes guest checkout runtime health.
 type GuestCheckoutReadiness struct {
-	GuestCheckoutEnabled bool                      `json:"guestCheckoutEnabled"`
-	WatchedAddressCount  int                       `json:"watchedAddressCount"`
-	SweepTasksPending    int                       `json:"sweepTasksPending"`
-	SweepTasksSubmitted  int                       `json:"sweepTasksSubmitted"`
-	SweepTasksFailed     int                       `json:"sweepTasksFailed"`
-	Chains               []GuestUTXOChainReadiness `json:"chains"`
-	EVMChains            []GuestEVMChainReadiness  `json:"evmChains,omitempty"`
+	GuestCheckoutEnabled bool `json:"guestCheckoutEnabled"`
+	WatchedAddressCount  int  `json:"watchedAddressCount"`
+	// SweepTasks* JSON names are retained for API compatibility; values now
+	// report WalletTransfer pending/submitted/exhausted counts.
+	SweepTasksPending   int                       `json:"sweepTasksPending"`
+	SweepTasksSubmitted int                       `json:"sweepTasksSubmitted"`
+	SweepTasksFailed    int                       `json:"sweepTasksFailed"`
+	Chains              []GuestUTXOChainReadiness `json:"chains"`
+	EVMChains           []GuestEVMChainReadiness  `json:"evmChains,omitempty"`
 }
 
 // --- UnifiedOrderView types ---
@@ -195,9 +197,10 @@ type OrderSummary struct {
 	SettlementState    string       `json:"settlementState,omitempty"`
 	SettlementTxHash   string       `json:"settlementTxHash,omitempty"`
 	TrackingNumber     string       `json:"trackingNumber,omitempty"`
-	SweepStatus        string       `json:"sweepStatus,omitempty"`
-	CreatedAt          time.Time    `json:"createdAt"`
-	UpdatedAt          time.Time    `json:"updatedAt"`
+	// SweepStatus is the backward-compatible JSON field for WalletTransfer state.
+	SweepStatus string    `json:"sweepStatus,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // ItemBrief is a minimal item summary for the unified list.

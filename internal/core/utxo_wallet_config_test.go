@@ -18,6 +18,10 @@ func (sweepCapabilityWallet) BuildSweepTx(_ []iwallet.SweepInput, _ btcec.Privat
 	return []byte{0x01}, "sweep", nil
 }
 
+func (sweepCapabilityWallet) BuildTransferTx(_ []iwallet.SweepInput, _ btcec.PrivateKey, _, _ string, _ int64, _ int64) ([]byte, string, error) {
+	return []byte{0x01}, "transfer", nil
+}
+
 type nonSweepCapabilityWallet struct {
 	iwallet.Wallet
 }

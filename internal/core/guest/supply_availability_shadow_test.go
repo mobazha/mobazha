@@ -496,7 +496,7 @@ func TestCreateGuestOrder_FreezesAffiliateTermsInPaymentCoin(t *testing.T) {
 	recorder := &recordingSupplyAvailability{quoteResult: &contracts.SupplyQuoteResult{CanSell: true}}
 	affiliate := &recordingGuestAffiliateService{}
 	svc.resolver = alwaysEnabledResolver{}
-	svc.directPayment = NewDirectPaymentService(db, fixedBIP44KeyDeriver{})
+	svc.directPayment = newFixedWalletDirectPaymentService(db)
 	svc.exchangeRates = wallet.NewFixedRateProvider("LTC", map[models.CurrencyCode]iwallet.Amount{
 		"USD": iwallet.NewAmount(8000),
 	})
@@ -552,7 +552,7 @@ func TestCreateGuestOrder_ShadowQuotePreservesGuestInventoryReservation(t *testi
 		quoteResult: &contracts.SupplyQuoteResult{CanSell: true},
 	}
 	svc.resolver = alwaysEnabledResolver{}
-	svc.directPayment = NewDirectPaymentService(db, fixedBIP44KeyDeriver{})
+	svc.directPayment = newFixedWalletDirectPaymentService(db)
 	svc.exchangeRates = wallet.NewFixedRateProvider("LTC", map[models.CurrencyCode]iwallet.Amount{
 		"USD": iwallet.NewAmount(8000),
 	})
@@ -635,7 +635,7 @@ func TestCreateGuestOrder_ShadowQuoteUsesExternalSupplyLineForSyncedListing(t *t
 		quoteResult: &contracts.SupplyQuoteResult{CanSell: true},
 	}
 	svc.resolver = alwaysEnabledResolver{}
-	svc.directPayment = NewDirectPaymentService(db, fixedBIP44KeyDeriver{})
+	svc.directPayment = newFixedWalletDirectPaymentService(db)
 	svc.exchangeRates = wallet.NewFixedRateProvider("LTC", map[models.CurrencyCode]iwallet.Amount{
 		"USD": iwallet.NewAmount(8000),
 	})
@@ -696,7 +696,7 @@ func TestCreateGuestOrder_AuthoritativeSupplyReserveUsesTransactionalService(t *
 
 	recorder := &transactionalRecordingSupplyAvailability{}
 	svc.resolver = alwaysEnabledResolver{}
-	svc.directPayment = NewDirectPaymentService(db, fixedBIP44KeyDeriver{})
+	svc.directPayment = newFixedWalletDirectPaymentService(db)
 	svc.exchangeRates = wallet.NewFixedRateProvider("LTC", map[models.CurrencyCode]iwallet.Amount{
 		"USD": iwallet.NewAmount(8000),
 	})
@@ -761,7 +761,7 @@ func TestCreateGuestOrder_PreparesDigitalSupplyBeforeWriteTransaction(t *testing
 
 	svc.db = guardDB
 	svc.resolver = alwaysEnabledResolver{}
-	svc.directPayment = NewDirectPaymentService(guardDB, fixedBIP44KeyDeriver{})
+	svc.directPayment = newFixedWalletDirectPaymentService(guardDB)
 	svc.exchangeRates = wallet.NewFixedRateProvider("LTC", map[models.CurrencyCode]iwallet.Amount{
 		"USD": iwallet.NewAmount(8000),
 	})
@@ -811,7 +811,7 @@ func TestCreateGuestOrder_AuthoritativeSupplyReserveSkipsExternalSyncedListing(t
 
 	recorder := &transactionalRecordingSupplyAvailability{}
 	svc.resolver = alwaysEnabledResolver{}
-	svc.directPayment = NewDirectPaymentService(db, fixedBIP44KeyDeriver{})
+	svc.directPayment = newFixedWalletDirectPaymentService(db)
 	svc.exchangeRates = wallet.NewFixedRateProvider("LTC", map[models.CurrencyCode]iwallet.Amount{
 		"USD": iwallet.NewAmount(8000),
 	})
@@ -978,14 +978,28 @@ func guestListingWithSku(slug, option, variant, quantity, price string) *pb.Sign
 	return listing
 }
 
-type fixedBIP44KeyDeriver struct{}
+type fixedWalletAccountService struct{}
 
-func (fixedBIP44KeyDeriver) DeriveAddress(iwallet.ChainType, uint32) (string, error) {
-	return "ltc1q_shadow_quote_test", nil
+func (fixedWalletAccountService) Capabilities(context.Context, string) (contracts.WalletCapabilities, error) {
+	return contracts.WalletCapabilities{Receive: true, Watch: true, Spend: true, AutoTransfer: true, Guest: true}, nil
 }
 
-func (fixedBIP44KeyDeriver) DerivePrivateKey(iwallet.ChainType, uint32) ([]byte, error) {
-	return []byte{1}, nil
+func (fixedWalletAccountService) Transfer(context.Context, contracts.WalletTransferRequest) (contracts.WalletTransfer, error) {
+	return contracts.WalletTransfer{}, nil
+}
+
+func (fixedWalletAccountService) ReconcileTransfers(context.Context) error { return nil }
+
+func (fixedWalletAccountService) ReserveAddress(_ context.Context, railID string, _ contracts.WalletAccountRole, _ string) (contracts.ReservedDestination, error) {
+	return contracts.ReservedDestination{
+		Destination: contracts.Destination{RailID: railID, Address: "ltc1q_payment", Version: 1},
+	}, nil
+}
+
+func newFixedWalletDirectPaymentService(db database.Database) *DirectPaymentService {
+	service := NewDirectPaymentService(db)
+	service.SetWalletAccountService(fixedWalletAccountService{})
+	return service
 }
 
 func newGuestQuoteDigitalAssetService(t *testing.T, db *testDatabase) *digital.DigitalAssetAppService {

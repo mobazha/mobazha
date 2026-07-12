@@ -12,6 +12,29 @@ import (
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
+type stubUTXOMonitor struct {
+	healthy bool
+	sources int
+	watched int
+}
+
+func (s *stubUTXOMonitor) IsHealthy(iwallet.ChainType) bool { return s != nil && s.healthy }
+func (s *stubUTXOMonitor) GetHealthySourceCount(iwallet.ChainType) int {
+	if s == nil || !s.healthy {
+		return 0
+	}
+	if s.sources > 0 {
+		return s.sources
+	}
+	return 1
+}
+func (s *stubUTXOMonitor) GetWatchedAddressCount() int {
+	if s == nil {
+		return 0
+	}
+	return s.watched
+}
+
 func newUTXOCapableService(t *testing.T, monitorHealthy, withReceiving bool) *GuestOrderAppService {
 	t.Helper()
 	db := newGuestTestDB(t)
@@ -26,11 +49,11 @@ func newUTXOCapableService(t *testing.T, monitorHealthy, withReceiving bool) *Gu
 		}).Error)
 	}
 	svc := &GuestOrderAppService{
-		db: db,
+		db:             db,
+		walletAccounts: readyGuestWalletAccountService{},
 		supportedUTXOChains: map[iwallet.ChainType]struct{}{
 			iwallet.ChainLitecoin: {},
 		},
-		sweepService: NewAutoSweepService(db, nil, nil),
 		multiwallet: &mockWalletOperator{
 			wallet: &mockUTXOWallet{scriptPubKey: []byte{0x76, 0xa9, 0x14}},
 		},
@@ -79,16 +102,29 @@ func TestEvaluateGuestPaymentCapability_UTXOHiddenWithoutMonitor(t *testing.T) {
 	}
 }
 
-func TestEvaluateGuestPaymentCapability_UTXOHiddenWithoutReceivingAccount(t *testing.T) {
+func TestEvaluateGuestPaymentCapability_UTXODoesNotRequireSelfSweepReceivingAccount(t *testing.T) {
 	svc := newUTXOCapableService(t, true, false)
 	ltc := iwallet.CoinType("crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native")
 	info, _ := iwallet.CoinInfoFromCoinType(ltc)
 
 	cap := svc.evaluateGuestPaymentCapability(ltc, info)
-	if cap.BuyerVisible {
-		t.Fatal("UTXO must be hidden without active receiving account")
+	if !cap.BuyerVisible {
+		t.Fatalf("AccountGuest balance is directly spendable and must not require a self-sweep receiving account: %s", cap.Reason)
 	}
 }
+
+type readyGuestWalletAccountService struct{}
+
+func (readyGuestWalletAccountService) Capabilities(context.Context, string) (contracts.WalletCapabilities, error) {
+	return contracts.WalletCapabilities{Receive: true, Watch: true, Spend: true, AutoTransfer: true, Guest: true}, nil
+}
+func (readyGuestWalletAccountService) ReserveAddress(context.Context, string, contracts.WalletAccountRole, string) (contracts.ReservedDestination, error) {
+	return contracts.ReservedDestination{}, nil
+}
+func (readyGuestWalletAccountService) Transfer(context.Context, contracts.WalletTransferRequest) (contracts.WalletTransfer, error) {
+	return contracts.WalletTransfer{}, nil
+}
+func (readyGuestWalletAccountService) ReconcileTransfers(context.Context) error { return nil }
 
 func TestFilterAvailableCoins_HidesEVMAndRequiresUTXOClosure(t *testing.T) {
 	svc := newUTXOCapableService(t, true, true)
@@ -119,7 +155,7 @@ func newEVMClosureTestService(t *testing.T, runtime ManagedEscrowClosureRuntime)
 		IsActive:    true,
 		Address:     "0x1111111111111111111111111111111111111111",
 	}).Error)
-	dp := NewDirectPaymentService(db, nil)
+	dp := NewDirectPaymentService(db)
 	dp.SetManagedEscrowFunding(testManagedEscrowProjector{}, testGuestOwnerResolver{})
 	svc := &GuestOrderAppService{
 		db:                      db,

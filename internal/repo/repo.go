@@ -21,6 +21,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/logging"
 	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/tyler-smith/go-bip39"
 	"gorm.io/gorm"
 )
@@ -344,7 +345,6 @@ func GetKeysFromDB(tx database.Tx) (dbEscrowKey, dbBip44Key, dbSolKey, dbRatingK
 		if err := tx.Read().Where("name = ?", "solana").First(&solKey).Error; err != nil {
 			return fmt.Errorf("failed to get SOL key: %v", err)
 		}
-
 		return nil
 	}()
 	if err != nil {
@@ -565,6 +565,10 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.GuestOrderItem{},
 		&models.InventoryReservation{},
 		&models.DirectPaymentAddressCounter{},
+		&models.WalletAddressCursor{},
+		&models.WalletAddressReservation{},
+		&models.WalletTransfer{},
+		&models.WalletTransferInput{},
 		&models.SweepTask{},
 		&models.DigitalAsset{},
 		&models.DigitalLicenseKey{},
@@ -656,6 +660,9 @@ func autoMigrateDatabase(db database.Database) error {
 					return fmt.Errorf("failed to create receiving_accounts: %v", err)
 				}
 			}
+		}
+		if err := assertNoLegacyWalletReceivingState(tx); err != nil {
+			return err
 		}
 
 		return nil
@@ -829,6 +836,10 @@ func autoMigrateDatabaseSafe(db database.Database) error {
 		&models.GuestOrderItem{},
 		&models.InventoryReservation{},
 		&models.DirectPaymentAddressCounter{},
+		&models.WalletAddressCursor{},
+		&models.WalletAddressReservation{},
+		&models.WalletTransfer{},
+		&models.WalletTransferInput{},
 		&models.SweepTask{},
 		&models.DigitalAsset{},
 		&models.DigitalLicenseKey{},
@@ -850,8 +861,68 @@ func autoMigrateDatabaseSafe(db database.Database) error {
 				return fmt.Errorf("migrate %s failed: %v", reflect.TypeOf(m).String(), err)
 			}
 		}
-		return migratePurchaseRequestCorrelations(tx)
+		if err := migratePurchaseRequestCorrelations(tx); err != nil {
+			return err
+		}
+		return assertNoLegacyWalletReceivingState(tx)
 	})
+}
+
+func assertNoLegacyWalletReceivingState(tx database.Tx) error {
+	var count int64
+	if err := tx.Read().Model(&models.SweepTask{}).
+		Where("key_source = ?", "affiliate_escrow").Count(&count).Error; err != nil {
+		return fmt.Errorf("inspect legacy affiliate sweep state: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("legacy affiliate escrow sweep state exists (%d records); stop startup and migrate funds explicitly", count)
+	}
+	if err := tx.Read().Model(&models.DirectPaymentAddressCounter{}).Count(&count).Error; err != nil {
+		return fmt.Errorf("inspect legacy guest address state: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("legacy guest address allocation state exists (%d records); stop startup and migrate or reset it explicitly", count)
+	}
+	if err := tx.Read().Model(&models.SweepTask{}).Count(&count).Error; err != nil {
+		return fmt.Errorf("inspect legacy guest sweep state: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("legacy guest sweep state exists (%d records); stop startup and migrate funds explicitly", count)
+	}
+	legacyGuestRails := make([]string, 0, 5)
+	for _, chain := range []iwallet.ChainType{
+		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash, iwallet.ChainLitecoin,
+		iwallet.ChainZCash, iwallet.ChainTRON,
+	} {
+		if rail, ok := iwallet.CanonicalNativeCoinType(chain); ok {
+			legacyGuestRails = append(legacyGuestRails, string(rail))
+		}
+	}
+	reservation := tx.Read().Model(&models.WalletAddressReservation{}).Select("1").
+		Where("wallet_address_reservations.tenant_id = guest_orders.tenant_id").
+		Where("wallet_address_reservations.rail_id = guest_orders.payment_coin").
+		Where("wallet_address_reservations.account_role = ?", "guest").
+		Where("wallet_address_reservations.reference_id = guest_orders.order_token").
+		Where("wallet_address_reservations.address = guest_orders.payment_address")
+	if err := tx.Read().Model(&models.GuestOrder{}).
+		Where("payment_coin IN ? AND payment_address <> ?", legacyGuestRails, "").
+		Where("payment_attempt_id = ?", "").
+		Where("NOT EXISTS (?)", reservation).
+		Count(&count).Error; err != nil {
+		return fmt.Errorf("inspect legacy guest payment address state: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("legacy guest payment address state exists (%d records); stop startup and migrate funds or reset orders explicitly", count)
+	}
+	if err := tx.Read().Model(&models.GuestOrder{}).
+		Where("managed_escrow_metadata IS NOT NULL AND length(managed_escrow_metadata) > 0 AND (settlement_owner_version IS NULL OR settlement_owner_version <> ?)", "settlement-domain-v1").
+		Count(&count).Error; err != nil {
+		return fmt.Errorf("inspect legacy guest managed escrow owner state: %w", err)
+	}
+	if count > 0 {
+		return fmt.Errorf("legacy guest managed escrow owner state exists (%d records); stop startup and migrate or reset its Safe authority explicitly", count)
+	}
+	return nil
 }
 
 func migratePurchaseRequestCorrelations(tx database.Tx) error {

@@ -2,9 +2,15 @@ package utxo
 
 import (
 	"context"
+	"errors"
 
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
+
+// ErrTransactionNotFound means every authoritative chain source queried
+// successfully and reported that the transaction is absent. Callers must not
+// treat transport, health, or timeout errors as equivalent to this result.
+var ErrTransactionNotFound = errors.New("transaction not found")
 
 // MonitorFactory creates and configures UTXO monitors
 // This interface allows external packages (like hosting) to create monitors

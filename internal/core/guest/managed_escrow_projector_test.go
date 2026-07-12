@@ -33,7 +33,7 @@ type testManagedEscrowProjector struct{}
 
 type testGuestOwnerResolver struct{}
 
-func (testGuestOwnerResolver) SellerEVMOwnerAddress(context.Context) (common.Address, error) {
+func (testGuestOwnerResolver) SellerEVMOwnerAddress(context.Context, string) (common.Address, error) {
 	return common.HexToAddress("0x3333333333333333333333333333333333333333"), nil
 }
 

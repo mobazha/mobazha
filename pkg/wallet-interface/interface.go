@@ -184,6 +184,13 @@ type UTXOSplitSweeper interface {
 	BuildSplitSweepTx(inputs []SweepInput, signingKey btcec.PrivateKey, sellerAddress, affiliateAddress string, affiliateAmount, feePerByte int64) (rawTx []byte, txHash string, err error)
 }
 
+// UTXOTransferBuilder builds an exact-value external transfer with change
+// returned to a wallet-controlled address. It is wallet infrastructure and
+// intentionally carries no Guest, Affiliate, or settlement semantics.
+type UTXOTransferBuilder interface {
+	BuildTransferTx(inputs []SweepInput, signingKey btcec.PrivateKey, changeAddress, destinationAddress string, amount, feePerByte int64) (rawTx []byte, txHash string, err error)
+}
+
 // UTXODustChecker exposes the chain wallet's current dust policy to callers
 // that must reject an unfundable output before showing a payment target.
 type UTXODustChecker interface {

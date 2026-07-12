@@ -283,9 +283,9 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 	n.initReceivingAccountService()
 
 	if n.bip44Key != nil {
-		keyDeriver := guest.NewNodeKeyDeriver(n.bip44Key, nil)
-		n.directPaymentService = guest.NewDirectPaymentService(n.db, keyDeriver)
-		n.autoSweepService = guest.NewAutoSweepService(n.db, keyDeriver, n.eventBus)
+		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet)
+		n.directPaymentService = guest.NewDirectPaymentService(n.db)
+		n.directPaymentService.SetWalletAccountService(n.walletAccountService)
 	}
 
 	initSovereignFeatureResolver(n)
@@ -301,7 +301,6 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 		Context:            n.nodeCtx,
 		DB:                 n.db,
 		DirectPayment:      n.directPaymentService,
-		SweepService:       n.autoSweepService,
 		EventBus:           n.eventBus,
 		NodeID:             n.nodeID,
 		PeerID:             n.peerID.String(),

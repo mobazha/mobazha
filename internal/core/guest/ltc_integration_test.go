@@ -36,6 +36,10 @@ func (m *mockUTXOWallet) BuildSplitSweepTx(_ []iwallet.SweepInput, _ btcec.Priva
 	return []byte{0x01}, "mock-split-sweep", nil
 }
 
+func (m *mockUTXOWallet) BuildTransferTx(_ []iwallet.SweepInput, _ btcec.PrivateKey, _, _ string, _ int64, _ int64) ([]byte, string, error) {
+	return []byte{0x01}, "mock-transfer", nil
+}
+
 func (m *mockUTXOWallet) IsDust(_ iwallet.Address, amount iwallet.Amount) bool {
 	return amount.Int64() < 1000
 }
@@ -165,43 +169,4 @@ func TestLTCGuestOrder_InsufficientPayment(t *testing.T) {
 	o := loadGuestOrder(t, db, token)
 	assert.Equal(t, models.GuestOrderAwaitingPayment, o.State,
 		"order should remain AwaitingPayment after insufficient payment")
-}
-
-// TestLTCGuestOrder_ConfirmToFunded_CreatesSweepTask verifies that
-// HandleConfirmationUpdate reaching the threshold creates a SweepTask
-// with correct LTC chain key derivation.
-func TestLTCGuestOrder_ConfirmToFunded_CreatesSweepTask(t *testing.T) {
-	db := newGuestTestDB(t)
-	sweepSvc := &AutoSweepService{db: db}
-	svc := &GuestOrderAppService{db: db, sweepService: sweepSvc}
-
-	token := "gst_ltc_funded_sweep"
-	seedGuestOrder(t, db, 502, models.GuestOrder{
-		OrderToken:     token,
-		State:          models.GuestOrderPaymentDetected,
-		PaymentCoin:    ltcCoinTypeStr,
-		PaymentTxHash:  "ltc_tx_conf_001",
-		PaymentAddress: "ltc1q_pay_addr_conf",
-		PaymentAmount:  "750000",
-		SweepToAddress: "ltc1q_seller_conf",
-		AddressIndex:   12,
-		RequiredConfs:  3,
-		ExpiresAt:      time.Now().Add(time.Hour),
-	})
-
-	err := svc.HandleConfirmationUpdate(token, 3)
-	require.NoError(t, err)
-
-	o := loadGuestOrder(t, db, token)
-	assert.Equal(t, models.GuestOrderFunded, o.State)
-	assert.NotNil(t, o.FundedAt)
-
-	var task models.SweepTask
-	require.NoError(t, db.gormDB.Where("order_token = ?", token).First(&task).Error)
-	assert.Equal(t, "ltc1q_pay_addr_conf", task.FromAddress)
-	assert.Equal(t, "ltc1q_seller_conf", task.ToAddress)
-	assert.Equal(t, "750000", task.Amount)
-	assert.Equal(t, uint32(12), task.AddressIndex)
-	assert.Equal(t, models.SweepStatusPending, task.Status)
-	assert.Equal(t, "LTC", task.ChainKey)
 }

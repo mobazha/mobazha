@@ -50,13 +50,14 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 	}
 
 	n.configureUTXOWallets(n.monitorService)
+	if walletAccounts, ok := n.walletAccountService.(*walletAccountService); ok {
+		walletAccounts.SetChainOperations(n.monitorService)
+	}
 
 	// Wire the guest checkout subsystem to the running monitor.
 	//
 	//   1. UTXO monitor → guestPaymentMonitor (so WatchAddress works).
-	//   2. ChainOperations (monitor) → autoSweepService (confirmation polling).
-	//   3. Wire UTXOSweepBroadcaster for sweepable chains.
-	//   4. EnableUTXOChain for every UTXO chain whose loaded wallet implements
+	//   2. EnableUTXOChain for every UTXO chain whose loaded wallet implements
 	//      the chain-specific UTXOSweeper contract.
 	if n.guestPaymentMonitor != nil {
 		if mon, ok := n.monitorService.(*utxo.Monitor); ok {
@@ -68,14 +69,6 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 	}
 	if n.guestOrderService != nil {
 		n.guestOrderService.LogGuestUTXOReadinessSummary(context.Background(), n.nodeID)
-	}
-	if n.autoSweepService != nil {
-		n.autoSweepService.SetChainOps(n.monitorService)
-		n.autoSweepService.SetMultiwallet(n.multiwallet)
-		n.autoSweepService.SetAffiliateSweepRuntime(n.keyProvider, n.settlementService)
-		if err := n.autoSweepService.StartAffiliateUTXOSweeps(context.Background(), n.nodeID, n.monitorService); err != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "start affiliate UTXO sweeps: %v", err)
-		}
 	}
 	if n.guestOrderService != nil && n.multiwallet != nil {
 		for _, chain := range n.multiwallet.SupportedChains() {
@@ -89,6 +82,9 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 			if _, sweepable := wallet.(iwallet.UTXOSweeper); !sweepable {
 				continue
 			}
+			if _, transferable := wallet.(iwallet.UTXOTransferBuilder); !transferable {
+				continue
+			}
 			n.guestOrderService.EnableUTXOChain(chain)
 		}
 	}
@@ -98,14 +94,19 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 		n.paymentService.CheckPendingPaymentsOnStartup()
 	}
 
-	// Restore guest checkout watches and pending sweeps after restart.
+	// Restore guest checkout watches and wallet transfers after restart.
 	if n.guestPaymentMonitor != nil {
 		if err := n.guestPaymentMonitor.RestoreWatches(context.Background()); err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "restore guest payment watches: %v", err)
 		}
 	}
-	if n.autoSweepService != nil {
-		n.autoSweepService.RestorePendingSweeps(context.Background())
+	if n.walletAccountService != nil {
+		if err := n.walletAccountService.ReconcileTransfers(context.Background()); err != nil {
+			logger.LogErrorWithIDf(log, n.nodeID, "restore wallet transfers: %v", err)
+		}
+	}
+	if n.guestOrderService != nil {
+		n.guestOrderService.RecoverGuestWalletAffiliateTransfers(context.Background())
 	}
 }
 

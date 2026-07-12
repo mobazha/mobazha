@@ -466,6 +466,12 @@ func (w *LitecoinWallet) BuildSplitSweepTx(inputs []iwallet.SweepInput, signingK
 	return w.buildSweepTx(inputs, signingKey, sellerAddress, affiliateAddress, affiliateAmount, feePerByte)
 }
 
+// BuildTransferTx builds an exact external output and returns the remainder to
+// a wallet-controlled change address.
+func (w *LitecoinWallet) BuildTransferTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, changeAddress, destinationAddress string, amount, feePerByte int64) ([]byte, string, error) {
+	return w.buildSweepTx(inputs, signingKey, changeAddress, destinationAddress, amount, feePerByte)
+}
+
 func (w *LitecoinWallet) buildSweepTx(inputs []iwallet.SweepInput, signingKey btcec.PrivateKey, destAddress, affiliateAddress string, affiliateAmount, feePerByte int64) ([]byte, string, error) {
 	if len(inputs) == 0 {
 		return nil, "", errors.New("no inputs provided")

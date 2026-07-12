@@ -98,8 +98,7 @@ func TestHandlePaymentDetected_NonZeroConfs_StaysDetected(t *testing.T) {
 
 func TestHandleConfirmationUpdate_ReachesThreshold_Funded(t *testing.T) {
 	db := newGuestTestDB(t)
-	sweepSvc := &AutoSweepService{db: db}
-	svc := &GuestOrderAppService{db: db, sweepService: sweepSvc}
+	svc := &GuestOrderAppService{db: db}
 
 	seedGuestOrder(t, db, 1, models.GuestOrder{
 		OrderToken:     "gst_test_confirm",
@@ -127,14 +126,9 @@ func TestHandleConfirmationUpdate_ReachesThreshold_Funded(t *testing.T) {
 	assert.Equal(t, 3, order.Confirmations)
 	assert.NotNil(t, order.FundedAt)
 
-	var task models.SweepTask
-	require.NoError(t, db.gormDB.Where("order_token = ?", "gst_test_confirm").First(&task).Error,
-		"SweepTask should be created when order transitions to Funded")
-	assert.Equal(t, "ltc1q_payment_addr", task.FromAddress)
-	assert.Equal(t, "ltc1q_seller_addr", task.ToAddress)
-	assert.Equal(t, "500000", task.Amount)
-	assert.Equal(t, uint32(7), task.AddressIndex)
-	assert.Equal(t, models.SweepStatusPending, task.Status)
+	var taskCount int64
+	require.NoError(t, db.gormDB.Model(&models.SweepTask{}).Where("order_token = ?", "gst_test_confirm").Count(&taskCount).Error)
+	assert.Zero(t, taskCount)
 }
 
 func TestHandlePaymentDetected_IdempotentForLaterStates(t *testing.T) {

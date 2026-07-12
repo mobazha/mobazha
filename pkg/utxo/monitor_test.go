@@ -21,6 +21,7 @@ type mockPaymentSource struct {
 	broadcastTx    string
 	subscribeErr   error
 	transactions   []*iwallet.Transaction
+	transactionErr error
 	subscribeCalls []string // tracks addresses passed to Subscribe
 	mu             sync.RWMutex
 }
@@ -59,7 +60,10 @@ func (m *mockPaymentSource) GetTransaction(ctx context.Context, txid string) (*i
 	if tx, ok := m.txByID[txid]; ok {
 		return tx, nil
 	}
-	return nil, errors.New("transaction not found")
+	if m.transactionErr != nil {
+		return nil, m.transactionErr
+	}
+	return nil, ErrTransactionNotFound
 }
 
 func (m *mockPaymentSource) IsHealthy() bool {
@@ -541,6 +545,42 @@ func TestMonitorGetTransaction(t *testing.T) {
 		// Should get from healthy source
 		if tx.Value.Int64() != 200000 {
 			t.Error("Should have gotten transaction from healthy source")
+		}
+	})
+
+	t.Run("all healthy sources agree transaction is missing", func(t *testing.T) {
+		m := NewMonitor(nil)
+		m.AddSource(iwallet.ChainBitcoin, newMockPaymentSource(true))
+		m.AddSource(iwallet.ChainBitcoin, newMockPaymentSource(true))
+
+		tx, err := m.GetTransaction(iwallet.ChainBitcoin, "missing")
+		if tx != nil {
+			t.Fatalf("expected no transaction, got %s", tx.ID)
+		}
+		if !errors.Is(err, ErrTransactionNotFound) {
+			t.Fatalf("expected ErrTransactionNotFound, got %v", err)
+		}
+	})
+
+	t.Run("unhealthy or failing source keeps absence inconclusive", func(t *testing.T) {
+		m := NewMonitor(nil)
+		m.AddSource(iwallet.ChainBitcoin, newMockPaymentSource(true))
+		m.AddSource(iwallet.ChainBitcoin, newMockPaymentSource(false))
+
+		_, err := m.GetTransaction(iwallet.ChainBitcoin, "missing")
+		if err == nil || errors.Is(err, ErrTransactionNotFound) {
+			t.Fatalf("expected inconclusive source error, got %v", err)
+		}
+
+		m = NewMonitor(nil)
+		missing := newMockPaymentSource(true)
+		failing := newMockPaymentSource(true)
+		failing.transactionErr = errors.New("temporary rpc failure")
+		m.AddSource(iwallet.ChainBitcoin, missing)
+		m.AddSource(iwallet.ChainBitcoin, failing)
+		_, err = m.GetTransaction(iwallet.ChainBitcoin, "missing")
+		if err == nil || errors.Is(err, ErrTransactionNotFound) {
+			t.Fatalf("expected transient source error, got %v", err)
 		}
 	})
 }

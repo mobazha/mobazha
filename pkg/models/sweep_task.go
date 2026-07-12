@@ -2,11 +2,9 @@ package models
 
 import "time"
 
-// SweepTask represents a pending or completed auto-sweep operation.
-// After a Guest Order payment is confirmed (FUNDED), the node creates a
-// SweepTask to transfer funds from the HD-derived address to the seller's
-// receiving account address. Affiliate UTXO payouts use the same task and
-// lifecycle, but are signed by the local escrow master key instead of BIP44.
+// SweepTask is the read-only schema sentinel for pre-ADR-016 Guest auto-sweep
+// rows. No runtime service creates or processes this model; startup fails when
+// legacy key sources are present so funds must be migrated explicitly.
 type SweepTask struct {
 	TenantMixin
 	ID                     int            `gorm:"primaryKey;autoIncrement:false" json:"id"`
@@ -27,18 +25,12 @@ type SweepTask struct {
 	UpdatedAt              time.Time      `gorm:"autoUpdateTime" json:"updatedAt"`
 }
 
-// SweepKeySource identifies the private-key domain that owns FromAddress.
-// It is deliberately task-local: a task must never infer its key source from
-// an address or fall back from affiliate escrow keys to Guest BIP44 keys.
+// SweepKeySource identifies a retired sweep private-key domain.
 type SweepKeySource string
 
 const (
-	// SweepKeySourceBIP44 signs Guest Checkout payment addresses derived from
-	// the node's BIP44 master key and AddressIndex.
+	// SweepKeySourceBIP44 identifies the retired Guest account-0 path.
 	SweepKeySourceBIP44 SweepKeySource = "bip44"
-	// SweepKeySourceAffiliateEscrow signs the promoter-controlled BTC/BCH/LTC
-	// address derived directly from the node's EscrowMasterKey public key.
-	SweepKeySourceAffiliateEscrow SweepKeySource = "affiliate_escrow"
 )
 
 // TableName overrides the default GORM table name.

@@ -14,25 +14,13 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
-
-// BIP44KeyDeriver derives blockchain addresses and private keys from the
-// node's BIP-44 master key for Guest Checkout direct payments and sweeps.
-//
-// The derivation path is m/44'/{coinType}'/0'/0/{index}; implementations
-// receive a master key already at m/44' and own the rest of the path.
-//
-// This interface is intentionally distinct from UTXOKeyDeriver (escrow
-// chaincode-based derivation). The two share no semantics.
-type BIP44KeyDeriver interface {
-	DeriveAddress(chainType iwallet.ChainType, index uint32) (address string, err error)
-	DerivePrivateKey(chainType iwallet.ChainType, index uint32) (privKey []byte, err error)
-}
 
 // PaymentAddressRequest contains the parameters for generating a payment address.
 type PaymentAddressRequest struct {
@@ -53,7 +41,8 @@ type PaymentAddressResult struct {
 	ReferenceKey  string // Legacy correlation key retained for stored-order compatibility.
 	SweepTo       string // seller receiving address (empty for Solana)
 	// ManagedEscrowMetadata is opaque provider JSON persisted by Core.
-	ManagedEscrowMetadata []byte
+	ManagedEscrowMetadata  []byte
+	SettlementOwnerVersion string
 }
 
 // DirectPaymentService generates unique payment targets for Guest Checkout.
@@ -61,7 +50,8 @@ type PaymentAddressResult struct {
 // trusted direct-observed module owns all provider-specific allocation.
 type DirectPaymentService struct {
 	db               database.Database
-	keyDeriver       BIP44KeyDeriver
+	walletAccountsMu sync.RWMutex
+	walletAccounts   contracts.WalletAccountService
 	projectorMu      sync.RWMutex
 	projector        distribution.ManagedEscrowGuestProjector
 	sellerOwner      GuestEVMSellerOwnerResolver
@@ -69,16 +59,22 @@ type DirectPaymentService struct {
 	externalPayments *distribution.ExternalPaymentRuntimeCatalog
 }
 
-// NewDirectPaymentService creates a DirectPaymentService.
-// AutoSweepService is injected later (Sprint 1) via a setter to break the init cycle.
-func NewDirectPaymentService(
-	db database.Database,
-	keyDeriver BIP44KeyDeriver,
-) *DirectPaymentService {
-	return &DirectPaymentService{
-		db:         db,
-		keyDeriver: keyDeriver,
+// NewDirectPaymentService creates a DirectPaymentService without accepting
+// any raw-key or derivation dependency.
+func NewDirectPaymentService(db database.Database) *DirectPaymentService {
+	return &DirectPaymentService{db: db}
+}
+
+// SetWalletAccountService installs the opaque wallet-domain adapter used for
+// Guest receiving addresses. When installed, Guest UTXO allocation never
+// exposes a derivation path or private key to this business service.
+func (s *DirectPaymentService) SetWalletAccountService(accounts contracts.WalletAccountService) {
+	if s == nil {
+		return
 	}
+	s.walletAccountsMu.Lock()
+	defer s.walletAccountsMu.Unlock()
+	s.walletAccounts = accounts
 }
 
 // SetManagedEscrowFunding atomically binds or clears the provider-specific
@@ -155,7 +151,7 @@ func (s *DirectPaymentService) generateManagedEscrowFunding(
 	if !common.IsHexAddress(receiving.Address) || common.HexToAddress(receiving.Address) == (common.Address{}) {
 		return nil, fmt.Errorf("managed escrow settlement recipient %q is not a valid EVM address", receiving.Address)
 	}
-	owner, err := sellerOwner.SellerEVMOwnerAddress(ctx)
+	owner, err := sellerOwner.SellerEVMOwnerAddress(ctx, string(req.CoinType))
 	if err != nil {
 		return nil, err
 	}
@@ -174,48 +170,31 @@ func (s *DirectPaymentService) generateManagedEscrowFunding(
 	}
 	return &PaymentAddressResult{
 		Address: target.Address, SweepTo: receiving.Address,
-		ManagedEscrowMetadata: append([]byte(nil), target.Metadata...),
+		ManagedEscrowMetadata:  append([]byte(nil), target.Metadata...),
+		SettlementOwnerVersion: "settlement-domain-v1",
 	}, nil
 }
 
-// derivePaymentAddress handles UTXO and TRON chains using node-managed HD derivation.
+// derivePaymentAddress requires the wallet account adapter. Legacy Guest
+// counter/account-0 allocation is intentionally unavailable for new work.
 func (s *DirectPaymentService) derivePaymentAddress(
 	ctx context.Context,
-	chainType iwallet.ChainType,
+	_ iwallet.ChainType,
 	req PaymentAddressRequest,
 ) (*PaymentAddressResult, error) {
-	var account models.ReceivingAccount
-	err := s.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("chain_type = ? AND is_active = ?",
-			string(chainType), true).First(&account).Error
-	})
-	if err != nil {
-		return nil, fmt.Errorf("no active receiving account for chain %s: %w", chainType, err)
+	s.walletAccountsMu.RLock()
+	accounts := s.walletAccounts
+	s.walletAccountsMu.RUnlock()
+	if accounts == nil {
+		return nil, fmt.Errorf("wallet account service is required for guest receiving addresses")
 	}
-
-	var index uint32
-	err = s.db.Update(func(tx database.Tx) error {
-		counter, err := s.getOrCreateCounter(tx, string(chainType))
-		if err != nil {
-			return err
-		}
-		index = counter.NextIndex
-		counter.NextIndex++
-		return tx.Save(counter)
-	})
+	reservation, err := accounts.ReserveAddress(ctx, string(req.CoinType), contracts.AccountGuest, req.OrderToken)
 	if err != nil {
-		return nil, fmt.Errorf("allocate address index: %w", err)
+		return nil, fmt.Errorf("reserve guest payment address: %w", err)
 	}
-
-	addr, err := s.keyDeriver.DeriveAddress(chainType, index)
-	if err != nil {
-		return nil, fmt.Errorf("derive address for %s index %d: %w", chainType, index, err)
-	}
-
 	return &PaymentAddressResult{
-		Address:      addr,
-		AddressIndex: index,
-		SweepTo:      account.Address,
+		Address:      reservation.Address,
+		AddressIndex: reservation.Index,
 	}, nil
 }
 
@@ -749,22 +728,4 @@ func externalPaymentAddressHasResult(state string) bool {
 func stableExternalPaymentIdentity(prefix, seed string) string {
 	sum := sha256.Sum256([]byte(seed))
 	return prefix + hex.EncodeToString(sum[:30])
-}
-
-func (s *DirectPaymentService) getOrCreateCounter(tx database.Tx, chainKey string) (*models.DirectPaymentAddressCounter, error) {
-	var counter models.DirectPaymentAddressCounter
-	err := tx.Read().
-		Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("chain_key = ?", chainKey).
-		First(&counter).Error
-	if err != nil {
-		counter = models.DirectPaymentAddressCounter{
-			ChainKey:  chainKey,
-			NextIndex: 0,
-		}
-		if err := tx.Save(&counter); err != nil {
-			return nil, err
-		}
-	}
-	return &counter, nil
 }

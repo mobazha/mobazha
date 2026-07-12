@@ -212,6 +212,12 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 			n.credentialKeys = credentialKeys
 		}
 	}
+	if n.settlementSigner == nil {
+		n.settlementSigner = newLocalSettlementSigner(n.keyProvider)
+	}
+	if n.walletAccountService == nil && n.db != nil && n.bip44Key != nil {
+		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet)
+	}
 	n.initProfileService()
 	n.initModerationService()
 	n.initMediaService()
@@ -848,6 +854,7 @@ func (n *MobazhaNode) initProfileService() {
 		SolanaPubKeyStr:        solanaPubKeyStr,
 		StripeAccountID:        n.stripeAccountID,
 		StoreAndForwardServers: n.storeAndForwardServers,
+		WalletAccounts:         n.walletAccountService,
 		CoTenantPublicData:     n.coTenantPublicDataDeferred(),
 	})
 }
@@ -984,9 +991,8 @@ func (n *MobazhaNode) initNetDBSyncService() {
 	})
 }
 
-// initGuestOrderService creates Guest Checkout services and the shared UTXO
-// sweep infrastructure. Affiliate sweeps require only the escrow key, so the
-// sweep service is deliberately available even when Guest BIP44 is absent.
+// initGuestOrderService creates Guest Checkout services. Wallet-domain
+// receiving and transfers replace the former Guest raw-key sweep worker.
 func (n *MobazhaNode) initGuestOrderService() {
 	if n.infrastructureOnly {
 		return
@@ -994,16 +1000,15 @@ func (n *MobazhaNode) initGuestOrderService() {
 	if n.db == nil || n.eventBus == nil {
 		return
 	}
-	if n.autoSweepService == nil {
-		n.autoSweepService = guest.NewAutoSweepService(n.db, nil, n.eventBus)
-	}
 	if n.bip44Key == nil {
 		return
 	}
 
-	keyDeriver := guest.NewNodeKeyDeriver(n.bip44Key, n.multiwallet)
-	n.directPaymentService = guest.NewDirectPaymentService(n.db, keyDeriver)
-	n.autoSweepService = guest.NewAutoSweepService(n.db, keyDeriver, n.eventBus)
+	if n.walletAccountService == nil {
+		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet)
+	}
+	n.directPaymentService = guest.NewDirectPaymentService(n.db)
+	n.directPaymentService.SetWalletAccountService(n.walletAccountService)
 	if n.supplyAvailabilityService == nil {
 		initSupplyAvailabilitySubsystem(n)
 	}
@@ -1026,7 +1031,7 @@ func (n *MobazhaNode) initGuestOrderService() {
 		Context:                 n.nodeCtx,
 		DB:                      n.db,
 		DirectPayment:           n.directPaymentService,
-		SweepService:            n.autoSweepService,
+		WalletAccounts:          n.walletAccountService,
 		EventBus:                n.eventBus,
 		NodeID:                  n.nodeID,
 		PeerID:                  n.peerID.String(),
@@ -1072,9 +1077,9 @@ func (n *MobazhaNode) initGuestOrderService() {
 }
 
 // detectGuestUTXOChains returns the UTXO chains that should be enabled for
-// guest checkout based on loaded wallet capabilities. Address derivation type
-// is not a proxy for sweep support: BCH uses CashAddr/P2PKH and provides its
-// own ForkID-aware UTXOSweeper implementation.
+// guest checkout based on loaded wallet capabilities. Both sweep-all and
+// exact-output-with-change are required so local balances and frozen
+// Affiliate outputs share one recoverable WalletTransfer path.
 func (n *MobazhaNode) detectGuestUTXOChains() []iwallet.ChainType {
 	if n.multiwallet == nil {
 		return nil
@@ -1089,6 +1094,9 @@ func (n *MobazhaNode) detectGuestUTXOChains() []iwallet.ChainType {
 			continue
 		}
 		if _, sweepable := wallet.(iwallet.UTXOSweeper); !sweepable {
+			continue
+		}
+		if _, transferable := wallet.(iwallet.UTXOTransferBuilder); !transferable {
 			continue
 		}
 		out = append(out, chain)

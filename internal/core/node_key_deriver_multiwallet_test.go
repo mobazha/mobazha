@@ -13,7 +13,7 @@ import (
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
-// testUTXOChains is the chain set exercised by NodeKeyDeriver tests.
+// testUTXOChains is the chain set exercised by wallet account adapter tests.
 var testUTXOChains = []iwallet.ChainType{
 	iwallet.ChainBitcoin,
 	iwallet.ChainLitecoin,
@@ -21,8 +21,7 @@ var testUTXOChains = []iwallet.ChainType{
 	iwallet.ChainZCash,
 }
 
-// loadTestMultiwallet builds a UTXO-only multiwallet for address-derivation
-// tests and
+// loadTestMultiwallet builds a UTXO-only multiwallet for wallet account tests and
 // initializes each wallet's BIP-44 keys from the provided master key.
 //
 // Returns a multiwallet containing exactly the chains in testUTXOChains.

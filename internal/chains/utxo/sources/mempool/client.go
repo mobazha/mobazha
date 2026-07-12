@@ -279,6 +279,10 @@ func (s *Source) GetTransaction(ctx context.Context, txid string) (*iwallet.Tran
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		s.markHealthy()
+		return nil, pkgutxo.ErrTransactionNotFound
+	}
 	if resp.StatusCode != http.StatusOK {
 		s.markUnhealthy()
 		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)

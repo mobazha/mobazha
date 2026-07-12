@@ -18,6 +18,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/request"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 type ProfileAppService struct {
@@ -33,6 +34,7 @@ type ProfileAppService struct {
 	solanaPubKeyStr        string
 	stripeAccountID        string
 	storeAndForwardServers []string
+	walletAccounts         contracts.WalletAccountService
 
 	coTenantPublicData contracts.CoTenantPublicDataFn
 }
@@ -50,6 +52,7 @@ type ProfileAppServiceConfig struct {
 	SolanaPubKeyStr        string
 	StripeAccountID        string
 	StoreAndForwardServers []string
+	WalletAccounts         contracts.WalletAccountService
 
 	CoTenantPublicData contracts.CoTenantPublicDataFn
 }
@@ -67,6 +70,7 @@ func NewProfileAppService(cfg ProfileAppServiceConfig) *ProfileAppService {
 		solanaPubKeyStr:        cfg.SolanaPubKeyStr,
 		stripeAccountID:        cfg.StripeAccountID,
 		storeAndForwardServers: cfg.StoreAndForwardServers,
+		walletAccounts:         cfg.WalletAccounts,
 		coTenantPublicData:     cfg.CoTenantPublicData,
 	}
 }
@@ -79,6 +83,16 @@ func (s *ProfileAppService) SetProfile(profile *models.Profile, done chan<- stru
 	profile.PeerID = s.peerID.String()
 	profile.LastModified = time.Now()
 	profile.StoreAndForwardServers = s.storeAndForwardServers
+	profile.PayoutDestinationSet = models.PayoutDestinationSet{}
+	if s.walletAccounts != nil {
+		// A single unavailable rail (e.g. a wallet adapter still syncing)
+		// must not block unrelated profile edits such as name or bio.
+		// reserveAffiliateDestinations publishes whatever rails currently
+		// succeed; a rail that fails is simply absent from the set until a
+		// later save succeeds. Hosting will keep new Affiliate links unavailable
+		// while any required destination is absent, without blocking profile edits.
+		profile.PayoutDestinationSet = s.reserveAffiliateDestinations()
+	}
 
 	if err := validateProfile(profile); err != nil {
 		if done != nil {
@@ -105,6 +119,38 @@ func (s *ProfileAppService) SetProfile(profile *models.Profile, done chan<- stru
 		maybeCloseDone(done)
 	}
 	return nil
+}
+
+// reserveAffiliateDestinations publishes the best-effort set of Affiliate
+// payout destinations. A rail that cannot currently reserve an address (for
+// example a wallet adapter that has not finished loading) is skipped rather
+// than failing the whole profile save; Hosting already treats a missing rail
+// destination as "not yet available" for that specific rail, so partial
+// publication keeps new Affiliate links unavailable without blocking profile edits.
+func (s *ProfileAppService) reserveAffiliateDestinations() models.PayoutDestinationSet {
+	chains := []iwallet.ChainType{
+		iwallet.ChainBitcoin,
+		iwallet.ChainBitcoinCash,
+		iwallet.ChainLitecoin,
+		iwallet.ChainEthereum,
+	}
+	destinations := make([]models.PayoutDestination, 0, len(chains))
+	for _, chain := range chains {
+		railID, ok := iwallet.CanonicalNativeCoinType(chain)
+		if !ok {
+			log.Warningf("affiliate payout destination: no canonical rail for %s", chain)
+			continue
+		}
+		reserved, err := s.walletAccounts.ReserveAddress(context.Background(), string(railID), contracts.AccountAffiliate, "default")
+		if err != nil {
+			log.Warningf("affiliate payout destination: reserve %s address failed (will retry on next profile save): %v", railID, err)
+			continue
+		}
+		destinations = append(destinations, models.PayoutDestination{
+			RailID: reserved.RailID, Address: reserved.Address, Tag: reserved.Tag, Version: reserved.Version,
+		})
+	}
+	return models.PayoutDestinationSet{Destinations: destinations}
 }
 
 func (s *ProfileAppService) GetMyProfile() (*models.Profile, error) {

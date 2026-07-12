@@ -692,16 +692,30 @@ func (m *Monitor) GetTransaction(chain iwallet.ChainType, txid string) (*iwallet
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	notFound := 0
+	queried := 0
 	for _, source := range sources {
 		if !source.IsHealthy() {
 			continue
 		}
+		queried++
 
 		tx, err := source.GetTransaction(ctx, txid)
-		if err == nil {
+		if err == nil && tx != nil {
 			return tx, nil
 		}
+		if errors.Is(err, ErrTransactionNotFound) || (err == nil && tx == nil) {
+			notFound++
+			continue
+		}
 		log.Warningf("Failed to get transaction %s from source: %v", txid, err)
+	}
+	// Absence is authoritative only when every configured source was healthy,
+	// answered, and agreed the transaction was missing. A skipped or failing
+	// source keeps the result inconclusive so callers cannot rebuild and pay a
+	// second time during an outage or index lag.
+	if queried == len(sources) && notFound == len(sources) {
+		return nil, ErrTransactionNotFound
 	}
 
 	return nil, errors.New("failed to get transaction from all sources")

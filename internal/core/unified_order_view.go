@@ -238,22 +238,20 @@ func (v *UnifiedOrderView) batchSweepStatuses(orders []models.GuestOrder) map[st
 
 	tokens := make([]string, 0, len(orders))
 	for _, o := range orders {
-		if o.SweepToAddress != "" {
-			tokens = append(tokens, o.OrderToken)
-		}
+		tokens = append(tokens, o.OrderToken)
 	}
 	if len(tokens) == 0 {
 		return result
 	}
 
-	var tasks []models.SweepTask
+	var transfers []models.WalletTransfer
 	_ = v.db.View(func(tx database.Tx) error {
-		return tx.Read().Where("order_token IN ?", tokens).
-			Select("order_token, status").Find(&tasks).Error
+		return tx.Read().Where("reference_id IN ? AND account_role = ?", tokens, string(contracts.AccountGuest)).
+			Select("reference_id, state").Find(&transfers).Error
 	})
 
-	for _, t := range tasks {
-		result[t.OrderToken] = string(t.Status)
+	for _, transfer := range transfers {
+		result[transfer.ReferenceID] = transfer.State
 	}
 	return result
 }
@@ -270,10 +268,6 @@ func convertGuestOrder(g models.GuestOrder, sweepStatus string) contracts.OrderS
 	buyerName := "Guest"
 	if g.ContactEmail != "" {
 		buyerName = g.ContactEmail
-	}
-
-	if sweepStatus == "" && g.SweepToAddress != "" {
-		sweepStatus = "pending"
 	}
 
 	updatedAt := g.CreatedAt

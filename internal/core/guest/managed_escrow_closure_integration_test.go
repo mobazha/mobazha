@@ -26,7 +26,7 @@ func TestManagedEscrowClosure_CapabilityAndReadinessE2E(t *testing.T) {
 		Address:     "0x2222222222222222222222222222222222222222",
 	}).Error)
 
-	dp := NewDirectPaymentService(db, nil)
+	dp := NewDirectPaymentService(db)
 	dp.SetManagedEscrowFunding(testManagedEscrowProjector{}, testGuestOwnerResolver{})
 
 	svc := &GuestOrderAppService{

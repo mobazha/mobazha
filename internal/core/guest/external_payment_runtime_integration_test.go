@@ -187,11 +187,10 @@ func TestGuestOrder_DurableRouteIsCreateOnly(t *testing.T) {
 // guest checkout lifecycle:
 //
 //	WatchOrder → pool detection → confirmed payment → confirmation
-//	polling → funded state + sweep task creation.
+//	polling → funded state without a Core business sweep task.
 func TestExternalPaymentRuntime_PoolThenConfirmed_ToFunded(t *testing.T) {
 	db := newGuestTestDB(t)
-	sweepSvc := &AutoSweepService{db: db}
-	svc := &GuestOrderAppService{db: db, sweepService: sweepSvc}
+	svc := &GuestOrderAppService{db: db}
 
 	runtime := newObservedPaymentRuntimeStub()
 
@@ -270,14 +269,9 @@ func TestExternalPaymentRuntime_PoolThenConfirmed_ToFunded(t *testing.T) {
 	o = loadGuestOrder(t, db, token)
 	assert.NotNil(t, o.FundedAt)
 
-	var task models.SweepTask
-	require.NoError(t, db.gormDB.Where("order_token = ?", token).First(&task).Error)
-	assert.Equal(t, "external_subaddr_test", task.FromAddress)
-	assert.Equal(t, "external_seller_main", task.ToAddress)
-	assert.Equal(t, "1000000000000", task.Amount)
-	assert.Equal(t, uint32(5), task.AddressIndex)
-	assert.Equal(t, models.SweepStatusPending, task.Status)
-	assert.Equal(t, "XMR", task.ChainKey)
+	var taskCount int64
+	require.NoError(t, db.gormDB.Model(&models.SweepTask{}).Where("order_token = ?", token).Count(&taskCount).Error)
+	assert.Zero(t, taskCount)
 }
 
 // TestExternalPaymentRuntime_DirectConfirmNoPool verifies externally observed orders that skip the
@@ -285,8 +279,7 @@ func TestExternalPaymentRuntime_PoolThenConfirmed_ToFunded(t *testing.T) {
 // correctly through PAYMENT_DETECTED → FUNDED.
 func TestExternalPaymentRuntime_DirectConfirmNoPool(t *testing.T) {
 	db := newGuestTestDB(t)
-	sweepSvc := &AutoSweepService{db: db}
-	svc := &GuestOrderAppService{db: db, sweepService: sweepSvc}
+	svc := &GuestOrderAppService{db: db}
 
 	runtime := newObservedPaymentRuntimeStub()
 
@@ -336,10 +329,9 @@ func TestExternalPaymentRuntime_DirectConfirmNoPool(t *testing.T) {
 	}, 5*time.Second, 50*time.Millisecond,
 		"order should reach FUNDED after 2 confirmations")
 
-	var task models.SweepTask
-	require.NoError(t, db.gormDB.Where("order_token = ?", token).First(&task).Error)
-	assert.Equal(t, "XMR", task.ChainKey)
-	assert.Equal(t, uint32(7), task.AddressIndex)
+	var taskCount int64
+	require.NoError(t, db.gormDB.Model(&models.SweepTask{}).Where("order_token = ?", token).Count(&taskCount).Error)
+	assert.Zero(t, taskCount)
 }
 
 // TestExternalPaymentRuntime_InsufficientPayment verifies that a partial externally observed

@@ -1,13 +1,49 @@
 package core
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	"github.com/mobazha/mobazha/internal/repo"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/models"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type profileWalletAccountStub struct {
+	roles       []contracts.WalletAccountRole
+	references  []string
+	failRailIDs map[string]bool
+}
+
+func (*profileWalletAccountStub) Capabilities(context.Context, string) (contracts.WalletCapabilities, error) {
+	return contracts.WalletCapabilities{Receive: true, Affiliate: true}, nil
+}
+
+func (*profileWalletAccountStub) Transfer(context.Context, contracts.WalletTransferRequest) (contracts.WalletTransfer, error) {
+	return contracts.WalletTransfer{}, nil
+}
+
+func (*profileWalletAccountStub) ReconcileTransfers(context.Context) error { return nil }
+
+func (s *profileWalletAccountStub) ReserveAddress(
+	_ context.Context,
+	railID string,
+	role contracts.WalletAccountRole,
+	referenceID string,
+) (contracts.ReservedDestination, error) {
+	if s.failRailIDs[railID] {
+		return contracts.ReservedDestination{}, fmt.Errorf("wallet adapter unavailable for %s", railID)
+	}
+	s.roles = append(s.roles, role)
+	s.references = append(s.references, referenceID)
+	return contracts.ReservedDestination{
+		Destination: contracts.Destination{RailID: railID, Address: "wallet:" + railID, Version: 1},
+	}, nil
+}
 
 const testEscrowPubKeyHex = "02a1633cafcc01ebfb6d78e39f687a1f0995c62fc95f51ead10a02ee0be551b5dc"
 
@@ -185,4 +221,45 @@ func TestProfileAppService_SetProfile_EmptyVisibilityDefaultsPublic(t *testing.T
 	got, err := svc.GetMyProfile()
 	require.NoError(t, err)
 	assert.Equal(t, models.VisibilityPublic, got.Visibility)
+}
+
+func TestProfileAppService_SetProfile_PublishesWalletManagedAffiliateDestinations(t *testing.T) {
+	accounts := &profileWalletAccountStub{}
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{WalletAccounts: accounts})
+	profile := &models.Profile{
+		Name: "Test",
+		PayoutDestinationSet: models.PayoutDestinationSet{Destinations: []models.PayoutDestination{{
+			RailID: "caller-injected", Address: "caller-address", Version: 99,
+		}}},
+	}
+
+	require.NoError(t, svc.SetProfile(profile, nil))
+	got, err := svc.GetMyProfile()
+	require.NoError(t, err)
+	require.Len(t, got.PayoutDestinationSet.Destinations, 4)
+	_, injected := got.PayoutDestinationSet.DestinationForRail("caller-injected")
+	assert.False(t, injected)
+	assert.Equal(t, []contracts.WalletAccountRole{
+		contracts.AccountAffiliate, contracts.AccountAffiliate,
+		contracts.AccountAffiliate, contracts.AccountAffiliate,
+	}, accounts.roles)
+	assert.Equal(t, []string{"default", "default", "default", "default"}, accounts.references)
+}
+
+func TestProfileAppService_SetProfile_ToleratesOneUnavailableAffiliateRail(t *testing.T) {
+	failingRail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoinCash)
+	require.True(t, ok)
+	accounts := &profileWalletAccountStub{failRailIDs: map[string]bool{string(failingRail): true}}
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{WalletAccounts: accounts})
+
+	// A single rail being unavailable (e.g. its wallet adapter is still
+	// syncing) must not block an otherwise unrelated profile edit.
+	require.NoError(t, svc.SetProfile(&models.Profile{Name: "Test"}, nil))
+
+	got, err := svc.GetMyProfile()
+	require.NoError(t, err)
+	assert.Equal(t, "Test", got.Name)
+	require.Len(t, got.PayoutDestinationSet.Destinations, 3, "the unavailable rail is omitted, not fatal")
+	_, hasFailingRail := got.PayoutDestinationSet.DestinationForRail(string(failingRail))
+	assert.False(t, hasFailingRail)
 }

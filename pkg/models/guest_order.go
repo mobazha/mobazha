@@ -110,7 +110,10 @@ type GuestOrder struct {
 	// ManagedEscrowMetadata is opaque provider JSON for per-order managed EVM
 	// funding targets.
 	ManagedEscrowMetadata []byte `gorm:"column:managed_escrow_metadata" json:"-"`
-	MoneroTxHeight        uint64 `json:"-"`
+	// SettlementOwnerVersion freezes which opaque Settlement Domain key
+	// protocol controls the managed Safe. Blank identifies pre-ADR-016 rows.
+	SettlementOwnerVersion string `gorm:"column:settlement_owner_version;type:varchar(64)" json:"-"`
+	MoneroTxHeight         uint64 `json:"-"`
 
 	// Pool-stage tracking (currently only populated by Monero, where
 	// mempool transfers are visible via wallet-rpc). These fields are a

@@ -52,15 +52,16 @@ type storageFields struct {
 
 // cryptoFields groups cryptographic key material and signing.
 type cryptoFields struct {
-	signer          contracts.Signer
-	ethMasterKey    *btcec.PrivateKey
-	escrowMasterKey *btcec.PrivateKey
-	solPrivKey      *solana.PrivateKey
-	ratingMasterKey *btcec.PrivateKey
-	tronMasterKey   *btcec.PrivateKey
-	keyProvider     contracts.KeyProvider
-	credentialKeys  contracts.ProviderCredentialKeyProvider
-	bip44Key        *hdkeychain.ExtendedKey
+	signer           contracts.Signer
+	ethMasterKey     *btcec.PrivateKey
+	escrowMasterKey  *btcec.PrivateKey
+	solPrivKey       *solana.PrivateKey
+	ratingMasterKey  *btcec.PrivateKey
+	tronMasterKey    *btcec.PrivateKey
+	keyProvider      contracts.KeyProvider
+	settlementSigner contracts.SettlementSigner
+	credentialKeys   contracts.ProviderCredentialKeyProvider
+	bip44Key         *hdkeychain.ExtendedKey
 }
 
 // networkFields groups P2P networking components.

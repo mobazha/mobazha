@@ -304,6 +304,11 @@ func TestSellerAffiliateStatement_ProjectsVerifiedSettlementOutputs(t *testing.T
 			}, want: "submitted",
 		},
 		{
+			name: "reorged returns to submitted", action: models.SettlementActionSnapshot{
+				OrderID: "affiliate-order", ActionID: "act-reorged", Action: "guest_affiliate_transfer", State: "reorged", TxHash: "0xreorged", SettlementCoin: "ETH", PlannedLines: []models.SettlementPayoutLine{planned}, UpdatedAt: now,
+			}, want: "submitted",
+		},
+		{
 			name: "confirmed only after matching observed output", action: models.SettlementActionSnapshot{
 				OrderID: "affiliate-order", ActionID: "act-confirmed", Action: "complete", State: "confirmed", TxHash: "0xconfirmed", SettlementCoin: "ETH", PlannedLines: []models.SettlementPayoutLine{planned},
 				ObservedLines: []models.SettlementPayoutLine{{Type: "affiliate", Amount: "125", Address: "0x1111111111111111111111111111111111111111", TxHash: "0xconfirmed"}}, UpdatedAt: now,

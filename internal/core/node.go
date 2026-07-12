@@ -98,7 +98,7 @@ type appServices struct {
 	netDBSyncService           *NetDBSyncService
 	guestOrderService          *guest.GuestOrderAppService
 	directPaymentService       *guest.DirectPaymentService
-	autoSweepService           *guest.AutoSweepService
+	walletAccountService       contracts.WalletAccountService
 	receivingAccountService    *receivingAccountService
 	guestPaymentMonitor        *guest.GuestPaymentMonitor
 	unifiedOrderView           *UnifiedOrderView

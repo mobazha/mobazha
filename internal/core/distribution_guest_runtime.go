@@ -35,8 +35,8 @@ func (b *distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRunt
 	if b.source == nil || b.watchSource == nil || runtime.Projector == nil || runtime.WatchRegistrar == nil || runtime.SettlementExecutor == nil || runtime.ReceiptValidator == nil || runtime.HealthProvider == nil {
 		return fmt.Errorf("managed escrow guest runtime: projector, sources, watch registrar, settlement executor, receipt validator, and health provider are required")
 	}
-	if b.node.keyProvider == nil {
-		return fmt.Errorf("managed escrow guest runtime: key provider is required")
+	if b.node.settlementSigner == nil {
+		return fmt.Errorf("managed escrow guest runtime: settlement signer is required")
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -57,7 +57,9 @@ func (b *distributionManagedEscrowGuestRuntimeBinder) BindManagedEscrowGuestRunt
 	settlement := guest.NewDistributionManagedEscrowGuestSettlementService(b.source, runtime.SettlementExecutor)
 	b.source.SetProjector(runtime.Projector)
 	b.watchSource.setProjector(runtime.Projector)
-	b.node.directPaymentService.SetManagedEscrowFunding(runtime.Projector, &guest.NodeEVMSellerOwnerResolver{Keys: b.node.keyProvider})
+	b.node.directPaymentService.SetManagedEscrowFunding(runtime.Projector, &guest.NodeEVMSellerOwnerResolver{
+		Signer: b.node.settlementSigner, TenantID: b.node.nodeID,
+	})
 	b.node.managedEscrowReceiptValidator = runtime.ReceiptValidator
 	b.node.guestPaymentMonitor.SetEVMManagedEscrowWatch(watcher)
 	b.node.guestOrderService.SetManagedEscrowSettlement(settlement)

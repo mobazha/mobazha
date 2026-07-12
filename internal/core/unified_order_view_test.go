@@ -395,8 +395,8 @@ func TestConvertGuestOrder_SweepStatus(t *testing.T) {
 	}
 
 	s := convertGuestOrder(g, "")
-	if s.SweepStatus != "pending" {
-		t.Errorf("expected sweepStatus=pending when no real task status, got %s", s.SweepStatus)
+	if s.SweepStatus != "" {
+		t.Errorf("expected no wallet transfer status when no real transfer exists, got %s", s.SweepStatus)
 	}
 
 	s2 := convertGuestOrder(g, "submitted")

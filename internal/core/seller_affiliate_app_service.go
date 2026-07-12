@@ -444,6 +444,13 @@ func affiliateSettlementFromAction(attribution *models.AffiliateAttribution, act
 	case "submitted":
 		output.State = "submitted"
 		return output
+	case "reorged":
+		// A previously confirmed output that left the canonical chain is no
+		// longer paid, but the persisted transaction remains the active
+		// submission while WalletTransfer waits for reconfirmation.
+		output.State = "submitted"
+		output.ConfirmedAt = nil
+		return output
 	case "confirmed":
 		observed, observedOK := affiliatePayoutLine(action.ObservedLines, expectedAddress, planned.Amount)
 		if !observedOK {

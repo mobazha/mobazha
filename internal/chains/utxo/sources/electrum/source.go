@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -124,6 +126,9 @@ func (s *Source) GetTransactions(ctx context.Context, address string, scriptPubK
 func (s *Source) GetTransaction(ctx context.Context, txid string) (*iwallet.Transaction, error) {
 	txInfo, err := s.client.GetTransaction(ctx, txid, true)
 	if err != nil {
+		if isTransactionNotFoundError(err) {
+			return nil, pkgutxo.ErrTransactionNotFound
+		}
 		// Don't mark unhealthy for "transaction not found" errors
 		// Only mark unhealthy for connection errors (checked separately via IsConnected)
 		return nil, err
@@ -158,6 +163,16 @@ func (s *Source) GetTransaction(ctx context.Context, txid string) (*iwallet.Tran
 	tx.Value = iwallet.NewAmount(totalValue)
 
 	return tx, nil
+}
+
+func isTransactionNotFoundError(err error) bool {
+	var rpcErr *RPCError
+	if !errors.As(err, &rpcErr) {
+		return false
+	}
+	message := strings.ToLower(strings.TrimSpace(rpcErr.Message))
+	return rpcErr.Code == -5 || strings.Contains(message, "transaction not found") ||
+		strings.Contains(message, "no such mempool or blockchain transaction")
 }
 
 func (s *Source) fetchTransaction(ctx context.Context, txid string, height int64) (*iwallet.Transaction, error) {

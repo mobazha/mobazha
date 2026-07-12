@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -36,14 +37,60 @@ type Profile struct {
 
 	Stats *ProfileStats `json:"stats,omitempty"`
 
-	EscrowPublicKey string `json:"publicKey"`
-	ETHPublicKey    string `json:"ethPublicKey"`
-	SolanaPublicKey string `json:"solanaPublicKey"`
-	StripeAccountID string `json:"stripeAccountID"`
+	EscrowPublicKey      string               `json:"publicKey"`
+	ETHPublicKey         string               `json:"ethPublicKey"`
+	SolanaPublicKey      string               `json:"solanaPublicKey"`
+	StripeAccountID      string               `json:"stripeAccountID"`
+	PayoutDestinationSet PayoutDestinationSet `json:"payoutDestinationSet,omitempty"`
 
 	StoreAndForwardServers []string `json:"storeAndForwardServers"`
 
 	LastModified time.Time `json:"lastModified"`
+}
+
+// PayoutDestination identifies one versioned receiving destination published
+// by a node. It contains no proof of custody; the profile signature only
+// proves that the node published the destination.
+type PayoutDestination struct {
+	RailID  string `json:"railID"`
+	Address string `json:"address"`
+	Tag     string `json:"tag,omitempty"`
+	Version uint32 `json:"version"`
+}
+
+// PayoutDestinationSet is the generic, versioned receiving-address surface
+// consumed by payment and affiliate flows. Chain-specific fields must not be
+// added to Profile for new rails.
+type PayoutDestinationSet struct {
+	Destinations []PayoutDestination `json:"destinations,omitempty"`
+}
+
+// DestinationForRail returns the published destination for one canonical rail.
+func (s PayoutDestinationSet) DestinationForRail(railID string) (PayoutDestination, bool) {
+	railID = strings.TrimSpace(railID)
+	for _, destination := range s.Destinations {
+		if strings.TrimSpace(destination.RailID) == railID && strings.TrimSpace(destination.Address) != "" && destination.Version > 0 {
+			return destination, true
+		}
+	}
+	return PayoutDestination{}, false
+}
+
+// Valid reports whether every destination has a unique canonical rail,
+// non-empty address, and positive version.
+func (s PayoutDestinationSet) Valid() bool {
+	seen := make(map[string]struct{}, len(s.Destinations))
+	for _, destination := range s.Destinations {
+		railID := strings.TrimSpace(destination.RailID)
+		if railID == "" || strings.TrimSpace(destination.Address) == "" || destination.Version == 0 {
+			return false
+		}
+		if _, duplicate := seen[railID]; duplicate {
+			return false
+		}
+		seen[railID] = struct{}{}
+	}
+	return true
 }
 
 // ProfileContactInfo is the user contact info.

@@ -47,8 +47,15 @@ func (s *GuestOrderAppService) evaluateUTXOClosureReadiness(coinType iwallet.Coi
 	if err := s.validateCoinAvailability(coinType, coinInfo); err != nil {
 		return err
 	}
-	if s.sweepService == nil {
-		return fmt.Errorf("%w: UTXO sweep service is not configured", contracts.ErrCoinUnavailable)
+	if s.walletAccounts == nil {
+		return fmt.Errorf("%w: wallet account service is not configured", contracts.ErrCoinUnavailable)
+	}
+	capabilities, err := s.walletAccounts.Capabilities(context.Background(), string(coinType))
+	if err != nil {
+		return fmt.Errorf("%w: wallet account capability unavailable: %v", contracts.ErrCoinUnavailable, err)
+	}
+	if !capabilities.Guest {
+		return fmt.Errorf("%w: wallet account spend and recovery are not complete for %s", contracts.ErrCoinUnavailable, coinInfo.Chain)
 	}
 	if s.multiwallet == nil {
 		return fmt.Errorf("%w: multiwallet is not configured", contracts.ErrCoinUnavailable)
@@ -58,16 +65,16 @@ func (s *GuestOrderAppService) evaluateUTXOClosureReadiness(coinType iwallet.Coi
 		return fmt.Errorf("%w: wallet for %s is not loaded", contracts.ErrCoinUnavailable, coinInfo.Chain)
 	}
 	if _, sweepable := wallet.(iwallet.UTXOSweeper); !sweepable {
-		return fmt.Errorf("%w: auto-sweep is not supported for chain %s", contracts.ErrCoinUnavailable, coinInfo.Chain)
+		return fmt.Errorf("%w: wallet sweep-all transfer is not supported for chain %s", contracts.ErrCoinUnavailable, coinInfo.Chain)
+	}
+	if _, transferable := wallet.(iwallet.UTXOTransferBuilder); !transferable {
+		return fmt.Errorf("%w: exact wallet transfer is not supported for chain %s", contracts.ErrCoinUnavailable, coinInfo.Chain)
 	}
 	if s.utxoMonitor == nil {
 		return fmt.Errorf("%w: UTXO monitor is not configured", contracts.ErrCoinUnavailable)
 	}
 	if !s.utxoMonitor.IsHealthy(coinInfo.Chain) {
 		return fmt.Errorf("%w: UTXO monitor has no healthy sources for %s", contracts.ErrCoinUnavailable, coinInfo.Chain)
-	}
-	if !s.hasActiveReceivingAccount(coinInfo.Chain) {
-		return fmt.Errorf("%w: no active seller receiving account for %s", contracts.ErrCoinUnavailable, coinInfo.Chain)
 	}
 	return nil
 }
@@ -87,13 +94,15 @@ func (s *GuestOrderAppService) GetGuestCheckoutReadiness(ctx context.Context) (*
 		var pending, submitted, failed int64
 		_ = s.db.View(func(tx database.Tx) error {
 			r := tx.Read()
-			if err := r.Model(&models.SweepTask{}).Where("status = ?", models.SweepStatusPending).Count(&pending).Error; err != nil {
+			if err := r.Model(&models.WalletTransfer{}).Where("state IN ? AND retry_count < ?", []string{
+				string(contracts.WalletTransferPending), string(contracts.WalletTransferBuilt), string(contracts.WalletTransferReorged),
+			}, models.MaxWalletTransferRetries).Count(&pending).Error; err != nil {
 				return err
 			}
-			if err := r.Model(&models.SweepTask{}).Where("status = ?", models.SweepStatusSubmitted).Count(&submitted).Error; err != nil {
+			if err := r.Model(&models.WalletTransfer{}).Where("state = ?", string(contracts.WalletTransferSubmitted)).Count(&submitted).Error; err != nil {
 				return err
 			}
-			return r.Model(&models.SweepTask{}).Where("status = ?", models.SweepStatusFailed).Count(&failed).Error
+			return r.Model(&models.WalletTransfer{}).Where("retry_count >= ?", models.MaxWalletTransferRetries).Count(&failed).Error
 		})
 		out.SweepTasksPending = int(pending)
 		out.SweepTasksSubmitted = int(submitted)
@@ -156,7 +165,7 @@ func (s *GuestOrderAppService) LogGuestUTXOReadinessSummary(ctx context.Context,
 		parts = append(parts, fmt.Sprintf("%s:sources=%d/%s", ch.Chain, ch.HealthySourceCount, vis))
 	}
 	logger.LogInfoWithIDf(log, nodeID,
-		"Guest UTXO readiness: watched=%d sweep_pending=%d sweep_failed=%d [%s]",
+		"Guest UTXO readiness: watched=%d transfer_pending=%d transfer_failed=%d [%s]",
 		report.WatchedAddressCount, report.SweepTasksPending, report.SweepTasksFailed,
 		strings.Join(parts, " "))
 }

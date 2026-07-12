@@ -1585,7 +1585,8 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 					StandardOrderSettlementAuthorizationRequest{
 						OrderID: request.OrderID, PaymentSelectionQuoteID: request.PaymentSelectionQuoteID,
 						RailID: request.RailID, AmountAtomic: request.AmountAtomic,
-						ModeratorPeerID: request.ModeratorPeerID,
+						ModeratorPeerID:    request.ModeratorPeerID,
+						BuyerRefundAddress: request.BuyerRefundAddress,
 					},
 				)
 				return err

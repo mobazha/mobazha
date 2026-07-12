@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 const (
@@ -35,6 +36,7 @@ type PaymentAttemptSettlementTerms struct {
 	FundingTargetAddress string                       `json:"fundingTargetAddress"`
 	RouteBindingID       string                       `json:"routeBindingID"`
 	BuyerPeerID          string                       `json:"buyerPeerID"`
+	BuyerRefundAddress   string                       `json:"buyerRefundAddress,omitempty"`
 	SellerPeerID         string                       `json:"sellerPeerID"`
 	ModeratorPeerID      string                       `json:"moderatorPeerID,omitempty"`
 	ModeratorFee         *PaymentAttemptSettlementFee `json:"moderatorFee,omitempty"`
@@ -104,6 +106,13 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 	}
 	moderatorPeerID := strings.TrimSpace(t.ModeratorPeerID)
 	solanaRail := strings.HasPrefix(strings.TrimSpace(t.AssetID), "crypto:solana:")
+	if solanaRail {
+		if err := ValidateRefundAddress(iwallet.CoinType(t.AssetID), strings.TrimSpace(t.BuyerRefundAddress)); err != nil {
+			return fmt.Errorf("invalid buyer refund address: %w", err)
+		}
+	} else if strings.TrimSpace(t.BuyerRefundAddress) != "" {
+		return fmt.Errorf("non-Solana settlement terms cannot bind buyer refund address")
+	}
 	if t.EscrowUnlockUnix < 0 || (solanaRail && (t.EscrowUnlockUnix == 0 || t.EscrowTimeoutHours == 0)) ||
 		(!solanaRail && t.EscrowUnlockUnix != 0) {
 		return fmt.Errorf("invalid escrow unlock time")

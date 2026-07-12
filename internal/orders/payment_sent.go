@@ -170,6 +170,8 @@ func validateFrozenStandardOrderPaymentSent(
 			!specOK || payment.MethodIsModerated(spec.Method) != moderated ||
 			strings.TrimSpace(paymentSent.Moderator) != strings.TrimSpace(terms.ModeratorPeerID) ||
 			strings.TrimSpace(paymentSent.ModeratorAddress) != moderatorAddress ||
+			(strings.HasPrefix(strings.TrimSpace(target.AssetID), "crypto:solana:") &&
+				!payment.SameCryptoAddress(target.AssetID, paymentSent.RefundAddress, terms.BuyerRefundAddress)) ||
 			paymentSent.EscrowTimeoutHours != terms.EscrowTimeoutHours {
 			continue
 		}

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
 const (
@@ -73,6 +74,7 @@ type SettlementKeyOffer struct {
 	PublicKey               []byte                    `json:"publicKey"`
 	ExpectedModeratorPeerID string                    `json:"expectedModeratorPeerID,omitempty"`
 	AmountAtomic            string                    `json:"amountAtomic,omitempty"`
+	BuyerRefundAddress      string                    `json:"buyerRefundAddress,omitempty"`
 	ModeratorPayoutAddress  string                    `json:"moderatorPayoutAddress,omitempty"`
 	ModeratorFeeAmount      string                    `json:"moderatorFeeAmount,omitempty"`
 	EscrowTimeoutHours      uint32                    `json:"escrowTimeoutHours,omitempty"`
@@ -93,6 +95,7 @@ type settlementKeyOfferPayload struct {
 	PublicKey               []byte                    `json:"publicKey"`
 	ExpectedModeratorPeerID string                    `json:"expectedModeratorPeerID,omitempty"`
 	AmountAtomic            string                    `json:"amountAtomic,omitempty"`
+	BuyerRefundAddress      string                    `json:"buyerRefundAddress,omitempty"`
 	ModeratorPayoutAddress  string                    `json:"moderatorPayoutAddress,omitempty"`
 	ModeratorFeeAmount      string                    `json:"moderatorFeeAmount,omitempty"`
 	EscrowTimeoutHours      uint32                    `json:"escrowTimeoutHours,omitempty"`
@@ -111,6 +114,7 @@ func (o SettlementKeyOffer) SigningPayload() ([]byte, error) {
 		ParticipantRole: o.ParticipantRole, RailID: o.RailID, Purpose: o.Purpose,
 		KeyAlgorithm: o.KeyAlgorithm, PublicKey: o.PublicKey, ExpectedModeratorPeerID: o.ExpectedModeratorPeerID,
 		AmountAtomic: o.AmountAtomic, ModeratorPayoutAddress: o.ModeratorPayoutAddress,
+		BuyerRefundAddress: o.BuyerRefundAddress,
 		ModeratorFeeAmount: o.ModeratorFeeAmount,
 		EscrowTimeoutHours: o.EscrowTimeoutHours, EscrowUnlockUnix: o.EscrowUnlockUnix,
 	})
@@ -202,6 +206,7 @@ func (o SettlementKeyOffer) validate(requireSignature bool) error {
 	}
 	moderatorPeerID := strings.TrimSpace(o.ExpectedModeratorPeerID)
 	amountAtomic := strings.TrimSpace(o.AmountAtomic)
+	buyerRefundAddress := strings.TrimSpace(o.BuyerRefundAddress)
 	payoutAddress := strings.TrimSpace(o.ModeratorPayoutAddress)
 	feeAmount := strings.TrimSpace(o.ModeratorFeeAmount)
 	if moderatorPeerID == "" {
@@ -240,6 +245,13 @@ func (o SettlementKeyOffer) validate(requireSignature bool) error {
 		} else if payoutAddress != "" || feeAmount != "" {
 			return fmt.Errorf("non-moderator settlement offer cannot bind moderator payout")
 		}
+	}
+	if solanaRail {
+		if err := ValidateRefundAddress(iwallet.CoinType(o.RailID), buyerRefundAddress); err != nil {
+			return fmt.Errorf("invalid settlement buyer refund address: %w", err)
+		}
+	} else if buyerRefundAddress != "" {
+		return fmt.Errorf("non-Solana settlement offer cannot bind buyer refund address")
 	}
 	if requireSignature && len(o.Signature) == 0 {
 		return fmt.Errorf("settlement key offer signature is required")
@@ -321,6 +333,7 @@ func (b PaymentAttemptAuthorizationBundle) Validate() error {
 	expectedModeratorPeerID := ""
 	amountAtomic := ""
 	escrowTimeoutHours := uint32(0)
+	buyerRefundAddress := ""
 	for _, offer := range b.Offers {
 		if err := offer.Verify(); err != nil {
 			return err
@@ -333,9 +346,11 @@ func (b PaymentAttemptAuthorizationBundle) Validate() error {
 			expectedModeratorPeerID = strings.TrimSpace(offer.ExpectedModeratorPeerID)
 			amountAtomic = strings.TrimSpace(offer.AmountAtomic)
 			escrowTimeoutHours = offer.EscrowTimeoutHours
+			buyerRefundAddress = strings.TrimSpace(offer.BuyerRefundAddress)
 		} else if strings.TrimSpace(offer.ExpectedModeratorPeerID) != expectedModeratorPeerID ||
-			strings.TrimSpace(offer.AmountAtomic) != amountAtomic || offer.EscrowTimeoutHours != escrowTimeoutHours {
-			return fmt.Errorf("settlement key offers disagree on moderator scope")
+			strings.TrimSpace(offer.AmountAtomic) != amountAtomic || offer.EscrowTimeoutHours != escrowTimeoutHours ||
+			strings.TrimSpace(offer.BuyerRefundAddress) != buyerRefundAddress {
+			return fmt.Errorf("settlement key offers disagree on shared settlement scope")
 		}
 		if _, requiredRole := required[offer.ParticipantRole]; !requiredRole {
 			return fmt.Errorf("unexpected settlement key offer role")
@@ -408,6 +423,9 @@ func ValidateSettlementTermsOfferBindings(
 				return fmt.Errorf("%w: duplicate moderator settlement offer", ErrPaymentAttemptSettlementTermsConflict)
 			}
 			moderatorOffer = offer
+		}
+		if solanaRail && strings.TrimSpace(offer.BuyerRefundAddress) != strings.TrimSpace(terms.BuyerRefundAddress) {
+			return fmt.Errorf("%w: buyer refund terms do not match signed offers", ErrPaymentAttemptSettlementTermsConflict)
 		}
 	}
 	if moderatorPeerID == "" {

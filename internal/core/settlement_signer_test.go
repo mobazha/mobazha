@@ -286,7 +286,7 @@ func TestIssueSettlementKeyOffer_SelectsSolanaEd25519Key(t *testing.T) {
 			Purpose: contracts.StandardOrderSettlementKeyPurpose, ReferenceID: contextID,
 		},
 		"order-solana", "attempt-solana", models.SettlementParticipantBuyer,
-		"", "1000", "", "", 72, 2000000000,
+		"", "1000", "", "", "34HNCS4M9qWZftHMyMd5MAwxpgfCbvMvbAvRSNZyQpsv", 72, 2000000000,
 	)
 	require.NoError(t, err)
 	require.Equal(t, models.SettlementKeyAlgorithmEd25519, offer.KeyAlgorithm)

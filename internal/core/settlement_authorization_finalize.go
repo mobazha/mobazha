@@ -313,9 +313,13 @@ func finalizeSellerSettlementAuthorization(
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
 	var moderatorFee *models.PaymentAttemptSettlementFee
+	var buyerRefundAddress string
 	var escrowTimeoutHours uint32
 	var escrowUnlockUnix int64
 	for _, offer := range offers {
+		if offer.ParticipantRole == models.SettlementParticipantBuyer {
+			buyerRefundAddress = strings.TrimSpace(offer.BuyerRefundAddress)
+		}
 		if offer.EscrowUnlockUnix == 0 {
 			continue
 		}
@@ -357,7 +361,8 @@ func finalizeSellerSettlementAuthorization(
 		AttemptID: attempt.AttemptID, AssetID: attempt.Currency, FundingAmount: attempt.AmountValue,
 		FundingTargetAddress: target.Address, RouteBindingID: route.RouteBindingID,
 		BuyerPeerID: buyerPeerID, SellerPeerID: sellerPeerID, ModeratorPeerID: attempt.ExpectedModeratorPeerID,
-		ModeratorFee: moderatorFee, SellerAddress: payout.Address,
+		BuyerRefundAddress: buyerRefundAddress,
+		ModeratorFee:       moderatorFee, SellerAddress: payout.Address,
 		EscrowTimeoutHours:   escrowTimeoutHours,
 		EscrowUnlockUnix:     escrowUnlockUnix,
 		SellerGrossBasis:     attempt.AmountValue,

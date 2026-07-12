@@ -24,6 +24,7 @@ func SettlementKeyOfferToProto(offer models.SettlementKeyOffer) (*pb.SettlementK
 		PublicKey:    append([]byte(nil), offer.PublicKey...), Signature: append([]byte(nil), offer.Signature...),
 		ExpectedModeratorPeerID: offer.ExpectedModeratorPeerID, AmountAtomic: offer.AmountAtomic,
 		ModeratorPayoutAddress: offer.ModeratorPayoutAddress, ModeratorFeeAmount: offer.ModeratorFeeAmount,
+		BuyerRefundAddress: offer.BuyerRefundAddress,
 		EscrowTimeoutHours: offer.EscrowTimeoutHours,
 		EscrowUnlockUnix:   offer.EscrowUnlockUnix,
 	}, nil
@@ -44,6 +45,7 @@ func SettlementKeyOfferFromProto(wire *pb.SettlementKeyOffer) (models.Settlement
 		PublicKey:    append([]byte(nil), wire.PublicKey...), Signature: append([]byte(nil), wire.Signature...),
 		ExpectedModeratorPeerID: wire.ExpectedModeratorPeerID, AmountAtomic: wire.AmountAtomic,
 		ModeratorPayoutAddress: wire.ModeratorPayoutAddress, ModeratorFeeAmount: wire.ModeratorFeeAmount,
+		BuyerRefundAddress: wire.BuyerRefundAddress,
 		EscrowTimeoutHours: wire.EscrowTimeoutHours,
 		EscrowUnlockUnix:   wire.EscrowUnlockUnix,
 	}

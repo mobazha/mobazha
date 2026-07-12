@@ -33,6 +33,7 @@ type StandardOrderSettlementAuthorizationRequest struct {
 	RailID                  string
 	AmountAtomic            string
 	ModeratorPeerID         string
+	BuyerRefundAddress      string
 }
 
 // StandardOrderSettlementAuthorizationStart is the durable result of starting
@@ -236,7 +237,7 @@ func beginBuyerSettlementAuthorization(
 			Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
 		},
 		request.OrderID, attempt.AttemptID, models.SettlementParticipantBuyer,
-		request.ModeratorPeerID, offerAmount, "", "", escrowTimeoutHours, escrowUnlockUnix,
+		request.ModeratorPeerID, offerAmount, "", "", request.BuyerRefundAddress, escrowTimeoutHours, escrowUnlockUnix,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationStart{}, err
@@ -353,7 +354,7 @@ func respondSellerSettlementAuthorization(
 			Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
 		},
 		order.ID.String(), attempt.AttemptID, models.SettlementParticipantSeller,
-		buyerOffer.ExpectedModeratorPeerID, offerAmount, "", "", buyerOffer.EscrowTimeoutHours, buyerOffer.EscrowUnlockUnix,
+		buyerOffer.ExpectedModeratorPeerID, offerAmount, "", "", buyerOffer.BuyerRefundAddress, buyerOffer.EscrowTimeoutHours, buyerOffer.EscrowUnlockUnix,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationResponse{}, err

@@ -317,8 +317,9 @@ message PaymentSent {
 
 // SettlementKeyOffer publishes one Identity-signed, attempt-scoped public key
 // before a crypto funding target becomes actionable. Moderated offers bind the
-// selected moderator, funding amount, timeout and moderator payout. TTLs and
-// availability leases deliberately do not belong to this wire version.
+// selected moderator, funding amount, timeout, buyer refund destination and
+// moderator payout. TTLs and availability leases deliberately do not belong
+// to this wire version.
 message SettlementKeyOffer {
     uint32 version                       = 1;
     string authorizationContextID        = 2;
@@ -337,6 +338,7 @@ message SettlementKeyOffer {
     uint32 escrowTimeoutHours             = 15;
     string keyAlgorithm                   = 16;
     int64 escrowUnlockUnix                = 17;
+    string buyerRefundAddress             = 18;
 }
 
 // SettlementAuthorization carries the seller-frozen canonical public

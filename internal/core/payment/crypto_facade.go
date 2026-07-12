@@ -35,6 +35,7 @@ type StandardOrderSettlementAuthorizationStartRequest struct {
 	RailID                  string
 	AmountAtomic            string
 	ModeratorPeerID         string
+	BuyerRefundAddress      string
 }
 
 type standardOrderSettlementAuthorizationStarter func(
@@ -158,7 +159,7 @@ func (c *CryptoPaymentFacade) CreateSession(
 			return nil, err
 		}
 		startRequest := standardOrderSettlementAuthorizationStartRequest(
-			req, strconv.FormatUint(setupParams.Amount, 10), moderator,
+			req, strconv.FormatUint(setupParams.Amount, 10), moderator, refundAddr,
 		)
 		if err := c.settlementStarter(ctx, startRequest); err != nil {
 			return nil, fmt.Errorf("crypto facade: start settlement authorization: %w", err)
@@ -203,11 +204,13 @@ func standardOrderSettlementAuthorizationStartRequest(
 	req contracts.CreatePaymentSessionRequest,
 	amountAtomic string,
 	moderatorPeerID string,
+	buyerRefundAddress string,
 ) StandardOrderSettlementAuthorizationStartRequest {
 	return StandardOrderSettlementAuthorizationStartRequest{
 		OrderID: req.OrderID, PaymentSelectionQuoteID: req.PaymentSelectionQuoteID,
 		RailID: req.PaymentCoin, AmountAtomic: strings.TrimSpace(amountAtomic),
-		ModeratorPeerID: strings.TrimSpace(moderatorPeerID),
+		ModeratorPeerID:    strings.TrimSpace(moderatorPeerID),
+		BuyerRefundAddress: strings.TrimSpace(buyerRefundAddress),
 	}
 }
 

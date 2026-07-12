@@ -42,7 +42,7 @@ func IssueSettlementKeyOfferWithScope(
 	return IssueSettlementKeyOfferWithScopeAndUnlock(
 		ctx, identitySigner, settlementSigner, keyRef, orderID, attemptID, role,
 		expectedModeratorPeerID, amountAtomic, moderatorPayoutAddress, moderatorFeeAmount,
-		escrowTimeoutHours, 0,
+		"", escrowTimeoutHours, 0,
 	)
 }
 
@@ -56,6 +56,7 @@ func IssueSettlementKeyOfferWithScopeAndUnlock(
 	orderID, attemptID string,
 	role models.SettlementParticipantRole,
 	expectedModeratorPeerID, amountAtomic, moderatorPayoutAddress, moderatorFeeAmount string,
+	buyerRefundAddress string,
 	escrowTimeoutHours uint32,
 	escrowUnlockUnix int64,
 ) (models.SettlementKeyOffer, error) {
@@ -89,6 +90,7 @@ func IssueSettlementKeyOfferWithScopeAndUnlock(
 		AmountAtomic:            strings.TrimSpace(amountAtomic),
 		ModeratorPayoutAddress:  strings.TrimSpace(moderatorPayoutAddress),
 		ModeratorFeeAmount:      strings.TrimSpace(moderatorFeeAmount),
+		BuyerRefundAddress:      strings.TrimSpace(buyerRefundAddress),
 		EscrowTimeoutHours:      escrowTimeoutHours,
 		EscrowUnlockUnix:        escrowUnlockUnix,
 	}

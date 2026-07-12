@@ -140,7 +140,7 @@ func (n *MobazhaNode) respondSelectedModeratorSettlementKeyOffer(
 		ctx, n.signer, n.settlementSigner,
 		contracts.SettlementKeyRef{TenantID: tenantID, RailID: offer.RailID, Purpose: standardOrderSettlementKeyPurpose, ReferenceID: offer.AuthorizationContextID},
 		offer.OrderID, offer.AttemptID, models.SettlementParticipantModerator,
-		localPeerID, offer.AmountAtomic, payout.Address, fee.String(),
+		localPeerID, offer.AmountAtomic, payout.Address, fee.String(), offer.BuyerRefundAddress,
 		offer.EscrowTimeoutHours, offer.EscrowUnlockUnix,
 	)
 	if err != nil {

@@ -310,6 +310,7 @@ func TestStandardOrderSettlementAuthorizationStartRequest_BindsModerator(t *test
 		},
 		"1000",
 		"  "+testStorePolicyPeerA+"  ",
+		"",
 	)
 
 	if request.OrderID != "order-moderated" || request.PaymentSelectionQuoteID != "quote-moderated" ||

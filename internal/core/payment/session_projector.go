@@ -45,7 +45,7 @@ type projectOrderInput struct {
 	order             *models.Order
 	orderOpen         *pb.OrderOpen   // may be nil for orders not yet opened
 	paymentSent       *pb.PaymentSent // may be nil for orders not yet paid
-	frozenAttempt     *models.PaymentAttempt
+	cryptoAttempt     *models.PaymentAttempt
 	frozenTarget      *models.PaymentAttemptFundingTarget
 	observedAmountRaw string
 	obsCount          int
@@ -697,11 +697,11 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 		input.paymentSent = ps
 	}
 
-	frozenAttempt, frozenTarget, err := p.loadFrozenCryptoAttempt(order.TenantID, orderID)
+	cryptoAttempt, frozenTarget, err := p.loadActiveCryptoAttempt(order.TenantID, orderID)
 	if err != nil {
 		return nil, err
 	}
-	input.frozenAttempt = frozenAttempt
+	input.cryptoAttempt = cryptoAttempt
 	input.frozenTarget = frozenTarget
 
 	// Observation progress includes pending rows so payment sessions can show
@@ -717,7 +717,7 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 	return input, nil
 }
 
-func (p *PaymentSessionProjector) loadFrozenCryptoAttempt(
+func (p *PaymentSessionProjector) loadActiveCryptoAttempt(
 	tenantID, orderID string,
 ) (*models.PaymentAttempt, *models.PaymentAttemptFundingTarget, error) {
 	if p == nil || p.db == nil || strings.TrimSpace(orderID) == "" {
@@ -729,20 +729,26 @@ func (p *PaymentSessionProjector) loadFrozenCryptoAttempt(
 			return nil
 		}
 		return tx.Read().
-			Where("tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
-				tenantID, orderID, models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptFundingTargetReady).
+			Where("tenant_id = ? AND order_id = ? AND kind = ? AND state IN ?",
+				tenantID, orderID, models.PaymentAttemptKindCryptoFundingTarget, []string{
+					models.PaymentAttemptAuthorizationDraft,
+					models.PaymentAttemptFundingTargetReady,
+				}).
 			Order("created_at DESC, attempt_id DESC").
 			Limit(2).
 			Find(&attempts).Error
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("payment session projector: load frozen crypto attempt: %w", err)
+		return nil, nil, fmt.Errorf("payment session projector: load active crypto attempt: %w", err)
 	}
 	if len(attempts) == 0 {
 		return nil, nil, nil
 	}
 	if len(attempts) > 1 {
-		return nil, nil, fmt.Errorf("payment session projector: multiple actionable crypto attempts for order %s", orderID)
+		return nil, nil, fmt.Errorf("payment session projector: multiple active crypto attempts for order %s", orderID)
+	}
+	if attempts[0].State == models.PaymentAttemptAuthorizationDraft {
+		return &attempts[0], nil, nil
 	}
 	target, err := attempts[0].GetFundingTarget()
 	if err != nil {

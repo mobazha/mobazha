@@ -248,7 +248,7 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		// exception is an unfunded provider checkout (for example, Stripe was
 		// opened as the default and the buyer then chose Solana before paying).
 		if view.PaymentCoin != "" && view.PaymentCoin != req.PaymentCoin {
-			if !canReprovisionForCoinSwitch(view, req.PaymentCoin, input.frozenAttempt != nil) {
+			if !canReprovisionForCoinSwitch(view, req.PaymentCoin, input.cryptoAttempt != nil) {
 				return nil, fmt.Errorf("%w: existing=%q requested=%q",
 					ErrPaymentCoinMismatch, view.PaymentCoin, req.PaymentCoin)
 			}
@@ -332,6 +332,16 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		if strings.HasPrefix(req.PaymentCoin, "crypto:") {
 			if s.crypto == nil {
 				return nil, ErrProvisioningNotImplemented
+			}
+			if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptAuthorizationDraft {
+				if normalizeCoinBestEffort(input.cryptoAttempt.Currency) != normalizeCoinBestEffort(req.PaymentCoin) {
+					return nil, fmt.Errorf("%w: draft=%q requested=%q",
+						ErrPaymentCoinMismatch, input.cryptoAttempt.Currency, req.PaymentCoin)
+				}
+				// The authorization ceremony owns provisioning once its durable
+				// draft exists. Returning the non-actionable projection prevents
+				// the legacy setup facade from publishing a target before freeze.
+				return view, nil
 			}
 			created, err := s.crypto.CreateSession(ctx, req)
 			if err != nil {

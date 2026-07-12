@@ -160,7 +160,7 @@ func TestPaymentSessionProjector_LoadsVerifiedFrozenAttemptTarget(t *testing.T) 
 	projector := NewPaymentSessionProjector(db)
 	input, err := projector.fetchProjectInput(orderID)
 	require.NoError(t, err)
-	require.NotNil(t, input.frozenAttempt)
+	require.NotNil(t, input.cryptoAttempt)
 	require.NotNil(t, input.frozenTarget)
 	session, err := projector.Project(input)
 	require.NoError(t, err)
@@ -304,6 +304,49 @@ func TestPaymentSessionServiceImpl_CreateSessionRunsPoliciesBeforeRailFacade(t *
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("CreateSession error = %v, want policy error", err)
 	}
+}
+
+func TestPaymentSessionServiceImpl_AuthorizationDraftBlocksLegacyProvisioning(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	readyAt := time.Now()
+	const orderID = "QmAuthorizationDraftGate"
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&models.Order{}); err != nil {
+			return err
+		}
+		if err := tx.Migrate(&models.PaymentAttempt{}); err != nil {
+			return err
+		}
+		if err := tx.Save(&models.Order{
+			ID: models.OrderID(orderID), MyRole: string(models.RoleBuyer), Open: true, PaymentReadyAt: &readyAt,
+		}); err != nil {
+			return err
+		}
+		return tx.Create(&models.PaymentAttempt{
+			AttemptID: "attempt-draft", Kind: models.PaymentAttemptKindCryptoFundingTarget,
+			PaymentSessionID: "ps_" + orderID, OrderID: orderID, AmountValue: "1000",
+			Currency: "crypto:eip155:1:native", RouteBindingID: "route-draft",
+			IdempotencyKey: "attempt-draft", State: models.PaymentAttemptAuthorizationDraft,
+		})
+	}))
+
+	svc := NewPaymentSessionService(db)
+	svc.SetCryptoFacade(&CryptoPaymentFacade{
+		db: db, projector: NewPaymentSessionProjector(db), setupSvc: panicSetupService{t: t},
+	})
+	session, err := svc.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
+		OrderID: orderID, PaymentCoin: "crypto:eip155:1:native",
+	})
+	require.NoError(t, err)
+	require.Empty(t, session.FundingTarget.Address)
+
+	_, err = svc.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
+		OrderID: orderID, PaymentCoin: "crypto:eip155:56:native",
+	})
+	require.ErrorIs(t, err, ErrPaymentCoinMismatch)
 }
 
 func TestPaymentSessionServiceImpl_CoinSwitchAuthorizesBeforeClearingExistingTarget(t *testing.T) {

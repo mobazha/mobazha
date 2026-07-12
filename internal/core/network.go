@@ -11,6 +11,7 @@ import (
 
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha/internal/core/paymentintent"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/internal/repo"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
@@ -344,6 +345,9 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 	if err != nil {
 		return err
 	}
+	if err := n.progressStandardOrderSettlementAuthorization(n.nodeCtx, orderMsg, order); err != nil {
+		return err
+	}
 
 	// Emit ratings event for NetDBSyncService
 	if orderMsg.MessageType == pb.OrderMessage_ORDER_COMPLETE && n.eventBus != nil {
@@ -360,6 +364,50 @@ func (n *MobazhaNode) handleOrderMessage(from peer.ID, message *pb.Message) erro
 	}
 	n.sendAckMessage(message.MessageID, from)
 	return nil
+}
+
+func (n *MobazhaNode) progressStandardOrderSettlementAuthorization(
+	ctx context.Context,
+	orderMsg *pb.OrderMessage,
+	order models.Order,
+) error {
+	if n == nil || orderMsg == nil {
+		return nil
+	}
+	switch orderMsg.MessageType {
+	case pb.OrderMessage_SETTLEMENT_KEY_OFFER:
+		wire := new(opb.SettlementKeyOffer)
+		if err := orderMsg.Message.UnmarshalTo(wire); err != nil {
+			return err
+		}
+		offer, err := paymentintent.SettlementKeyOfferFromProto(wire)
+		if err != nil {
+			return err
+		}
+		if order.Role() != models.RoleVendor || offer.ParticipantRole != models.SettlementParticipantBuyer {
+			return nil
+		}
+		if _, err := n.RespondStandardOrderSettlementAuthorization(ctx, orderMsg.OrderID, offer.AttemptID); err != nil {
+			return err
+		}
+		_, err = n.FinalizeStandardOrderSettlementAuthorization(ctx, orderMsg.OrderID, offer.AttemptID)
+		return err
+	case pb.OrderMessage_SETTLEMENT_AUTHORIZATION:
+		if order.Role() != models.RoleBuyer {
+			return nil
+		}
+		wire := new(opb.SettlementAuthorization)
+		if err := orderMsg.Message.UnmarshalTo(wire); err != nil {
+			return err
+		}
+		if _, err := paymentintent.SettlementAuthorizationFromProto(wire); err != nil {
+			return err
+		}
+		_, err := n.AdoptRetainedStandardOrderSettlementAuthorization(ctx, orderMsg.OrderID, wire.AttemptID)
+		return err
+	default:
+		return nil
+	}
 }
 
 func (n *MobazhaNode) isSelfDefaultSNFServer() bool {

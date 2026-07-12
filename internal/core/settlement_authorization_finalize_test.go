@@ -161,6 +161,46 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 	require.NoError(t, err)
 	require.Equal(t, first.Terms, *storedTerms)
 	require.NoError(t, first.Terms.VerifySellerAuthorization(sellerPeerID.String(), first.SellerSignature))
+
+	buyerDB, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:buyer-authorization-adopt-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, buyerDB.AutoMigrate(
+		&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{},
+	))
+	require.NoError(t, buyerDB.Transaction(func(tx *gorm.DB) error {
+		if err := paymentintent.RetainReceivedSettlementKeyOfferInTransaction(tx, attempt.TenantID, buyerOffer); err != nil {
+			return err
+		}
+		return paymentintent.RetainReceivedSettlementKeyOfferInTransaction(tx, attempt.TenantID, sellerOffer)
+	}))
+	buyerAttempt, _, err := paymentintent.PrepareCryptoPaymentAttemptDraft(
+		buyerDB,
+		paymentintent.CryptoPaymentAttemptDraftRequest{
+			TenantID: attempt.TenantID, AttemptID: attempt.AttemptID, OrderID: attempt.OrderID,
+			AmountAtomic: attempt.AmountValue, RailID: attempt.Currency,
+		},
+		routeIdentity,
+	)
+	require.NoError(t, err)
+	require.Equal(t, attempt.AuthorizationContextID, buyerAttempt.AuthorizationContextID)
+	buyerOrder := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: attempt.TenantID}, ID: models.OrderID(attempt.OrderID),
+		MyRole: string(models.RoleBuyer), SerializedOrderOpen: openBytes,
+	}
+	adopted, err := adoptBuyerSettlementAuthorization(
+		t.Context(), buyerDB, buyerOrder, contracts.NewKeyPairSigner(buyerKeys, buyerPeerID),
+		projector, first.SettlementAuthorization,
+	)
+	require.NoError(t, err)
+	adoptedRetry, err := adoptBuyerSettlementAuthorization(
+		t.Context(), buyerDB, buyerOrder, contracts.NewKeyPairSigner(buyerKeys, buyerPeerID),
+		projector, first.SettlementAuthorization,
+	)
+	require.NoError(t, err)
+	require.Equal(t, models.PaymentAttemptFundingTargetReady, adopted.Attempt.State)
+	require.Equal(t, first.Attempt.AuthorizationBundleHash, adopted.Attempt.AuthorizationBundleHash)
+	require.Equal(t, adopted.Attempt.AuthorizationBundleHash, adoptedRetry.Attempt.AuthorizationBundleHash)
+	require.Equal(t, first.Target, adopted.Target)
 }
 
 func TestStandardOrderUTXOFundingTargetProjector_RejectsInvalidOffers(t *testing.T) {

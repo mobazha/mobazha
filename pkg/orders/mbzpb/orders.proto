@@ -331,6 +331,16 @@ message SettlementKeyOffer {
     bytes signature                      = 10;
 }
 
+// SettlementAuthorization carries the seller-frozen canonical public
+// authorization snapshot. The nested value is canonical JSON so Core has one
+// validation and hashing implementation rather than a second protobuf model.
+message SettlementAuthorization {
+    uint32 version                       = 1;
+    string orderID                       = 2;
+    string attemptID                     = 3;
+    bytes authorization                  = 4;
+}
+
 message PaymentFinalized {
     google.protobuf.Timestamp timestamp = 1;
 }

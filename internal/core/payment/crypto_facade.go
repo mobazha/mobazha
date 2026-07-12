@@ -25,6 +25,21 @@ type CryptoPaymentSetupService interface {
 	GeneratePaymentSetup(ctx context.Context, params paypb.PaymentSetupParams) (*paypb.PaymentSetupResult, error)
 }
 
+// StandardOrderSettlementAuthorizationStartRequest is the minimal callback
+// value needed to start the new non-actionable authorization ceremony without
+// importing the Core node package into the payment package.
+type StandardOrderSettlementAuthorizationStartRequest struct {
+	OrderID                 string
+	PaymentSelectionQuoteID string
+	RailID                  string
+	AmountAtomic            string
+}
+
+type standardOrderSettlementAuthorizationStarter func(
+	context.Context,
+	StandardOrderSettlementAuthorizationStartRequest,
+) error
+
 // CryptoPaymentFacade wraps the canonical payment setup service to populate
 // crypto funding targets (managed EVM, UTXO, monitored flows) behind
 // PaymentSessionService.CreateSession.
@@ -36,6 +51,17 @@ type CryptoPaymentFacade struct {
 	exchange             contracts.ExchangeRateService
 	storePolicy          contracts.StorePolicyService
 	sellerPolicyResolver sellerStorePolicyResolver
+	settlementStarter    standardOrderSettlementAuthorizationStarter
+}
+
+// SetStandardOrderSettlementAuthorizationStarter wires the development
+// cutover callback for eligible native UTXO standard orders.
+func (c *CryptoPaymentFacade) SetStandardOrderSettlementAuthorizationStarter(
+	starter func(context.Context, StandardOrderSettlementAuthorizationStartRequest) error,
+) {
+	if c != nil {
+		c.settlementStarter = starter
+	}
 }
 
 // NewCryptoPaymentFacade constructs CryptoPaymentFacade.
@@ -104,6 +130,28 @@ func (c *CryptoPaymentFacade) CreateSession(
 	if err != nil {
 		return nil, err
 	}
+	if c.settlementStarter != nil && standardOrderNativeUTXORail(coin) {
+		if moderator != "" {
+			return nil, fmt.Errorf("crypto facade: moderated UTXO settlement authorization is not implemented")
+		}
+		if !standardOrderUTXOAuthorizationEligible(coin, orderOpen) {
+			return nil, fmt.Errorf("crypto facade: cross-currency UTXO settlement authorization is not implemented")
+		}
+		if err := c.saveCreateSessionRefundAddress(ctx, coin, req.OrderID, refundAddr); err != nil {
+			return nil, err
+		}
+		if err := c.settlementStarter(ctx, StandardOrderSettlementAuthorizationStartRequest{
+			OrderID: req.OrderID, PaymentSelectionQuoteID: req.PaymentSelectionQuoteID,
+			RailID: req.PaymentCoin, AmountAtomic: req.AuthorizedPaymentAmount,
+		}); err != nil {
+			return nil, fmt.Errorf("crypto facade: start settlement authorization: %w", err)
+		}
+		updated, err := c.projector.fetchProjectInput(req.OrderID)
+		if err != nil {
+			return nil, fmt.Errorf("crypto facade: re-load settlement authorization draft: %w", err)
+		}
+		return c.projector.Project(updated)
+	}
 
 	setupParams, err := buildPaymentSetupParamsFromOrder(order, orderOpen, coin,
 		req.PayerAddress, refundAddr, moderator, req.AuthorizedPaymentAmount, c.exchange)
@@ -132,6 +180,22 @@ func (c *CryptoPaymentFacade) CreateSession(
 		return nil, fmt.Errorf("crypto facade: re-load order %s: %w", req.OrderID, err)
 	}
 	return c.projector.Project(input2)
+}
+
+func standardOrderUTXOAuthorizationEligible(coin iwallet.CoinType, orderOpen *porderpb.OrderOpen) bool {
+	if orderOpen == nil {
+		return false
+	}
+	if !standardOrderNativeUTXORail(coin) {
+		return false
+	}
+	paymentCurrency, err := coin.PricingCurrencyCode()
+	return err == nil && strings.EqualFold(strings.TrimSpace(paymentCurrency), strings.TrimSpace(orderOpen.PricingCoin))
+}
+
+func standardOrderNativeUTXORail(coin iwallet.CoinType) bool {
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coin)
+	return err == nil && coinInfo.IsNative && coinInfo.Chain.IsUTXOChain()
 }
 
 // UpdateCreateSessionRefundAddress saves the refund address carried by a

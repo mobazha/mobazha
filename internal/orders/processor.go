@@ -403,6 +403,8 @@ func (op *OrderProcessor) processMessage(dbtx database.Tx, order *models.Order, 
 		event, err = op.processPaymentFinalizeMessage(dbtx, order, message)
 	case npb.OrderMessage_SETTLEMENT_KEY_OFFER:
 		event, err = op.processSettlementKeyOfferMessage(dbtx, order, message)
+	case npb.OrderMessage_SETTLEMENT_AUTHORIZATION:
+		event, err = op.processSettlementAuthorizationMessage(dbtx, order, message)
 	default:
 		return nil, errors.New("unknown order message type")
 	}

@@ -1,0 +1,64 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 fengzie and the respective contributors.
+
+package models
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+)
+
+// PaymentAttemptSettlementAuthorization is the complete public snapshot a
+// seller sends to the buyer after freezing one payment attempt. Both peers
+// validate and persist the same canonical value before the target is exposed.
+type PaymentAttemptSettlementAuthorization struct {
+	Version       uint32                            `json:"version"`
+	Terms         PaymentAttemptSettlementTerms     `json:"terms"`
+	Target        PaymentAttemptFundingTarget       `json:"target"`
+	Authorization PaymentAttemptAuthorizationBundle `json:"authorization"`
+}
+
+// CanonicalBytesAndHash validates and canonically encodes the complete public
+// settlement authorization snapshot.
+func (a PaymentAttemptSettlementAuthorization) CanonicalBytesAndHash() ([]byte, string, error) {
+	if err := a.Validate(); err != nil {
+		return nil, "", err
+	}
+	canonical, err := json.Marshal(a)
+	if err != nil {
+		return nil, "", fmt.Errorf("encode payment attempt settlement authorization: %w", err)
+	}
+	digest := sha256.Sum256(canonical)
+	return canonical, hex.EncodeToString(digest[:]), nil
+}
+
+// Validate verifies the target, seller terms authorization, and final bundle
+// all describe the same order, attempt, rail and canonical hashes.
+func (a PaymentAttemptSettlementAuthorization) Validate() error {
+	if a.Version != SettlementAuthorizationVersion {
+		return fmt.Errorf("invalid payment attempt settlement authorization version")
+	}
+	_, termsHash, err := a.Terms.CanonicalBytesAndHash()
+	if err != nil {
+		return err
+	}
+	_, targetHash, err := a.Target.CanonicalBytesAndHash()
+	if err != nil {
+		return err
+	}
+	if err := a.Authorization.Validate(); err != nil {
+		return err
+	}
+	if a.Terms.OrderID != a.Authorization.OrderID || a.Terms.AttemptID != a.Authorization.AttemptID ||
+		a.Terms.AssetID != a.Authorization.RailID || a.Target.AttemptID != a.Authorization.AttemptID ||
+		a.Target.AssetID != a.Authorization.RailID || a.Target.AmountAtomic != a.Terms.FundingAmount ||
+		a.Target.Address != a.Terms.FundingTargetAddress || a.Authorization.SettlementTermsHash != termsHash ||
+		a.Authorization.FundingTargetHash != targetHash {
+		return ErrPaymentAttemptSettlementTermsConflict
+	}
+	return a.Terms.VerifySellerAuthorization(
+		a.Authorization.SellerTermsSigner, a.Authorization.SellerTermsSignature,
+	)
+}

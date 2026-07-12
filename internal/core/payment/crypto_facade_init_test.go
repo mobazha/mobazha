@@ -261,3 +261,23 @@ func TestResolveCreateSessionRefundAddress_CustodialRequiresExplicitRefund(t *te
 		t.Fatalf("error = %v, want bad request + refund address required", err)
 	}
 }
+
+func TestStandardOrderUTXOAuthorizationEligible_RequiresSameCurrencyNativeUTXO(t *testing.T) {
+	bitcoin, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoin)
+	if !ok {
+		t.Fatal("canonical Bitcoin rail unavailable")
+	}
+	if !standardOrderUTXOAuthorizationEligible(bitcoin, &porderpb.OrderOpen{PricingCoin: "BTC"}) {
+		t.Fatal("same-currency native Bitcoin order should use settlement authorization")
+	}
+	if standardOrderUTXOAuthorizationEligible(bitcoin, &porderpb.OrderOpen{PricingCoin: "USD"}) {
+		t.Fatal("cross-currency order must remain outside the first authorization scope")
+	}
+	ethereum, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainEthereum)
+	if !ok {
+		t.Fatal("canonical Ethereum rail unavailable")
+	}
+	if standardOrderUTXOAuthorizationEligible(ethereum, &porderpb.OrderOpen{PricingCoin: "ETH"}) {
+		t.Fatal("EVM order must remain disabled until its attempt owner projector is implemented")
+	}
+}

@@ -61,6 +61,7 @@ message OrderMessage {
         PAYMENT_LOCKED              = 14;  // RWA 确认交易模式资金锁定
         AFTER_SALE_DISPUTE_OPEN     = 15;
         SETTLEMENT_KEY_OFFER        = 16;
+        SETTLEMENT_AUTHORIZATION    = 17;
     }
 }
 

@@ -76,6 +76,7 @@ type SettlementKeyOffer struct {
 	ModeratorPayoutAddress  string                    `json:"moderatorPayoutAddress,omitempty"`
 	ModeratorFeeAmount      string                    `json:"moderatorFeeAmount,omitempty"`
 	EscrowTimeoutHours      uint32                    `json:"escrowTimeoutHours,omitempty"`
+	EscrowUnlockUnix        int64                     `json:"escrowUnlockUnix,omitempty"`
 	Signature               []byte                    `json:"signature"`
 }
 
@@ -95,6 +96,7 @@ type settlementKeyOfferPayload struct {
 	ModeratorPayoutAddress  string                    `json:"moderatorPayoutAddress,omitempty"`
 	ModeratorFeeAmount      string                    `json:"moderatorFeeAmount,omitempty"`
 	EscrowTimeoutHours      uint32                    `json:"escrowTimeoutHours,omitempty"`
+	EscrowUnlockUnix        int64                     `json:"escrowUnlockUnix,omitempty"`
 }
 
 // SigningPayload validates an unsigned offer and returns its domain-separated
@@ -110,7 +112,7 @@ func (o SettlementKeyOffer) SigningPayload() ([]byte, error) {
 		KeyAlgorithm: o.KeyAlgorithm, PublicKey: o.PublicKey, ExpectedModeratorPeerID: o.ExpectedModeratorPeerID,
 		AmountAtomic: o.AmountAtomic, ModeratorPayoutAddress: o.ModeratorPayoutAddress,
 		ModeratorFeeAmount: o.ModeratorFeeAmount,
-		EscrowTimeoutHours: o.EscrowTimeoutHours,
+		EscrowTimeoutHours: o.EscrowTimeoutHours, EscrowUnlockUnix: o.EscrowUnlockUnix,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode settlement key offer: %w", err)
@@ -189,6 +191,9 @@ func (o SettlementKeyOffer) validate(requireSignature bool) error {
 	if solanaRail != (strings.TrimSpace(o.KeyAlgorithm) == SettlementKeyAlgorithmEd25519) {
 		return fmt.Errorf("settlement key algorithm does not match rail")
 	}
+	if o.EscrowUnlockUnix < 0 || (solanaRail && o.EscrowUnlockUnix == 0) || (!solanaRail && o.EscrowUnlockUnix != 0) {
+		return fmt.Errorf("invalid settlement escrow unlock time")
+	}
 	if !validCanonicalNativeRail(o.RailID) {
 		return fmt.Errorf("settlement key offer rail must be a canonical native rail")
 	}
@@ -200,8 +205,15 @@ func (o SettlementKeyOffer) validate(requireSignature bool) error {
 	payoutAddress := strings.TrimSpace(o.ModeratorPayoutAddress)
 	feeAmount := strings.TrimSpace(o.ModeratorFeeAmount)
 	if moderatorPeerID == "" {
-		if amountAtomic != "" || payoutAddress != "" || feeAmount != "" {
+		if payoutAddress != "" || feeAmount != "" ||
+			(!solanaRail && (amountAtomic != "" || o.EscrowTimeoutHours != 0)) ||
+			(solanaRail && (amountAtomic == "" || o.EscrowTimeoutHours == 0)) {
 			return fmt.Errorf("settlement key offer moderator scope is incomplete")
+		}
+		if solanaRail {
+			if _, err := settlementAtomicAmount(amountAtomic, true); err != nil {
+				return fmt.Errorf("invalid settlement key offer amount")
+			}
 		}
 	} else {
 		if _, err := peer.Decode(moderatorPeerID); err != nil || amountAtomic == "" {
@@ -360,6 +372,7 @@ func ValidateSettlementTermsOfferBindings(
 	offers []SettlementKeyOffer,
 ) error {
 	moderatorPeerID := strings.TrimSpace(terms.ModeratorPeerID)
+	solanaRail := strings.HasPrefix(strings.TrimSpace(terms.AssetID), "crypto:solana:")
 	var moderatorOffer *SettlementKeyOffer
 	for i := range offers {
 		offer := &offers[i]
@@ -382,12 +395,12 @@ func ValidateSettlementTermsOfferBindings(
 		if strings.TrimSpace(offer.ParticipantPeerID) != expectedParticipantPeerID {
 			return fmt.Errorf("%w: settlement participant does not match signed offer", ErrPaymentAttemptSettlementTermsConflict)
 		}
-		if moderatorPeerID == "" {
+		if moderatorPeerID == "" && !solanaRail {
 			if strings.TrimSpace(offer.AmountAtomic) != "" || offer.EscrowTimeoutHours != 0 {
 				return fmt.Errorf("%w: unmoderated terms contain moderated offer scope", ErrPaymentAttemptSettlementTermsConflict)
 			}
 		} else if strings.TrimSpace(offer.AmountAtomic) != strings.TrimSpace(terms.FundingAmount) ||
-			offer.EscrowTimeoutHours != terms.EscrowTimeoutHours {
+			offer.EscrowTimeoutHours != terms.EscrowTimeoutHours || offer.EscrowUnlockUnix != terms.EscrowUnlockUnix {
 			return fmt.Errorf("%w: settlement amount or timeout does not match signed offers", ErrPaymentAttemptSettlementTermsConflict)
 		}
 		if offer.ParticipantRole == SettlementParticipantModerator {
@@ -398,7 +411,7 @@ func ValidateSettlementTermsOfferBindings(
 		}
 	}
 	if moderatorPeerID == "" {
-		if moderatorOffer != nil || terms.ModeratorFee != nil || terms.EscrowTimeoutHours != 0 {
+		if moderatorOffer != nil || terms.ModeratorFee != nil || (!solanaRail && terms.EscrowTimeoutHours != 0) {
 			return fmt.Errorf("%w: unmoderated terms contain moderator payout facts", ErrPaymentAttemptSettlementTermsConflict)
 		}
 		return nil

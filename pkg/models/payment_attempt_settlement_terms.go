@@ -39,6 +39,7 @@ type PaymentAttemptSettlementTerms struct {
 	ModeratorPeerID      string                       `json:"moderatorPeerID,omitempty"`
 	ModeratorFee         *PaymentAttemptSettlementFee `json:"moderatorFee,omitempty"`
 	EscrowTimeoutHours   uint32                       `json:"escrowTimeoutHours,omitempty"`
+	EscrowUnlockUnix     int64                        `json:"escrowUnlockUnix,omitempty"`
 	SellerAddress        string                       `json:"sellerAddress"`
 	SellerGrossBasis     string                       `json:"sellerGrossBasis"`
 	PlatformReleaseFee   PaymentAttemptSettlementFee  `json:"platformReleaseFee"`
@@ -102,6 +103,11 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 		return fmt.Errorf("buyer and seller settlement participants must differ")
 	}
 	moderatorPeerID := strings.TrimSpace(t.ModeratorPeerID)
+	solanaRail := strings.HasPrefix(strings.TrimSpace(t.AssetID), "crypto:solana:")
+	if t.EscrowUnlockUnix < 0 || (solanaRail && (t.EscrowUnlockUnix == 0 || t.EscrowTimeoutHours == 0)) ||
+		(!solanaRail && t.EscrowUnlockUnix != 0) {
+		return fmt.Errorf("invalid escrow unlock time")
+	}
 	if moderatorPeerID != "" {
 		if _, err := peer.Decode(moderatorPeerID); err != nil {
 			return fmt.Errorf("invalid moderator peer ID")

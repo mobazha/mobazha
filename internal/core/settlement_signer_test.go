@@ -279,13 +279,14 @@ func TestIssueSettlementKeyOffer_SelectsSolanaEd25519Key(t *testing.T) {
 		newFileKeyProvider(nil, settlementTestPrivateKey(t, 1), nil, nil, nil),
 	)
 	contextID := strings.Repeat("a", 64)
-	offer, err := paymentintent.IssueSettlementKeyOffer(
+	offer, err := paymentintent.IssueSettlementKeyOfferWithScopeAndUnlock(
 		t.Context(), identitySigner, settlementSigner,
 		contracts.SettlementKeyRef{
 			TenantID: "tenant-solana", RailID: "crypto:solana:mainnet:native",
 			Purpose: contracts.StandardOrderSettlementKeyPurpose, ReferenceID: contextID,
 		},
 		"order-solana", "attempt-solana", models.SettlementParticipantBuyer,
+		"", "1000", "", "", 72, 2000000000,
 	)
 	require.NoError(t, err)
 	require.Equal(t, models.SettlementKeyAlgorithmEd25519, offer.KeyAlgorithm)

@@ -46,9 +46,10 @@ type ManagedEscrowReceiptValidator interface {
 // monitored rail needs to deterministically project one immutable funding
 // target. Implementations must not return provider secrets or private keys.
 type AttemptSettlementFundingRequest struct {
-	Attempt models.PaymentAttempt
-	Route   models.PaymentRouteBinding
-	Offers  []models.SettlementKeyOffer
+	Attempt       models.PaymentAttempt
+	Route         models.PaymentRouteBinding
+	Offers        []models.SettlementKeyOffer
+	Authorization *models.PaymentAttemptSettlementAuthorization
 }
 
 // AttemptSettlementFundingProjector is an optional V2 capability for rails

@@ -84,6 +84,16 @@ type ManagedSolanaSignRequest struct {
 	Message           []byte
 	Purpose           ManagedSolanaSignPurpose
 	CorrelationID     string
+	AttemptScope      *ManagedSolanaAttemptSignScope
+}
+
+// ManagedSolanaAttemptSignScope binds an Anchor owner signature to one
+// participant's immutable attempt key and settlement terms.
+type ManagedSolanaAttemptSignScope struct {
+	KeyRef    contracts.SettlementKeyRef
+	AttemptID string
+	Sequence  uint64
+	TermsHash string
 }
 
 // ManagedSolanaSigner exposes only an allow-listed owner-message signature.

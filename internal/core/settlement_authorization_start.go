@@ -216,21 +216,27 @@ func beginBuyerSettlementAuthorization(
 	}
 	offerAmount := ""
 	escrowTimeoutHours := uint32(0)
-	if request.ModeratorPeerID != "" {
+	escrowUnlockUnix := int64(0)
+	coinInfo, coinErr := iwallet.CoinInfoFromCoinType(iwallet.CoinType(request.RailID))
+	solanaRail := coinErr == nil && coinInfo.Chain == iwallet.ChainSolana
+	if request.ModeratorPeerID != "" || solanaRail {
 		offerAmount = request.AmountAtomic
 		escrowTimeoutHours = standardOrderEscrowTimeoutHours(orderOpen)
 		if escrowTimeoutHours == 0 {
-			return StandardOrderSettlementAuthorizationStart{}, fmt.Errorf("moderated settlement authorization requires signed escrow timeout")
+			return StandardOrderSettlementAuthorizationStart{}, fmt.Errorf("settlement authorization requires signed escrow timeout")
+		}
+		if solanaRail {
+			escrowUnlockUnix = time.Now().UTC().Add(time.Duration(escrowTimeoutHours) * time.Hour).Unix()
 		}
 	}
-	offer, err := paymentintent.IssueSettlementKeyOfferWithScope(
+	offer, err := paymentintent.IssueSettlementKeyOfferWithScopeAndUnlock(
 		ctx, identitySigner, settlementSigner,
 		contracts.SettlementKeyRef{
 			TenantID: tenantID, RailID: request.RailID,
 			Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
 		},
 		request.OrderID, attempt.AttemptID, models.SettlementParticipantBuyer,
-		request.ModeratorPeerID, offerAmount, "", "", escrowTimeoutHours,
+		request.ModeratorPeerID, offerAmount, "", "", escrowTimeoutHours, escrowUnlockUnix,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationStart{}, err
@@ -334,18 +340,21 @@ func respondSellerSettlementAuthorization(
 	if attempt.AuthorizationContextID != buyerOffer.AuthorizationContextID {
 		return StandardOrderSettlementAuthorizationResponse{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
+	if buyerOffer.EscrowUnlockUnix != 0 && buyerOffer.EscrowUnlockUnix <= time.Now().UTC().Unix() {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("settlement authorization escrow unlock is expired")
+	}
 	offerAmount := ""
-	if buyerOffer.ExpectedModeratorPeerID != "" {
+	if buyerOffer.ExpectedModeratorPeerID != "" || buyerOffer.KeyAlgorithm == models.SettlementKeyAlgorithmEd25519 {
 		offerAmount = amountAtomic
 	}
-	offer, err := paymentintent.IssueSettlementKeyOfferWithScope(
+	offer, err := paymentintent.IssueSettlementKeyOfferWithScopeAndUnlock(
 		ctx, identitySigner, settlementSigner,
 		contracts.SettlementKeyRef{
 			TenantID: tenantID, RailID: buyerOffer.RailID,
 			Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
 		},
 		order.ID.String(), attempt.AttemptID, models.SettlementParticipantSeller,
-		buyerOffer.ExpectedModeratorPeerID, offerAmount, "", "", buyerOffer.EscrowTimeoutHours,
+		buyerOffer.ExpectedModeratorPeerID, offerAmount, "", "", buyerOffer.EscrowTimeoutHours, buyerOffer.EscrowUnlockUnix,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationResponse{}, err

@@ -25,6 +25,7 @@ func SettlementKeyOfferToProto(offer models.SettlementKeyOffer) (*pb.SettlementK
 		ExpectedModeratorPeerID: offer.ExpectedModeratorPeerID, AmountAtomic: offer.AmountAtomic,
 		ModeratorPayoutAddress: offer.ModeratorPayoutAddress, ModeratorFeeAmount: offer.ModeratorFeeAmount,
 		EscrowTimeoutHours: offer.EscrowTimeoutHours,
+		EscrowUnlockUnix:   offer.EscrowUnlockUnix,
 	}, nil
 }
 
@@ -44,6 +45,7 @@ func SettlementKeyOfferFromProto(wire *pb.SettlementKeyOffer) (models.Settlement
 		ExpectedModeratorPeerID: wire.ExpectedModeratorPeerID, AmountAtomic: wire.AmountAtomic,
 		ModeratorPayoutAddress: wire.ModeratorPayoutAddress, ModeratorFeeAmount: wire.ModeratorFeeAmount,
 		EscrowTimeoutHours: wire.EscrowTimeoutHours,
+		EscrowUnlockUnix:   wire.EscrowUnlockUnix,
 	}
 	if err := offer.Verify(); err != nil {
 		return models.SettlementKeyOffer{}, err

@@ -39,6 +39,26 @@ func IssueSettlementKeyOfferWithScope(
 	expectedModeratorPeerID, amountAtomic, moderatorPayoutAddress, moderatorFeeAmount string,
 	escrowTimeoutHours uint32,
 ) (models.SettlementKeyOffer, error) {
+	return IssueSettlementKeyOfferWithScopeAndUnlock(
+		ctx, identitySigner, settlementSigner, keyRef, orderID, attemptID, role,
+		expectedModeratorPeerID, amountAtomic, moderatorPayoutAddress, moderatorFeeAmount,
+		escrowTimeoutHours, 0,
+	)
+}
+
+// IssueSettlementKeyOfferWithScopeAndUnlock additionally binds an absolute
+// escrow unlock instant for program rails such as Solana Anchor.
+func IssueSettlementKeyOfferWithScopeAndUnlock(
+	ctx context.Context,
+	identitySigner contracts.Signer,
+	settlementSigner contracts.SettlementSigner,
+	keyRef contracts.SettlementKeyRef,
+	orderID, attemptID string,
+	role models.SettlementParticipantRole,
+	expectedModeratorPeerID, amountAtomic, moderatorPayoutAddress, moderatorFeeAmount string,
+	escrowTimeoutHours uint32,
+	escrowUnlockUnix int64,
+) (models.SettlementKeyOffer, error) {
 	if identitySigner == nil || settlementSigner == nil {
 		return models.SettlementKeyOffer{}, fmt.Errorf("identity and settlement signers are required for settlement key offer")
 	}
@@ -83,6 +103,7 @@ func IssueSettlementKeyOfferWithScope(
 		ModeratorPayoutAddress:  strings.TrimSpace(moderatorPayoutAddress),
 		ModeratorFeeAmount:      strings.TrimSpace(moderatorFeeAmount),
 		EscrowTimeoutHours:      escrowTimeoutHours,
+		EscrowUnlockUnix:        escrowUnlockUnix,
 	}
 	payload, err := offer.SigningPayload()
 	if err != nil {

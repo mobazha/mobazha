@@ -315,11 +315,24 @@ func finalizeSellerSettlementAuthorization(
 	}
 	var moderatorFee *models.PaymentAttemptSettlementFee
 	var escrowTimeoutHours uint32
+	var escrowUnlockUnix int64
+	for _, offer := range offers {
+		if offer.EscrowUnlockUnix == 0 {
+			continue
+		}
+		if escrowUnlockUnix != 0 && (offer.EscrowUnlockUnix != escrowUnlockUnix || offer.EscrowTimeoutHours != escrowTimeoutHours) {
+			return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		escrowUnlockUnix = offer.EscrowUnlockUnix
+		escrowTimeoutHours = offer.EscrowTimeoutHours
+	}
 	if attempt.ExpectedModeratorPeerID != "" {
 		for _, offer := range offers {
 			if offer.ParticipantRole == models.SettlementParticipantModerator {
 				moderatorFee = &models.PaymentAttemptSettlementFee{Address: offer.ModeratorPayoutAddress, Amount: offer.ModeratorFeeAmount}
-				escrowTimeoutHours = offer.EscrowTimeoutHours
+				if escrowTimeoutHours == 0 {
+					escrowTimeoutHours = offer.EscrowTimeoutHours
+				}
 				break
 			}
 		}
@@ -347,6 +360,7 @@ func finalizeSellerSettlementAuthorization(
 		BuyerPeerID: buyerPeerID, SellerPeerID: sellerPeerID, ModeratorPeerID: attempt.ExpectedModeratorPeerID,
 		ModeratorFee: moderatorFee, SellerAddress: payout.Address,
 		EscrowTimeoutHours:   escrowTimeoutHours,
+		EscrowUnlockUnix:     escrowUnlockUnix,
 		SellerGrossBasis:     attempt.AmountValue,
 		PlatformReleaseFee:   models.PaymentAttemptSettlementFee{Amount: "0"},
 		BuyerCancellationFee: models.PaymentAttemptSettlementFee{Amount: "0"},

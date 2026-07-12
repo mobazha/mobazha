@@ -22,7 +22,8 @@ import (
 const maxManagedSolanaMessageSize = 4096
 
 type distributionManagedSolanaSigner struct {
-	keys contracts.KeyProvider
+	keys       contracts.KeyProvider
+	settlement contracts.SettlementSigner
 }
 
 type distributionManagedSolanaSetupService struct {
@@ -174,11 +175,40 @@ func (s distributionManagedSolanaSigner) SignManagedSolanaMessage(
 	if err := validateManagedSolanaSignRequest(request); err != nil {
 		return "", nil, err
 	}
-	key, err := s.key(ctx)
-	if err != nil {
-		return "", nil, err
+	var publicKey gosolana.PublicKey
+	var signature []byte
+	if request.AttemptScope != nil {
+		signer, ok := s.settlement.(contracts.SolanaSettlementSigner)
+		if !ok {
+			return "", nil, fmt.Errorf("distribution Solana signer: attempt-scoped signer unavailable")
+		}
+		scope := request.AttemptScope
+		scopeCoin, scopeErr := iwallet.CoinInfoFromCoinType(iwallet.CoinType(scope.KeyRef.RailID))
+		if scopeErr != nil || scopeCoin.Chain != iwallet.ChainSolana {
+			return "", nil, fmt.Errorf("distribution Solana signer: attempt rail is not Solana")
+		}
+		publicKeyBytes, signed, signErr := signer.SignSolanaMessage(ctx, contracts.SolanaMessageSettlementSignRequest{
+			KeyRef: scope.KeyRef, OrderID: request.OrderID, AttemptID: scope.AttemptID,
+			Action: request.ActionKind, Sequence: scope.Sequence, TermsHash: scope.TermsHash,
+			ProgramAddress: request.ProgramAddress, EscrowAddress: request.EscrowAddress,
+			Message: append([]byte(nil), request.Message...),
+		})
+		if signErr != nil {
+			return "", nil, fmt.Errorf("distribution Solana signer: %w", signErr)
+		}
+		if len(publicKeyBytes) != gosolana.PublicKeyLength {
+			return "", nil, fmt.Errorf("distribution Solana signer: invalid attempt public key")
+		}
+		publicKey = gosolana.PublicKeyFromBytes(publicKeyBytes)
+		signature = signed
+	} else {
+		key, err := s.key(ctx)
+		if err != nil {
+			return "", nil, err
+		}
+		publicKey = key.PublicKey()
+		signature = ed25519.Sign(ed25519.PrivateKey(*key), request.Message)
 	}
-	publicKey := key.PublicKey()
 	authorized := false
 	seen := make(map[gosolana.PublicKey]struct{}, len(request.AuthorizedSigners))
 	for _, raw := range request.AuthorizedSigners {
@@ -195,7 +225,6 @@ func (s distributionManagedSolanaSigner) SignManagedSolanaMessage(
 	if !authorized {
 		return "", nil, fmt.Errorf("distribution Solana signer: local owner %s is outside the authorized owner set", publicKey)
 	}
-	signature := ed25519.Sign(ed25519.PrivateKey(*key), request.Message)
 	return publicKey.String(), signature, nil
 }
 

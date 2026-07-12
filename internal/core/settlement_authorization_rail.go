@@ -94,6 +94,7 @@ func (n *MobazhaNode) activateFrozenStandardOrderSettlementAttempt(
 	}
 	return activator.ActivateAttemptSettlementFunding(ctx, payment.AttemptSettlementFundingRequest{
 		Attempt: finalization.Attempt, Route: finalization.Route,
-		Offers: append([]models.SettlementKeyOffer(nil), finalization.Authorization.Offers...),
+		Offers:        append([]models.SettlementKeyOffer(nil), finalization.Authorization.Offers...),
+		Authorization: &finalization.SettlementAuthorization,
 	}, finalization.Target)
 }

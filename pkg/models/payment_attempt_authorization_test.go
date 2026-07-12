@@ -59,7 +59,7 @@ func TestSettlementKeyOffer_BindsEd25519AlgorithmToSolanaRail(t *testing.T) {
 		OrderID: "order-solana", AttemptID: "attempt-solana", ParticipantPeerID: participant.String(),
 		ParticipantRole: SettlementParticipantBuyer, RailID: "crypto:solana:mainnet:native",
 		Purpose: "standard-order-participant:buyer", KeyAlgorithm: SettlementKeyAlgorithmEd25519,
-		PublicKey: make([]byte, 32),
+		PublicKey: make([]byte, 32), AmountAtomic: "1000", EscrowTimeoutHours: 72, EscrowUnlockUnix: 2000000000,
 	}
 	offer.PublicKey[0] = 1
 	payload, err := offer.SigningPayload()

@@ -136,12 +136,12 @@ func (n *MobazhaNode) respondSelectedModeratorSettlementKeyOffer(
 	if err != nil {
 		return true, fmt.Errorf("freeze moderator settlement fee: %w", err)
 	}
-	moderatorOffer, err := paymentintent.IssueSettlementKeyOfferWithScope(
+	moderatorOffer, err := paymentintent.IssueSettlementKeyOfferWithScopeAndUnlock(
 		ctx, n.signer, n.settlementSigner,
 		contracts.SettlementKeyRef{TenantID: tenantID, RailID: offer.RailID, Purpose: standardOrderSettlementKeyPurpose, ReferenceID: offer.AuthorizationContextID},
 		offer.OrderID, offer.AttemptID, models.SettlementParticipantModerator,
 		localPeerID, offer.AmountAtomic, payout.Address, fee.String(),
-		offer.EscrowTimeoutHours,
+		offer.EscrowTimeoutHours, offer.EscrowUnlockUnix,
 	)
 	if err != nil {
 		return true, err

@@ -137,7 +137,7 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 		ActionRecorder:   actionRecorder,
 	}
 	managedSolana := distribution.ManagedSolanaRuntime{
-		Signer:         distributionManagedSolanaSigner{keys: n.keyProvider},
+		Signer:         distributionManagedSolanaSigner{keys: n.keyProvider, settlement: n.settlementSigner},
 		Setup:          distributionManagedSolanaSetupService{service: n.paymentService},
 		Orders:         distributionManagedSolanaOrderSource{db: n.db},
 		FundingSink:    n.newDistributionFundingSink(),

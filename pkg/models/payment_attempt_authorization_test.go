@@ -107,6 +107,10 @@ func TestPaymentAttemptAuthorizationBundle_CanonicalizesAndRequiresCompleteOffer
 	require.NoError(t, err)
 	require.ErrorContains(t, duplicateKey.Validate(), "public key is reused")
 
+	mismatchedSeller := bundle
+	mismatchedSeller.SellerTermsSigner = buyer.String()
+	require.ErrorContains(t, mismatchedSeller.Validate(), "seller signer does not match seller offer")
+
 	bundle.RequiredRoles = append(bundle.RequiredRoles, SettlementParticipantModerator)
 	require.Error(t, bundle.Validate())
 }

@@ -55,7 +55,7 @@ func TestCanReprovisionForCoinSwitch_AllowsUnfundedFiatCheckoutToCrypto(t *testi
 		},
 	}
 
-	if !canReprovisionForCoinSwitch(view, "crypto:solana:mainnet:native") {
+	if !canReprovisionForCoinSwitch(view, "crypto:solana:mainnet:native", false) {
 		t.Fatal("expected unfunded provider checkout to allow crypto reprovision")
 	}
 }
@@ -70,7 +70,22 @@ func TestCanReprovisionForCoinSwitch_RejectsFundedFiatCheckout(t *testing.T) {
 		},
 	}
 
-	if canReprovisionForCoinSwitch(view, "crypto:solana:mainnet:native") {
+	if canReprovisionForCoinSwitch(view, "crypto:solana:mainnet:native", false) {
 		t.Fatal("funded provider checkout must not allow crypto reprovision")
+	}
+}
+
+func TestCanReprovisionForCoinSwitch_RejectsFrozenAttempt(t *testing.T) {
+	view := &pkpayment.PaymentSession{
+		PaymentCoin:    "crypto:eip155:1/native",
+		SettlementMode: pkpayment.SettlementModeAddressMonitored,
+		PaymentProgress: pkpayment.PaymentProgressView{
+			ObservedAmount: "0",
+			FundingState:   pkpayment.FundingStateAwaitingFunds,
+		},
+	}
+
+	if canReprovisionForCoinSwitch(view, "crypto:solana:mainnet:native", true) {
+		t.Fatal("frozen payment attempt must not allow crypto reprovision")
 	}
 }

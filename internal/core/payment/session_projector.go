@@ -45,6 +45,8 @@ type projectOrderInput struct {
 	order             *models.Order
 	orderOpen         *pb.OrderOpen   // may be nil for orders not yet opened
 	paymentSent       *pb.PaymentSent // may be nil for orders not yet paid
+	frozenAttempt     *models.PaymentAttempt
+	frozenTarget      *models.PaymentAttemptFundingTarget
 	observedAmountRaw string
 	obsCount          int
 	lastObsAt         *time.Time
@@ -55,6 +57,9 @@ type projectOrderInput struct {
 // It is the single source of truth for the projection rules applied by
 // PaymentSessionService.GetSession and RefreshSession.
 func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.PaymentSession, error) {
+	if input == nil || input.order == nil {
+		return nil, fmt.Errorf("payment session projector: order input is required")
+	}
 	order := input.order
 
 	// ── Session ID (Phase B derivation) ──────────────────────────────────
@@ -65,12 +70,25 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	// Fallback: FiatMetadata (fiat order not yet paid) or PendingPaymentInfo
 	// (UTXO order with address set but PaymentSent not yet received).
 	paymentCoin, productMode := p.derivePaymentInfo(order, input.orderOpen, input.paymentSent)
+	if input.frozenTarget != nil {
+		frozenCoin := normalizeCoinBestEffort(input.frozenTarget.AssetID)
+		if paymentCoin != "" && normalizeCoinBestEffort(paymentCoin) != frozenCoin {
+			return nil, fmt.Errorf("payment session projector: frozen attempt asset conflicts with order payment state")
+		}
+		if order.PaymentAddress != "" && strings.TrimSpace(order.PaymentAddress) != strings.TrimSpace(input.frozenTarget.Address) {
+			return nil, fmt.Errorf("payment session projector: frozen attempt target conflicts with order payment address")
+		}
+		paymentCoin = frozenCoin
+	}
 
 	// ── Expected amount ───────────────────────────────────────────────────
 	// Use the order's canonical expected-amount resolver so address-monitored
 	// rails (UTXO / managed EVM) project only their locked pending amount instead of
 	// the signed listing amount from OrderOpen, which may be a different coin.
 	expectedAmountRaw := strings.TrimSpace(order.ExpectedPaymentAmountString())
+	if input.frozenTarget != nil {
+		expectedAmountRaw = strings.TrimSpace(input.frozenTarget.AmountAtomic)
+	}
 	expectedAmount := payment.FormatSessionAmount(expectedAmountRaw, paymentCoin)
 
 	// ── Settlement mode & funding target ─────────────────────────────────
@@ -265,14 +283,26 @@ func (p *PaymentSessionProjector) deriveFundingTarget(
 	order *models.Order,
 	paymentCoin string,
 	expectedAmount string,
-	_ *projectOrderInput,
+	input *projectOrderInput,
 ) (payment.SettlementMode, payment.FundingTargetView) {
 	// Fiat path
 	if strings.HasPrefix(paymentCoin, "fiat:") {
 		return payment.SettlementModeProviderCheckout, p.deriveFiatFundingTarget(order, paymentCoin, expectedAmount)
 	}
 
-	// Crypto path. Empty address means the session still needs provisioning via
+	if input != nil && input.frozenTarget != nil {
+		target := input.frozenTarget
+		return payment.SettlementModeAddressMonitored, payment.FundingTargetView{
+			Type:      payment.FundingTargetTypeAddress,
+			Address:   target.Address,
+			AssetID:   paymentCoin,
+			Amount:    expectedAmount,
+			MemoOrTag: target.MemoOrTag,
+			QRPayload: payment.BuildFundingQRPayload(paymentCoin, target.Address, expectedAmount),
+		}
+	}
+
+	// Legacy crypto path. Empty address means the session still needs provisioning via
 	// POST /v1/orders/{orderID}/payment-session; it is not an actionable target.
 	target := payment.FundingTargetView{
 		Type:      payment.FundingTargetTypeAddress,
@@ -667,6 +697,13 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 		input.paymentSent = ps
 	}
 
+	frozenAttempt, frozenTarget, err := p.loadFrozenCryptoAttempt(order.TenantID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	input.frozenAttempt = frozenAttempt
+	input.frozenTarget = frozenTarget
+
 	// Observation progress includes pending rows so payment sessions can show
 	// mempool-detected funds without marking the order chain-verified.
 	observedAmountRaw, obsCount, lastObsAt, observations, err := p.queryObservationProgress(order.TenantID, orderID)
@@ -678,6 +715,43 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 	}
 
 	return input, nil
+}
+
+func (p *PaymentSessionProjector) loadFrozenCryptoAttempt(
+	tenantID, orderID string,
+) (*models.PaymentAttempt, *models.PaymentAttemptFundingTarget, error) {
+	if p == nil || p.db == nil || strings.TrimSpace(orderID) == "" {
+		return nil, nil, nil
+	}
+	var attempts []models.PaymentAttempt
+	err := p.db.View(func(tx database.Tx) error {
+		if !tx.Read().Migrator().HasTable(&models.PaymentAttempt{}) {
+			return nil
+		}
+		return tx.Read().
+			Where("tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+				tenantID, orderID, models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptFundingTargetReady).
+			Order("created_at DESC, attempt_id DESC").
+			Limit(2).
+			Find(&attempts).Error
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("payment session projector: load frozen crypto attempt: %w", err)
+	}
+	if len(attempts) == 0 {
+		return nil, nil, nil
+	}
+	if len(attempts) > 1 {
+		return nil, nil, fmt.Errorf("payment session projector: multiple actionable crypto attempts for order %s", orderID)
+	}
+	target, err := attempts[0].GetFundingTarget()
+	if err != nil {
+		return nil, nil, fmt.Errorf("payment session projector: verify frozen crypto attempt: %w", err)
+	}
+	if target == nil {
+		return nil, nil, fmt.Errorf("payment session projector: actionable crypto attempt has no funding target")
+	}
+	return &attempts[0], target, nil
 }
 
 // queryObservationProgress returns deduplicated pending-or-confirmed observed

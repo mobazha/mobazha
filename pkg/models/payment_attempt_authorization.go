@@ -231,6 +231,7 @@ func (b PaymentAttemptAuthorizationBundle) Validate() error {
 	}
 	seen := make(map[SettlementParticipantRole]struct{}, len(b.Offers))
 	publicKeys := make(map[string]SettlementParticipantRole, len(b.Offers))
+	sellerOfferPeerID := ""
 	for _, offer := range b.Offers {
 		if err := offer.Verify(); err != nil {
 			return err
@@ -250,9 +251,15 @@ func (b PaymentAttemptAuthorizationBundle) Validate() error {
 		}
 		seen[offer.ParticipantRole] = struct{}{}
 		publicKeys[string(offer.PublicKey)] = offer.ParticipantRole
+		if offer.ParticipantRole == SettlementParticipantSeller {
+			sellerOfferPeerID = strings.TrimSpace(offer.ParticipantPeerID)
+		}
 	}
 	if len(seen) != len(required) {
 		return fmt.Errorf("incomplete settlement key offers")
+	}
+	if sellerOfferPeerID == "" || strings.TrimSpace(b.SellerTermsSigner) != sellerOfferPeerID {
+		return fmt.Errorf("authorization bundle seller signer does not match seller offer")
 	}
 	return nil
 }

@@ -248,7 +248,7 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		// exception is an unfunded provider checkout (for example, Stripe was
 		// opened as the default and the buyer then chose Solana before paying).
 		if view.PaymentCoin != "" && view.PaymentCoin != req.PaymentCoin {
-			if !canReprovisionForCoinSwitch(view, req.PaymentCoin) {
+			if !canReprovisionForCoinSwitch(view, req.PaymentCoin, input.frozenAttempt != nil) {
 				return nil, fmt.Errorf("%w: existing=%q requested=%q",
 					ErrPaymentCoinMismatch, view.PaymentCoin, req.PaymentCoin)
 			}
@@ -373,8 +373,11 @@ func fiatSessionIDFromView(view *payment.PaymentSession) string {
 	return sid
 }
 
-func canReprovisionForCoinSwitch(view *payment.PaymentSession, requestedCoin string) bool {
+func canReprovisionForCoinSwitch(view *payment.PaymentSession, requestedCoin string, hasFrozenAttempt bool) bool {
 	if view == nil {
+		return false
+	}
+	if hasFrozenAttempt {
 		return false
 	}
 	if !strings.HasPrefix(requestedCoin, "crypto:") && !strings.HasPrefix(requestedCoin, "fiat:") {

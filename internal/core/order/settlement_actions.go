@@ -239,16 +239,20 @@ func validateFrozenStandardOrderCompleteRelease(
 		!sameSettlementActionAddress(release.PlatformAddress, terms.PlatformReleaseFee.Address, platformAmount) {
 		return models.ErrPaymentAttemptSettlementTermsConflict
 	}
-	affiliateAddress := ""
-	affiliateAmountRaw := "0"
-	if terms.Affiliate != nil {
-		affiliateAddress = terms.Affiliate.Address
-		affiliateAmountRaw = terms.Affiliate.Amount
-	}
-	affiliateAmount, err := canonicalSettlementActionAmount(release.AffiliateAmount, false)
-	if err != nil || affiliateAmount.String() != affiliateAmountRaw ||
-		!sameSettlementActionAddress(release.AffiliateAddress, affiliateAddress, affiliateAmount) {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+	affiliateAmount := new(big.Int)
+	if terms.Affiliate == nil {
+		// Empty affiliate fields mean that no affiliate terms were seller-signed.
+		// Keep that distinct from an explicit zero, which is evidence that terms
+		// exist but round to no executable output.
+		if strings.TrimSpace(release.AffiliateAddress) != "" || strings.TrimSpace(release.AffiliateAmount) != "" {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+	} else {
+		affiliateAmount, err = canonicalSettlementActionAmount(release.AffiliateAmount, false)
+		if err != nil || affiliateAmount.String() != terms.Affiliate.Amount ||
+			!sameSettlementActionAddress(release.AffiliateAddress, terms.Affiliate.Address, affiliateAmount) {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
 	}
 	sellerAmount, err := canonicalSettlementActionAmount(release.ToAmount, true)
 	if err != nil {

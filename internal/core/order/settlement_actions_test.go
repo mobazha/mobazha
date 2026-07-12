@@ -151,7 +151,7 @@ func TestValidateFrozenStandardOrderCompleteRelease_BindsFrozenOutputs(t *testin
 	valid := &pb.EscrowRelease{
 		Outpoints: []*pb.Outpoint{{FromID: []byte{0x01}, Value: "1000"}},
 		ToAddress: "tb1seller", ToAmount: "890", PlatformAddress: "tb1platform", PlatformAmount: "100",
-		AffiliateAmount: "0", TransactionFee: "10",
+		TransactionFee: "10",
 	}
 	require.NoError(t, validateFrozenStandardOrderCompleteRelease(valid, terms, target))
 
@@ -162,6 +162,8 @@ func TestValidateFrozenStandardOrderCompleteRelease_BindsFrozenOutputs(t *testin
 		{name: "redirect platform", mutate: func(release *pb.EscrowRelease) { release.PlatformAddress = "tb1attacker" }},
 		{name: "inflate seller", mutate: func(release *pb.EscrowRelease) { release.ToAmount = "900" }},
 		{name: "hide fee output", mutate: func(release *pb.EscrowRelease) { release.PlatformAmount = "0" }},
+		{name: "inject zero affiliate terms", mutate: func(release *pb.EscrowRelease) { release.AffiliateAmount = "0" }},
+		{name: "inject affiliate address", mutate: func(release *pb.EscrowRelease) { release.AffiliateAddress = "tb1attacker" }},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

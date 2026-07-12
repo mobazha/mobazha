@@ -134,6 +134,13 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 		PaymentReadiness:        readiness,
 		UserActionRequest:       nil, // Phase B: no user action required for address_monitored
 	}
+	if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptFundingTargetReady {
+		terms, err := input.cryptoAttempt.GetSettlementTerms()
+		if err != nil || terms == nil {
+			return nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		session.EscrowTimeoutHours = terms.EscrowTimeoutHours
+	}
 	applyRefundProjection(p.db, session, input, paymentCoin)
 	payment.ApplyBuyerPaymentReadinessGate(session)
 	return session, nil

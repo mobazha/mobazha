@@ -112,6 +112,28 @@ func TestPaymentSessionProjector_FrozenAttemptTargetIsAuthoritative(t *testing.T
 	require.NotEmpty(t, session.FundingTarget.Amount)
 }
 
+func TestPaymentSessionProjector_ExposesFrozenEscrowTimeout(t *testing.T) {
+	base := frozenPaymentAttemptForProjectionTest(t, "QmFrozenAttemptTimeout")
+	terms, err := base.GetSettlementTerms()
+	require.NoError(t, err)
+	require.NotNil(t, terms)
+	terms.EscrowTimeoutHours = 72
+	target, err := base.GetFundingTarget()
+	require.NoError(t, err)
+	require.NotNil(t, target)
+	attempt := base
+	attempt.State = models.PaymentAttemptFundingTargetReady
+	attempt.SettlementTerms = nil
+	attempt.SettlementTermsHash = ""
+	require.NoError(t, attempt.SetSettlementTerms(*terms))
+
+	session, err := NewPaymentSessionProjector(nil).Project(&projectOrderInput{
+		order: &models.Order{ID: "QmFrozenAttemptTimeout"}, cryptoAttempt: &attempt, frozenTarget: target,
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint32(72), session.EscrowTimeoutHours)
+}
+
 func TestPaymentSessionProjector_RejectsMutableAddressConflictWithFrozenAttempt(t *testing.T) {
 	p := NewPaymentSessionProjector(nil)
 	order := &models.Order{

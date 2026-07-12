@@ -298,6 +298,9 @@ type PaymentSession struct {
 	RefundRequiresInput bool `json:"refundRequiresInput,omitempty"`
 	// RefundResolveReason explains why input is required or still pending.
 	RefundResolveReason string `json:"refundResolveReason,omitempty"`
+	// EscrowTimeoutHours is copied from frozen attempt settlement terms so a
+	// client can echo the exact authorized value in its payment notification.
+	EscrowTimeoutHours uint32 `json:"escrowTimeoutHours,omitempty"`
 
 	ExpiresAt time.Time `json:"expiresAt"`
 

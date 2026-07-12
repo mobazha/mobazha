@@ -99,6 +99,7 @@ func TestBeginBuyerSettlementAuthorization_PersistsDraftAndPublishesIdempotentOf
 	request := StandardOrderSettlementAuthorizationRequest{
 		OrderID: order.ID.String(), PaymentSelectionQuoteID: "quote-1",
 		RailID: route.AssetID, AmountAtomic: "1000",
+		BuyerRefundAddress: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
 	}
 	require.NoError(t, db.Create(&models.PaymentSelectionQuote{
 		TenantID: order.TenantID, QuoteID: order.PaymentSelectionQuoteID, OrderID: order.ID.String(),
@@ -129,6 +130,7 @@ func TestBeginBuyerSettlementAuthorization_PersistsDraftAndPublishesIdempotentOf
 	require.Equal(t, first.BuyerOffer, retry.BuyerOffer)
 	require.Equal(t, sellerPeerID.String(), first.SellerPeerID)
 	require.Equal(t, models.SettlementParticipantBuyer, first.BuyerOffer.ParticipantRole)
+	require.Empty(t, first.BuyerOffer.BuyerRefundAddress)
 	require.Equal(t, []peer.ID{sellerTarget, sellerTarget}, publisher.targets)
 	require.Len(t, settlementSigner.keyRefs, 2)
 	require.Equal(t, "standard-order-participant:buyer", settlementSigner.keyRefs[0].Purpose)

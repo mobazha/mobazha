@@ -230,6 +230,10 @@ func beginBuyerSettlementAuthorization(
 			escrowUnlockUnix = time.Now().UTC().Add(time.Duration(escrowTimeoutHours) * time.Hour).Unix()
 		}
 	}
+	buyerRefundAddress := ""
+	if solanaRail {
+		buyerRefundAddress = request.BuyerRefundAddress
+	}
 	offer, err := paymentintent.IssueSettlementKeyOfferWithScopeAndUnlock(
 		ctx, identitySigner, settlementSigner,
 		contracts.SettlementKeyRef{
@@ -237,7 +241,7 @@ func beginBuyerSettlementAuthorization(
 			Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
 		},
 		request.OrderID, attempt.AttemptID, models.SettlementParticipantBuyer,
-		request.ModeratorPeerID, offerAmount, "", "", request.BuyerRefundAddress, escrowTimeoutHours, escrowUnlockUnix,
+		request.ModeratorPeerID, offerAmount, "", "", buyerRefundAddress, escrowTimeoutHours, escrowUnlockUnix,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationStart{}, err

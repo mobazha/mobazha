@@ -392,6 +392,11 @@ func TestCreateCryptoPaymentAttemptDraft_InheritsRetainedOfferContext(t *testing
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		return RetainReceivedSettlementKeyOfferInTransaction(tx, attempt.TenantID, buyerOffer)
 	}))
+	loadedOffer, err := LoadRetainedSettlementKeyOffer(
+		db, attempt.TenantID, attempt.AttemptID, models.SettlementParticipantBuyer,
+	)
+	require.NoError(t, err)
+	require.Equal(t, buyerOffer, loadedOffer)
 
 	created, err := CreateCryptoPaymentAttemptDraft(db, attempt, route)
 	require.NoError(t, err)

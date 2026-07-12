@@ -42,6 +42,15 @@ type StandardOrderSettlementAuthorizationStart struct {
 	SellerPeerID string
 }
 
+// StandardOrderSettlementAuthorizationResponse is the seller's durable,
+// non-actionable response to one retained buyer offer.
+type StandardOrderSettlementAuthorizationResponse struct {
+	Attempt     models.PaymentAttempt
+	Route       models.PaymentRouteBinding
+	SellerOffer models.SettlementKeyOffer
+	BuyerPeerID string
+}
+
 type settlementKeyOfferPublisher interface {
 	PublishSettlementKeyOffer(context.Context, peer.ID, models.SettlementKeyOffer) error
 }
@@ -96,6 +105,58 @@ func (n *MobazhaNode) BeginStandardOrderSettlementAuthorization(
 	}
 	return beginBuyerSettlementAuthorization(
 		ctx, rawProvider.RawDB(), &order, n.signer, n.settlementSigner, n.orderService, route, request,
+	)
+}
+
+// RespondStandardOrderSettlementAuthorization adopts a retained buyer offer,
+// persists the matching seller draft, and reliably publishes the seller's
+// attempt-scoped key offer. The first response scope is unmoderated,
+// same-currency native-rail orders only.
+func (n *MobazhaNode) RespondStandardOrderSettlementAuthorization(
+	ctx context.Context,
+	orderID, attemptID string,
+) (StandardOrderSettlementAuthorizationResponse, error) {
+	if err := ctx.Err(); err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	if n == nil || n.db == nil || n.orderService == nil || n.signer == nil || n.settlementSigner == nil {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("standard order settlement authorization is not configured")
+	}
+	orderID = strings.TrimSpace(orderID)
+	attemptID = strings.TrimSpace(attemptID)
+	if orderID == "" || attemptID == "" {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization requires order and attempt")
+	}
+	var order models.Order
+	if err := n.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID).First(&order).Error
+	}); err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("load seller order for settlement authorization: %w", err)
+	}
+	rawProvider, ok := n.db.(rawSettlementAuthorizationDB)
+	if !ok || rawProvider.RawDB() == nil {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("standard order settlement authorization raw database is unavailable")
+	}
+	buyerOffer, err := paymentintent.LoadRetainedSettlementKeyOffer(
+		rawProvider.RawDB(), strings.TrimSpace(order.TenantID), attemptID, models.SettlementParticipantBuyer,
+	)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	rail, network, asset, _, err := provisioningCapabilityRoute(corepayment.SessionProvisioningPolicyInput{
+		PaymentCoin: buyerOffer.RailID,
+	})
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	route, err := n.ResolveNewPaymentRouteIdentity(ctx, distribution.PaymentCapabilityRequest{
+		Rail: rail, Network: network, Asset: asset, Operation: distribution.PaymentOperationSetup,
+	})
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	return respondSellerSettlementAuthorization(
+		ctx, rawProvider.RawDB(), &order, buyerOffer, n.signer, n.settlementSigner, n.orderService, route,
 	)
 }
 
@@ -167,6 +228,101 @@ func beginBuyerSettlementAuthorization(
 	}
 	return StandardOrderSettlementAuthorizationStart{
 		Attempt: attempt, Route: binding, BuyerOffer: offer, SellerPeerID: sellerPeerID,
+	}, nil
+}
+
+func respondSellerSettlementAuthorization(
+	ctx context.Context,
+	db *gorm.DB,
+	order *models.Order,
+	buyerOffer models.SettlementKeyOffer,
+	identitySigner contracts.Signer,
+	settlementSigner contracts.SettlementSigner,
+	publisher settlementKeyOfferPublisher,
+	route payment.RouteIdentity,
+) (StandardOrderSettlementAuthorizationResponse, error) {
+	if db == nil || order == nil || identitySigner == nil || settlementSigner == nil || publisher == nil {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization dependencies are required")
+	}
+	if order.Role() != models.RoleVendor || buyerOffer.OrderID != order.ID.String() ||
+		buyerOffer.ParticipantRole != models.SettlementParticipantBuyer {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("settlement authorization response requires the local seller order and buyer offer")
+	}
+	if err := buyerOffer.Verify(); err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(buyerOffer.RailID))
+	if err != nil || !coinInfo.IsNative {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization requires a canonical native rail")
+	}
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("load signed order participants: %w", err)
+	}
+	buyerPeerID, sellerPeerID, err := standardOrderSettlementParticipants(orderOpen)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	if buyerOffer.ParticipantPeerID != buyerPeerID || identitySigner.PeerID().String() != sellerPeerID {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("settlement key offer participants do not match signed order")
+	}
+	paymentCurrency, err := iwallet.CoinType(buyerOffer.RailID).PricingCurrencyCode()
+	amountAtomic := strings.TrimSpace(orderOpen.Amount)
+	if err != nil || !strings.EqualFold(strings.TrimSpace(paymentCurrency), strings.TrimSpace(orderOpen.PricingCoin)) ||
+		amountAtomic == "" {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization requires same-currency signed order amount")
+	}
+	if route.AssetID != buyerOffer.RailID {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller payment route does not match buyer offer rail")
+	}
+	tenantID := strings.TrimSpace(order.TenantID)
+	retainedOffer, err := paymentintent.LoadRetainedSettlementKeyOffer(
+		db, tenantID, buyerOffer.AttemptID, models.SettlementParticipantBuyer,
+	)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	retainedCanonical, retainedHash, err := retainedOffer.CanonicalBytesAndHash()
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	buyerCanonical, buyerHash, err := buyerOffer.CanonicalBytesAndHash()
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	if retainedHash != buyerHash || string(retainedCanonical) != string(buyerCanonical) {
+		return StandardOrderSettlementAuthorizationResponse{}, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	attempt, binding, err := paymentintent.PrepareCryptoPaymentAttemptDraft(db, paymentintent.CryptoPaymentAttemptDraftRequest{
+		TenantID: tenantID, AttemptID: buyerOffer.AttemptID, OrderID: order.ID.String(),
+		AmountAtomic: amountAtomic, RailID: buyerOffer.RailID,
+	}, route)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	if attempt.AuthorizationContextID != buyerOffer.AuthorizationContextID {
+		return StandardOrderSettlementAuthorizationResponse{}, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	offer, err := paymentintent.IssueSettlementKeyOffer(
+		ctx, identitySigner, settlementSigner,
+		contracts.SettlementKeyRef{
+			TenantID: tenantID, RailID: buyerOffer.RailID,
+			Purpose: "standard-order-participant", ReferenceID: attempt.AuthorizationContextID,
+		},
+		order.ID.String(), attempt.AttemptID, models.SettlementParticipantSeller,
+	)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	buyer, err := peer.Decode(buyerPeerID)
+	if err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("decode signed order buyer: %w", err)
+	}
+	if err := publisher.PublishSettlementKeyOffer(ctx, buyer, offer); err != nil {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("publish seller settlement key offer: %w", err)
+	}
+	return StandardOrderSettlementAuthorizationResponse{
+		Attempt: attempt, Route: binding, SellerOffer: offer, BuyerPeerID: buyerPeerID,
 	}, nil
 }
 

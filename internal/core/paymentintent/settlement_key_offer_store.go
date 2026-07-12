@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha/pkg/models"
@@ -91,6 +92,30 @@ func RetainReceivedSettlementKeyOfferInTransaction(
 	default:
 		return retainSettlementKeyOfferRecord(tx, tenantID, offer, canonical, hash)
 	}
+}
+
+// LoadRetainedSettlementKeyOffer returns one re-verified inbox offer without
+// requiring a local attempt draft. Seller-side responders use it to adopt the
+// buyer's already-persisted attempt and authorization context.
+func LoadRetainedSettlementKeyOffer(
+	db *gorm.DB,
+	tenantID, attemptID string,
+	role models.SettlementParticipantRole,
+) (models.SettlementKeyOffer, error) {
+	if db == nil || strings.TrimSpace(attemptID) == "" || !role.Valid() {
+		return models.SettlementKeyOffer{}, fmt.Errorf("load retained settlement key offer: invalid request")
+	}
+	var record models.PaymentAttemptSettlementOffer
+	if err := db.Session(&gorm.Session{NewDB: true}).Where(
+		"tenant_id = ? AND attempt_id = ? AND participant_role = ?", tenantID, attemptID, role,
+	).First(&record).Error; err != nil {
+		return models.SettlementKeyOffer{}, fmt.Errorf("load retained settlement key offer: %w", err)
+	}
+	offer, err := record.SettlementKeyOffer()
+	if err != nil {
+		return models.SettlementKeyOffer{}, err
+	}
+	return *offer, nil
 }
 
 // PruneStaleRetainedSettlementKeyOffers removes local inbox records that can

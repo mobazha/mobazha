@@ -84,6 +84,38 @@ const (
 	FundingStateExpiredUnfunded      FundingState = "expired_unfunded"
 )
 
+// FundsState is the chain/provider-neutral lifecycle of the money after a
+// payment session is created. Unlike FundingState, it continues through
+// release, dispute, and refund execution.
+type FundsState string
+
+const (
+	FundsStateUnfunded          FundsState = "unfunded"
+	FundsStatePartiallyFunded   FundsState = "partially_funded"
+	FundsStateFunded            FundsState = "funded"
+	FundsStateReleasePending    FundsState = "release_pending"
+	FundsStateRefundPending     FundsState = "refund_pending"
+	FundsStateReleased          FundsState = "released"
+	FundsStateRefunded          FundsState = "refunded"
+	FundsStateDisputed          FundsState = "disputed"
+	FundsStateFailedRecoverable FundsState = "failed_recoverable"
+	FundsStateFailedTerminal    FundsState = "failed_terminal"
+)
+
+// FundsStatusView identifies the durable execution currently controlling the
+// money. Action fields refer to either a chain SettlementAction or a fiat
+// PaymentProviderAction; consumers do not need provider-specific branching.
+type FundsStatusView struct {
+	State      FundsState `json:"state"`
+	Action     string     `json:"action,omitempty"`
+	ActionID   string     `json:"actionID,omitempty"`
+	ProviderID string     `json:"providerID,omitempty"`
+	TxHash     string     `json:"txHash,omitempty"`
+	Retryable  bool       `json:"retryable,omitempty"`
+	LastError  string     `json:"lastError,omitempty"`
+	UpdatedAt  *time.Time `json:"updatedAt,omitempty"`
+}
+
 // FundingTargetType classifies the kind of funding target the buyer must
 // interact with.
 type FundingTargetType string
@@ -306,6 +338,7 @@ type PaymentSession struct {
 
 	FundingTarget   FundingTargetView       `json:"fundingTarget"`
 	PaymentProgress PaymentProgressView     `json:"paymentProgress"`
+	FundsStatus     FundsStatusView         `json:"fundsStatus"`
 	Capabilities    SessionCapabilitiesView `json:"capabilities"`
 
 	// PaymentReadiness is the seller-receipt gate for buyer-side sessions.

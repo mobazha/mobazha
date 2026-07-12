@@ -1,0 +1,113 @@
+package payment
+
+import (
+	"testing"
+	"time"
+
+	"github.com/mobazha/mobazha/pkg/models"
+	pkpayment "github.com/mobazha/mobazha/pkg/payment"
+	"github.com/stretchr/testify/require"
+)
+
+func TestDeriveFundsStatus_ProjectsChainAndProviderLifecycles(t *testing.T) {
+	now := time.Date(2026, 7, 13, 8, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name       string
+		orderState models.OrderState
+		funding    pkpayment.FundingState
+		settlement *models.SettlementAction
+		provider   *models.PaymentProviderAction
+		want       pkpayment.FundsState
+		retryable  bool
+	}{
+		{name: "unfunded", funding: pkpayment.FundingStateAwaitingFunds, want: pkpayment.FundsStateUnfunded},
+		{name: "partially funded", funding: pkpayment.FundingStatePartiallyFunded, want: pkpayment.FundsStatePartiallyFunded},
+		{name: "funded", funding: pkpayment.FundingStateFullyFunded, want: pkpayment.FundsStateFunded},
+		{name: "disputed", orderState: models.OrderState_DISPUTED, funding: pkpayment.FundingStateFullyFunded, want: pkpayment.FundsStateDisputed},
+		{
+			name: "chain release pending", funding: pkpayment.FundingStateFullyFunded,
+			settlement: &models.SettlementAction{ActionID: "sa-release", ActionKind: "complete", State: "submitted", UpdatedAt: now},
+			want:       pkpayment.FundsStateReleasePending,
+		},
+		{
+			name: "chain refund confirmed", funding: pkpayment.FundingStateFullyFunded,
+			settlement: &models.SettlementAction{ActionID: "sa-refund", ActionKind: pkpayment.SettlementActionCancel, State: "confirmed", UpdatedAt: now},
+			want:       pkpayment.FundsStateRefunded,
+		},
+		{
+			name: "chain action failed recoverably", funding: pkpayment.FundingStateFullyFunded,
+			settlement: &models.SettlementAction{ActionID: "sa-failed", ActionKind: "complete", State: "failed", LastError: "rpc unavailable", UpdatedAt: now},
+			want:       pkpayment.FundsStateFailedRecoverable, retryable: true,
+		},
+		{
+			name: "provider refund pending", funding: pkpayment.FundingStateFullyFunded,
+			provider: &models.PaymentProviderAction{ActionID: "fpa-pending", ActionKind: models.PaymentProviderActionRefund, State: models.PaymentProviderActionPendingExternal, UpdatedAt: now},
+			want:     pkpayment.FundsStateRefundPending, retryable: true,
+		},
+		{
+			name: "provider refund needs reconcile", funding: pkpayment.FundingStateFullyFunded,
+			provider: &models.PaymentProviderAction{ActionID: "fpa-reconcile", ActionKind: models.PaymentProviderActionRefund, State: models.PaymentProviderActionReconcileRequired, UpdatedAt: now},
+			want:     pkpayment.FundsStateFailedRecoverable, retryable: true,
+		},
+		{
+			name: "provider refund failed terminally", funding: pkpayment.FundingStateFullyFunded,
+			provider: &models.PaymentProviderAction{ActionID: "fpa-failed", ActionKind: models.PaymentProviderActionRefund, State: models.PaymentProviderActionFailed, UpdatedAt: now},
+			want:     pkpayment.FundsStateFailedTerminal,
+		},
+		{
+			name: "provider refund completed", funding: pkpayment.FundingStateFullyFunded,
+			provider: &models.PaymentProviderAction{ActionID: "fpa-complete", ActionKind: models.PaymentProviderActionRefund, State: models.PaymentProviderActionCompleted, ResultPayload: []byte(`{"refund":{"status":"succeeded"}}`), UpdatedAt: now},
+			want:     pkpayment.FundsStateRefunded,
+		},
+		{
+			name: "provider accepted pending refund", funding: pkpayment.FundingStateFullyFunded,
+			provider: &models.PaymentProviderAction{ActionID: "fpa-accepted", ActionKind: models.PaymentProviderActionRefund, State: models.PaymentProviderActionCompleted, ResultPayload: []byte(`{"refund":{"status":"pending"}}`), UpdatedAt: now},
+			want:     pkpayment.FundsStateRefundPending,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			order := &models.Order{State: tt.orderState}
+			got := deriveFundsStatus(order, tt.funding, tt.settlement, tt.provider)
+			require.Equal(t, tt.want, got.State)
+			require.Equal(t, tt.retryable, got.Retryable)
+		})
+	}
+}
+
+func TestLoadLatestFundsActions_IsTenantAndOrderScoped(t *testing.T) {
+	db := newVerifierTestDB(t)
+	require.NoError(t, db.gormDB.AutoMigrate(
+		&models.PaymentAttempt{}, &models.PaymentProviderAction{}, &models.SettlementAction{},
+	))
+	now := time.Now().UTC()
+	attempts := []models.PaymentAttempt{
+		{TenantID: "tenant-a", AttemptID: "attempt-a", PaymentSessionID: "ps-a", OrderID: "order-shared", Kind: models.PaymentAttemptKindProviderSession, RouteBindingID: "route-a", IdempotencyKey: "attempt-key-a", State: models.PaymentAttemptExternalCreated, CreatedAt: now},
+		{TenantID: "tenant-b", AttemptID: "attempt-b", PaymentSessionID: "ps-b", OrderID: "order-shared", Kind: models.PaymentAttemptKindProviderSession, RouteBindingID: "route-b", IdempotencyKey: "attempt-key-b", State: models.PaymentAttemptExternalCreated, CreatedAt: now},
+	}
+	require.NoError(t, db.gormDB.Create(&attempts).Error)
+	require.NoError(t, db.gormDB.Create(&models.PaymentProviderAction{
+		TenantID: "tenant-a", ActionID: "refund-a", ActionKind: models.PaymentProviderActionRefund,
+		AttemptID: "attempt-a", RouteBindingID: "route-a", ProviderBindingID: "binding-a",
+		ProviderID: "stripe", ExternalReference: "pi-a", IdempotencyKey: "key-a", IntentFingerprint: "fp-a",
+		IntentPayload: []byte(`{}`), State: models.PaymentProviderActionPendingExternal, UpdatedAt: now,
+	}).Error)
+	require.NoError(t, db.gormDB.Create(&models.PaymentProviderAction{
+		TenantID: "tenant-b", ActionID: "refund-b", ActionKind: models.PaymentProviderActionRefund,
+		AttemptID: "attempt-b", RouteBindingID: "route-b", ProviderBindingID: "binding-b",
+		ProviderID: "paypal", ExternalReference: "cap-b", IdempotencyKey: "key-b", IntentFingerprint: "fp-b",
+		IntentPayload: []byte(`{}`), State: models.PaymentProviderActionCompleted, UpdatedAt: now.Add(time.Minute),
+	}).Error)
+	require.NoError(t, db.gormDB.Create(&models.SettlementAction{
+		TenantMixin: models.TenantMixin{TenantID: "tenant-a"}, ActionID: "settle-a", OrderID: "order-shared",
+		ActionKind: "complete", State: "submitted", UpdatedAt: now,
+	}).Error)
+
+	settlement, provider, err := NewPaymentSessionProjector(db).loadLatestFundsActions("tenant-a", "order-shared")
+	require.NoError(t, err)
+	require.NotNil(t, settlement)
+	require.Equal(t, "settle-a", settlement.ActionID)
+	require.NotNil(t, provider)
+	require.Equal(t, "refund-a", provider.ActionID)
+}

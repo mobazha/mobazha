@@ -1,12 +1,14 @@
 package payment
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/mobazha/mobazha/internal/core/paymentintent"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
@@ -51,6 +53,8 @@ type projectOrderInput struct {
 	obsCount          int
 	lastObsAt         *time.Time
 	observations      []models.PaymentObservation
+	settlementAction  *models.SettlementAction
+	providerAction    *models.PaymentProviderAction
 }
 
 // Project builds a payment.PaymentSession for the given order.
@@ -130,6 +134,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 		ExpiresAt:               expiresAt,
 		FundingTarget:           fundingTarget,
 		PaymentProgress:         progress,
+		FundsStatus:             deriveFundsStatus(order, progress.FundingState, input.settlementAction, input.providerAction),
 		Capabilities:            caps,
 		PaymentReadiness:        readiness,
 		UserActionRequest:       nil, // Phase B: no user action required for address_monitored
@@ -144,6 +149,123 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	applyRefundProjection(p.db, session, input, paymentCoin)
 	payment.ApplyBuyerPaymentReadinessGate(session)
 	return session, nil
+}
+
+func deriveFundsStatus(
+	order *models.Order,
+	fundingState payment.FundingState,
+	settlementAction *models.SettlementAction,
+	providerAction *models.PaymentProviderAction,
+) payment.FundsStatusView {
+	base := payment.FundsStatusView{State: payment.FundsStateUnfunded}
+	switch fundingState {
+	case payment.FundingStatePartiallyFunded:
+		base.State = payment.FundsStatePartiallyFunded
+	case payment.FundingStateFullyFunded, payment.FundingStateOverfunded:
+		base.State = payment.FundsStateFunded
+	}
+	if order != nil {
+		switch order.State {
+		case models.OrderState_DISPUTED, models.OrderState_DECIDED:
+			base.State = payment.FundsStateDisputed
+		case models.OrderState_REFUNDED:
+			base.State = payment.FundsStateRefunded
+		case models.OrderState_COMPLETED, models.OrderState_PAYMENT_FINALIZED:
+			base.State = payment.FundsStateReleased
+		}
+	}
+	if settlementAction != nil {
+		return fundsStatusFromSettlementAction(base, settlementAction)
+	}
+	if providerAction != nil {
+		return fundsStatusFromProviderAction(base, providerAction)
+	}
+	return base
+}
+
+func fundsStatusFromSettlementAction(base payment.FundsStatusView, action *models.SettlementAction) payment.FundsStatusView {
+	if action == nil {
+		return base
+	}
+	updatedAt := action.UpdatedAt
+	base.Action = strings.TrimSpace(action.ActionKind)
+	base.ActionID = strings.TrimSpace(action.ActionID)
+	base.TxHash = strings.TrimSpace(action.TxHash)
+	base.LastError = strings.TrimSpace(action.LastError)
+	base.UpdatedAt = &updatedAt
+	isRefund := fundsActionIsRefund(base.Action)
+	switch strings.ToLower(strings.TrimSpace(action.State)) {
+	case "confirmed", "completed":
+		if isRefund {
+			base.State = payment.FundsStateRefunded
+		} else {
+			base.State = payment.FundsStateReleased
+		}
+	case "failed":
+		base.State = payment.FundsStateFailedRecoverable
+		base.Retryable = true
+	default:
+		if isRefund {
+			base.State = payment.FundsStateRefundPending
+		} else {
+			base.State = payment.FundsStateReleasePending
+		}
+	}
+	return base
+}
+
+func fundsStatusFromProviderAction(base payment.FundsStatusView, action *models.PaymentProviderAction) payment.FundsStatusView {
+	if action == nil {
+		return base
+	}
+	updatedAt := action.UpdatedAt
+	base.Action = strings.TrimSpace(action.ActionKind)
+	base.ActionID = strings.TrimSpace(action.ActionID)
+	base.ProviderID = strings.TrimSpace(action.ProviderID)
+	base.LastError = strings.TrimSpace(action.LastError)
+	base.UpdatedAt = &updatedAt
+	if action.ActionKind != models.PaymentProviderActionRefund {
+		return base
+	}
+	switch action.State {
+	case models.PaymentProviderActionCompleted:
+		base.State = completedProviderRefundFundsState(action.ResultPayload)
+	case models.PaymentProviderActionFailed:
+		base.State = payment.FundsStateFailedTerminal
+	case models.PaymentProviderActionReconcileRequired:
+		base.State = payment.FundsStateFailedRecoverable
+		base.Retryable = true
+	default:
+		base.State = payment.FundsStateRefundPending
+		base.Retryable = true
+	}
+	return base
+}
+
+func completedProviderRefundFundsState(payload []byte) payment.FundsState {
+	var result struct {
+		Refund *contracts.RefundResult `json:"refund"`
+	}
+	if len(payload) == 0 || json.Unmarshal(payload, &result) != nil || result.Refund == nil {
+		return payment.FundsStateFailedRecoverable
+	}
+	switch strings.ToLower(strings.TrimSpace(result.Refund.Status)) {
+	case "succeeded", "completed", "refunded":
+		return payment.FundsStateRefunded
+	case "failed", "canceled", "cancelled":
+		return payment.FundsStateFailedTerminal
+	default:
+		return payment.FundsStateRefundPending
+	}
+}
+
+func fundsActionIsRefund(action string) bool {
+	switch strings.ToLower(strings.TrimSpace(action)) {
+	case payment.SettlementActionCancel, payment.SettlementActionSellerDeclineRefund, "refund":
+		return true
+	default:
+		return false
+	}
 }
 
 func applyRefundProjection(db database.Database, session *payment.PaymentSession, input *projectOrderInput, paymentCoin string) {
@@ -728,8 +850,67 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 		input.lastObsAt = lastObsAt
 		input.observations = observations
 	}
+	settlementAction, providerAction, err := p.loadLatestFundsActions(order.TenantID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	input.settlementAction = settlementAction
+	input.providerAction = providerAction
 
 	return input, nil
+}
+
+func (p *PaymentSessionProjector) loadLatestFundsActions(
+	tenantID, orderID string,
+) (*models.SettlementAction, *models.PaymentProviderAction, error) {
+	if p == nil || p.db == nil || strings.TrimSpace(orderID) == "" {
+		return nil, nil, nil
+	}
+	var settlementAction models.SettlementAction
+	var providerAction models.PaymentProviderAction
+	err := p.db.View(func(tx database.Tx) error {
+		read := tx.Read()
+		if read.Migrator().HasTable(&models.SettlementAction{}) {
+			if err := read.Where("tenant_id = ? AND order_id = ?", tenantID, orderID).
+				Order("updated_at DESC, action_id DESC").
+				Limit(1).
+				Find(&settlementAction).Error; err != nil {
+				return err
+			}
+		}
+		if !read.Migrator().HasTable(&models.PaymentAttempt{}) ||
+			!read.Migrator().HasTable(&models.PaymentProviderAction{}) {
+			return nil
+		}
+		var attemptIDs []string
+		if err := read.Model(&models.PaymentAttempt{}).
+			Where("tenant_id = ? AND order_id = ?", tenantID, orderID).
+			Pluck("attempt_id", &attemptIDs).Error; err != nil {
+			return err
+		}
+		if len(attemptIDs) == 0 {
+			return nil
+		}
+		return read.Where(
+			"tenant_id = ? AND attempt_id IN ? AND action_kind = ?",
+			tenantID, attemptIDs, models.PaymentProviderActionRefund,
+		).
+			Order("updated_at DESC, action_id DESC").
+			Limit(1).
+			Find(&providerAction).Error
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("payment session projector: load funds actions: %w", err)
+	}
+	var settlementResult *models.SettlementAction
+	if settlementAction.ActionID != "" {
+		settlementResult = &settlementAction
+	}
+	var providerResult *models.PaymentProviderAction
+	if providerAction.ActionID != "" {
+		providerResult = &providerAction
+	}
+	return settlementResult, providerResult, nil
 }
 
 func (p *PaymentSessionProjector) loadActiveCryptoAttempt(

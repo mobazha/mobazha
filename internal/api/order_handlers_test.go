@@ -17,6 +17,26 @@ import (
 func TestOrderHandlers(t *testing.T) {
 	runAPITests(t, apiTests{
 		{
+			name:   "cancel partial payment delegates frozen target without legacy order address",
+			path:   "/v1/orders/order-frozen-partial/payment/cancel-partial",
+			method: http.MethodPost,
+			setNodeMethods: func(n *mockNode) {
+				n.getOrderFunc = func(orderID string) (*models.Order, error) {
+					return &models.Order{ID: models.OrderID(orderID)}, nil
+				}
+				n.cancelPartialPaymentFunc = func(orderID string) (string, uint64, error) {
+					if orderID != "order-frozen-partial" {
+						t.Fatalf("unexpected order ID: %s", orderID)
+					}
+					return "refund-tx", 40000, nil
+				}
+			},
+			statusCode: http.StatusOK,
+			expectedResponse: func() ([]byte, error) {
+				return nil, nil
+			},
+		},
+		{
 			name:   "purchase bad request returns 400",
 			path:   "/v1/orders",
 			method: http.MethodPost,

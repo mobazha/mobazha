@@ -1369,11 +1369,6 @@ func (g *Gateway) handlePOSTCancelPartialPayment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if order.PaymentAddress == "" {
-		ErrorResponse(w, http.StatusBadRequest, "no payment address for this order")
-		return
-	}
-
 	if _, err := order.PaymentSentMessage(); err == nil {
 		ErrorResponse(w, http.StatusBadRequest, "payment already sent, cannot cancel partial payment")
 		return

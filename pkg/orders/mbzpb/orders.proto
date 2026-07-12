@@ -315,6 +315,22 @@ message PaymentSent {
     }
 }
 
+// SettlementKeyOffer publishes one Identity-signed, attempt-scoped public key
+// before a crypto funding target becomes actionable. Economic terms, TTLs and
+// availability leases deliberately do not belong to this first wire version.
+message SettlementKeyOffer {
+    uint32 version                       = 1;
+    string authorizationContextID        = 2;
+    string orderID                       = 3;
+    string attemptID                     = 4;
+    string participantPeerID             = 5;
+    string participantRole               = 6;
+    string railID                        = 7;
+    string purpose                       = 8;
+    bytes publicKey                      = 9;
+    bytes signature                      = 10;
+}
+
 message PaymentFinalized {
     google.protobuf.Timestamp timestamp = 1;
 }

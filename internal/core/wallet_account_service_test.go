@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
+	gosolana "github.com/gagliardetto/solana-go"
 	"github.com/mobazha/mobazha/internal/repo"
 	"github.com/mobazha/mobazha/pkg/config"
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -22,6 +23,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type fixedWalletSolanaKeyProvider struct {
+	contracts.KeyProvider
+	key gosolana.PrivateKey
+}
+
+func (p fixedWalletSolanaKeyProvider) SolanaMasterKey() (*gosolana.PrivateKey, error) {
+	key := p.key
+	return &key, nil
+}
 
 func newWalletAccountServiceForTest(t *testing.T, db database.Database) contracts.WalletAccountService {
 	t.Helper()
@@ -43,6 +54,30 @@ func migrateWalletAccountModels(t *testing.T, db database.Database) {
 		}
 		return tx.Migrate(&models.WalletTransferInput{})
 	}))
+}
+
+func TestWalletAccountService_ReserveAddress_SolanaUsesTenantKey(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	migrateWalletAccountModels(t, db)
+	key := gosolana.NewWallet().PrivateKey
+	masterKey := testMasterKey(t)
+	service := NewWalletAccountService(
+		db, masterKey, testMultiwallet(t, masterKey), fixedWalletSolanaKeyProvider{key: key},
+	)
+	rail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainSolana)
+	require.True(t, ok)
+
+	capabilities, err := service.Capabilities(t.Context(), string(rail))
+	require.NoError(t, err)
+	require.True(t, capabilities.Receive)
+	first, err := service.ReserveAddress(t.Context(), string(rail), contracts.AccountMain, "solana-payout-1")
+	require.NoError(t, err)
+	require.Equal(t, key.PublicKey().String(), first.Address)
+	retry, err := service.ReserveAddress(t.Context(), string(rail), contracts.AccountMain, "solana-payout-1")
+	require.NoError(t, err)
+	require.Equal(t, first, retry)
 }
 
 type walletTransferChainOps struct {

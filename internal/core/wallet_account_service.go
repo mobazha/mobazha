@@ -38,6 +38,7 @@ type walletAccountService struct {
 	db            database.Database
 	masterKey     *hdkeychain.ExtendedKey
 	multiwallet   contracts.WalletOperator
+	keyProvider   contracts.KeyProvider
 	reservationMu sync.Mutex
 	transferMu    sync.Mutex
 	chainOps      utxo.ChainOperations
@@ -50,8 +51,13 @@ func NewWalletAccountService(
 	db database.Database,
 	masterKey *hdkeychain.ExtendedKey,
 	multiwallet contracts.WalletOperator,
+	keyProviders ...contracts.KeyProvider,
 ) contracts.WalletAccountService {
-	return &walletAccountService{db: db, masterKey: masterKey, multiwallet: multiwallet}
+	service := &walletAccountService{db: db, masterKey: masterKey, multiwallet: multiwallet}
+	if len(keyProviders) > 0 {
+		service.keyProvider = keyProviders[0]
+	}
+	return service
 }
 
 // Capabilities reports only operations that are closed end-to-end. Receiving
@@ -62,8 +68,11 @@ func (s *walletAccountService) Capabilities(_ context.Context, railID string) (c
 		return contracts.WalletCapabilities{}, fmt.Errorf("wallet account service is not configured")
 	}
 	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(strings.TrimSpace(railID)))
-	if err != nil || !coinInfo.IsNative || (!isWalletUTXOChain(coinInfo.Chain) && !isWalletEVMChain(coinInfo.Chain)) {
+	if err != nil || !coinInfo.IsNative || (!isWalletUTXOChain(coinInfo.Chain) && !isWalletEVMChain(coinInfo.Chain) && !isWalletSolanaChain(coinInfo.Chain)) {
 		return contracts.WalletCapabilities{}, fmt.Errorf("wallet rail %q is not supported", railID)
+	}
+	if isWalletSolanaChain(coinInfo.Chain) && s.keyProvider == nil {
+		return contracts.WalletCapabilities{}, fmt.Errorf("wallet receiving adapter unavailable for %s", coinInfo.Chain)
 	}
 	capabilities := contracts.WalletCapabilities{Receive: true, Affiliate: true}
 	if isWalletUTXOChain(coinInfo.Chain) {
@@ -113,7 +122,7 @@ func (s *walletAccountService) ReserveAddress(
 	if err != nil {
 		return contracts.ReservedDestination{}, fmt.Errorf("parse wallet rail %q: %w", railID, err)
 	}
-	if !coinInfo.IsNative || (!isWalletUTXOChain(coinInfo.Chain) && !isWalletEVMChain(coinInfo.Chain)) {
+	if !coinInfo.IsNative || (!isWalletUTXOChain(coinInfo.Chain) && !isWalletEVMChain(coinInfo.Chain) && !isWalletSolanaChain(coinInfo.Chain)) {
 		return contracts.ReservedDestination{}, fmt.Errorf("wallet rail %q is not a supported native receiving rail", railID)
 	}
 	s.reservationMu.Lock()
@@ -244,6 +253,19 @@ func (s *walletAccountService) deriveAddress(
 	role contracts.WalletAccountRole,
 	index uint32,
 ) (string, error) {
+	if isWalletSolanaChain(chainType) {
+		if s.keyProvider == nil {
+			return "", fmt.Errorf("Solana wallet key provider is unavailable")
+		}
+		key, err := s.keyProvider.SolanaMasterKey()
+		if err != nil {
+			return "", fmt.Errorf("load Solana wallet key: %w", err)
+		}
+		if key == nil {
+			return "", fmt.Errorf("load Solana wallet key: key is unavailable")
+		}
+		return key.PublicKey().String(), nil
+	}
 	childKey, err := s.deriveChildKey(chainType, role, index)
 	if err != nil {
 		return "", err
@@ -760,6 +782,10 @@ func isWalletEVMChain(chainType iwallet.ChainType) bool {
 	default:
 		return false
 	}
+}
+
+func isWalletSolanaChain(chainType iwallet.ChainType) bool {
+	return chainType == iwallet.ChainSolana
 }
 
 func walletAccountIndex(role contracts.WalletAccountRole) uint32 {

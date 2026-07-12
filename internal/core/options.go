@@ -216,7 +216,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 		n.settlementSigner = newLocalSettlementSigner(n.keyProvider, n.multiwallet)
 	}
 	if n.walletAccountService == nil && n.db != nil && n.bip44Key != nil {
-		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet)
+		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet, n.keyProvider)
 	}
 	n.initProfileService()
 	n.initModerationService()
@@ -1007,7 +1007,7 @@ func (n *MobazhaNode) initGuestOrderService() {
 	}
 
 	if n.walletAccountService == nil {
-		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet)
+		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet, n.keyProvider)
 	}
 	n.directPaymentService = guest.NewDirectPaymentService(n.db)
 	n.directPaymentService.SetWalletAccountService(n.walletAccountService)

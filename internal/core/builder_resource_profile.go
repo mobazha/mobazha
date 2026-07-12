@@ -287,7 +287,7 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 	n.initReceivingAccountService()
 
 	if n.bip44Key != nil {
-		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet)
+		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet, n.keyProvider)
 		n.directPaymentService = guest.NewDirectPaymentService(n.db)
 		n.directPaymentService.SetWalletAccountService(n.walletAccountService)
 	}

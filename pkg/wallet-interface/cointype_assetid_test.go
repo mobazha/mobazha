@@ -164,6 +164,16 @@ func TestCoinType_PricingCurrencyCode_RejectsNonCanonicalFiat(t *testing.T) {
 	}
 }
 
+func TestCoinType_MatchesPricingCurrency(t *testing.T) {
+	solana := CoinType("crypto:solana:mainnet:native")
+	if !solana.MatchesPricingCurrency("SOL") || !solana.MatchesPricingCurrency("crypto:solana:mainnet:native") {
+		t.Fatal("Solana native asset should match both pricing code and canonical payment coin")
+	}
+	if solana.MatchesPricingCurrency("ETH") || CoinType("ETH").MatchesPricingCurrency("ETH") {
+		t.Fatal("different or non-canonical payment coins must not match")
+	}
+}
+
 func TestCoinType_IsCanonicalCryptoAssetID(t *testing.T) {
 	if !CoinType("crypto:eip155:1:native").IsCanonicalCryptoAssetID() {
 		t.Fatal("canonical asset id should be true")

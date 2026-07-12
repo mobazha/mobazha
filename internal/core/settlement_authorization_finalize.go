@@ -304,8 +304,7 @@ func finalizeSellerSettlementAuthorization(
 	if identitySigner.PeerID().String() != sellerPeerID {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("local identity does not match signed order seller")
 	}
-	paymentCurrency, err := iwallet.CoinType(attempt.Currency).PricingCurrencyCode()
-	if err != nil || !strings.EqualFold(strings.TrimSpace(paymentCurrency), strings.TrimSpace(orderOpen.PricingCoin)) ||
+	if !iwallet.CoinType(attempt.Currency).MatchesPricingCurrency(orderOpen.PricingCoin) ||
 		strings.TrimSpace(orderOpen.Amount) != attempt.AmountValue {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("seller settlement finalization requires same-currency signed order amount")
 	}
@@ -553,8 +552,7 @@ func adoptBuyerSettlementAuthorization(
 		authorization.Terms.SellerPeerID != sellerPeerID {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("settlement authorization participants do not match signed order")
 	}
-	paymentCurrency, err := iwallet.CoinType(authorization.Terms.AssetID).PricingCurrencyCode()
-	if err != nil || !strings.EqualFold(strings.TrimSpace(paymentCurrency), strings.TrimSpace(orderOpen.PricingCoin)) ||
+	if !iwallet.CoinType(authorization.Terms.AssetID).MatchesPricingCurrency(orderOpen.PricingCoin) ||
 		authorization.Terms.FundingAmount != strings.TrimSpace(orderOpen.Amount) {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("buyer settlement adoption requires same-currency signed order amount")
 	}

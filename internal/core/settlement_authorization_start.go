@@ -296,9 +296,8 @@ func respondSellerSettlementAuthorization(
 	if buyerOffer.ParticipantPeerID != buyerPeerID || identitySigner.PeerID().String() != sellerPeerID {
 		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("settlement key offer participants do not match signed order")
 	}
-	paymentCurrency, err := iwallet.CoinType(buyerOffer.RailID).PricingCurrencyCode()
 	amountAtomic := strings.TrimSpace(orderOpen.Amount)
-	if err != nil || !strings.EqualFold(strings.TrimSpace(paymentCurrency), strings.TrimSpace(orderOpen.PricingCoin)) ||
+	if !iwallet.CoinType(buyerOffer.RailID).MatchesPricingCurrency(orderOpen.PricingCoin) ||
 		amountAtomic == "" {
 		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization requires same-currency signed order amount")
 	}
@@ -405,8 +404,7 @@ func validateStandardOrderAuthorizationAmount(
 		}
 		return nil
 	}
-	paymentCurrency, err := iwallet.CoinType(request.RailID).PricingCurrencyCode()
-	if err != nil || !strings.EqualFold(strings.TrimSpace(paymentCurrency), strings.TrimSpace(orderOpen.PricingCoin)) ||
+	if !iwallet.CoinType(request.RailID).MatchesPricingCurrency(orderOpen.PricingCoin) ||
 		strings.TrimSpace(orderOpen.Amount) != request.AmountAtomic {
 		return fmt.Errorf("settlement authorization requires a matching payment-selection quote")
 	}

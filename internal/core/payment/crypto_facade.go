@@ -219,8 +219,7 @@ func standardOrderSettlementAuthorizationEligible(coin iwallet.CoinType, orderOp
 	if orderOpen == nil {
 		return false
 	}
-	paymentCurrency, err := coin.PricingCurrencyCode()
-	return err == nil && strings.EqualFold(strings.TrimSpace(paymentCurrency), strings.TrimSpace(orderOpen.PricingCoin))
+	return coin.MatchesPricingCurrency(orderOpen.PricingCoin)
 }
 
 func standardOrderNativeUTXORail(coin iwallet.CoinType) bool {
@@ -483,7 +482,7 @@ func buildPaymentSetupParamsFromOrder(
 			return paypb.PaymentSetupParams{}, errors.New("authorized payment amount is invalid")
 		}
 		amt = quoted.Uint64()
-	} else if pricingCoin != "" && pricingCoin != paymentCoinCode {
+	} else if pricingCoin != "" && !coin.MatchesPricingCurrency(pricingCoin) {
 		// Cross-currency order: pricing coin differs from payment coin.
 		// ExchangeRateService is required; its adapter returns an informative error
 		// (not a panic) when the underlying provider is nil, so errors propagate

@@ -168,6 +168,20 @@ func (ct CoinType) PricingCurrencyCode() (string, error) {
 	return "", fmt.Errorf("coin must be canonical payment coin (crypto:* / fiat:{provider}:{currency}), got %q", ct)
 }
 
+// MatchesPricingCurrency reports whether raw identifies this payment asset by
+// either its canonical payment coin or its human-facing pricing code.
+func (ct CoinType) MatchesPricingCurrency(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || (!ct.IsCanonicalPaymentCoin() && ct != CtMock && ct != CtTestCoin) {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(string(ct)), raw) {
+		return true
+	}
+	code, err := ct.PricingCurrencyCode()
+	return err == nil && strings.EqualFold(code, raw)
+}
+
 func lookupCanonicalAssetDefinition(ct CoinType) (assetid.Definition, bool, error) {
 	raw := strings.TrimSpace(string(ct))
 	if !strings.HasPrefix(strings.ToLower(raw), "crypto:") {

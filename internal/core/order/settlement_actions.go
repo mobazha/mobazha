@@ -43,6 +43,28 @@ func (s *OrderAppService) signSettlementActionRelease(ctx context.Context, coinT
 	if err != nil {
 		return nil, false, err
 	}
+	if attemptSigner, ok := strategy.(payment.AttemptSettlementActionAuthorizer); ok && params.OrderData != nil {
+		attemptContext, handled, loadErr := s.frozenSettlementAttemptActionContext(ctx, params.OrderData, coinType)
+		if loadErr != nil {
+			return nil, handled, loadErr
+		}
+		if handled {
+			if action == payment.SettlementActionComplete &&
+				attemptContext.localOffer.ParticipantRole == models.SettlementParticipantModerator {
+				return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+			}
+			applyFrozenSettlementAttemptActionParams(&params, attemptContext)
+			ownerSigs, signErr := attemptSigner.SignAttemptSettlementAction(ctx, payment.AttemptSettlementActionSignRequest{
+				Action: action, Sequence: params.AttemptSequence,
+				TenantID: params.AttemptTenantID, LocalRole: params.AttemptLocalRole,
+				Authorization: *params.AttemptAuthorization, Params: params,
+			})
+			if signErr != nil {
+				return nil, true, signErr
+			}
+			return settlementActionOwnerSignaturesToProto(ownerSigs), true, nil
+		}
+	}
 	actionSigner, ok := strategy.(payment.ActionSigner)
 	if !ok {
 		return nil, false, nil
@@ -51,6 +73,10 @@ func (s *OrderAppService) signSettlementActionRelease(ctx context.Context, coinT
 	if err != nil {
 		return nil, true, err
 	}
+	return settlementActionOwnerSignaturesToProto(ownerSigs), true, nil
+}
+
+func settlementActionOwnerSignaturesToProto(ownerSigs []payment.ActionOwnerSignature) []*pb.Signature {
 	out := make([]*pb.Signature, 0, len(ownerSigs))
 	for _, sig := range ownerSigs {
 		out = append(out, &pb.Signature{
@@ -59,7 +85,7 @@ func (s *OrderAppService) signSettlementActionRelease(ctx context.Context, coinT
 			Index:     sig.Index,
 		})
 	}
-	return out, true, nil
+	return out
 }
 
 func (s *OrderAppService) signFrozenStandardOrderUTXOAction(
@@ -73,6 +99,10 @@ func (s *OrderAppService) signFrozenStandardOrderUTXOAction(
 	}
 	utxoSigner, ok := s.settlementSigner.(contracts.UTXOSettlementSigner)
 	if !ok {
+		return nil, false, nil
+	}
+	coinInfo, err := iwallet.CoinInfoFromCoinType(coinType)
+	if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
 		return nil, false, nil
 	}
 	if params.ReleaseInfo == nil {

@@ -141,7 +141,7 @@ func (s *OrderAppService) runMonitoredSettlementDisputeRelease(
 		return nil, nil, false, nil
 	}
 
-	result, err := strategy.DisputeRelease(ctx, payment.ActionParams{
+	actionParams := payment.ActionParams{
 		OrderID:         order.ID.String(),
 		PaymentCoin:     string(coinType),
 		PaymentAmount:   paymentSent.Amount,
@@ -150,7 +150,13 @@ func (s *OrderAppService) runMonitoredSettlementDisputeRelease(
 		OrderData:       order,
 		ReleaseInfo:     release,
 		AffiliatePayout: executionPayout,
-	})
+	}
+	if attemptContext, handled, loadErr := s.frozenSettlementAttemptActionContext(ctx, order, coinType); loadErr != nil {
+		return nil, nil, true, loadErr
+	} else if handled {
+		applyFrozenSettlementAttemptActionParams(&actionParams, attemptContext)
+	}
+	result, err := strategy.DisputeRelease(ctx, actionParams)
 	if err != nil {
 		return nil, nil, true, err
 	}

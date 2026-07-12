@@ -76,6 +76,8 @@ type AttemptSettlementFundingActivator interface {
 type AttemptSettlementActionSignRequest struct {
 	Action        string
 	Sequence      uint64
+	TenantID      string
+	LocalRole     models.SettlementParticipantRole
 	Authorization models.PaymentAttemptSettlementAuthorization
 	Params        ActionParams
 }
@@ -346,6 +348,14 @@ type ActionParams struct {
 	// deduct the same amount from the seller output; they must not recalculate
 	// affiliate terms from order or profile data.
 	AffiliatePayout *models.AffiliateSettlementPayout
+
+	// AttemptAuthorization carries the immutable snapshot for rails that have
+	// opted into attempt-scoped owner keys. The accompanying tenant/role fields
+	// identify the local opaque key without exposing private material.
+	AttemptAuthorization *models.PaymentAttemptSettlementAuthorization
+	AttemptTenantID      string
+	AttemptLocalRole     models.SettlementParticipantRole
+	AttemptSequence      uint64
 }
 
 // ActionStatus describes the lifecycle of a submitted action. The

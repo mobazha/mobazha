@@ -114,3 +114,109 @@ func TestPaymentAttemptAuthorizationBundle_CanonicalizesAndRequiresCompleteOffer
 	bundle.RequiredRoles = append(bundle.RequiredRoles, SettlementParticipantModerator)
 	require.Error(t, bundle.Validate())
 }
+
+func TestPaymentAttemptSettlementAuthorization_RejectsSellerMutationOfModeratorFacts(t *testing.T) {
+	contextID, err := NewSettlementAuthorizationContextID()
+	require.NoError(t, err)
+	roles := []SettlementParticipantRole{
+		SettlementParticipantBuyer, SettlementParticipantSeller, SettlementParticipantModerator,
+	}
+	privateKeys := make([]libp2pcrypto.PrivKey, 0, len(roles))
+	peerIDs := make([]peer.ID, 0, len(roles))
+	for range roles {
+		privateKey, publicKey, err := libp2pcrypto.GenerateEd25519Key(rand.Reader)
+		require.NoError(t, err)
+		peerID, err := peer.IDFromPublicKey(publicKey)
+		require.NoError(t, err)
+		privateKeys = append(privateKeys, privateKey)
+		peerIDs = append(peerIDs, peerID)
+	}
+	const (
+		orderID         = "order-moderated-bindings"
+		attemptID       = "attempt-moderated-bindings"
+		railID          = "crypto:bip122:000000000019d6689c085ae165831e93:native"
+		fundingAmount   = "100000"
+		moderatorAddr   = "bc1qmoderatoroffer000000000000000000000000"
+		moderatorAmount = "100"
+		timeoutHours    = uint32(72)
+	)
+	offers := make([]SettlementKeyOffer, 0, len(roles))
+	for i, role := range roles {
+		offer := SettlementKeyOffer{
+			Version: SettlementAuthorizationVersion, AuthorizationContextID: contextID,
+			OrderID: orderID, AttemptID: attemptID, ParticipantPeerID: peerIDs[i].String(),
+			ParticipantRole: role, RailID: railID, Purpose: "standard-order-participant:" + string(role),
+			PublicKey:               []byte("settlement-key-" + string(role)),
+			ExpectedModeratorPeerID: peerIDs[2].String(), AmountAtomic: fundingAmount,
+			EscrowTimeoutHours: timeoutHours,
+		}
+		if role == SettlementParticipantModerator {
+			offer.ModeratorPayoutAddress = moderatorAddr
+			offer.ModeratorFeeAmount = moderatorAmount
+		}
+		payload, err := offer.SigningPayload()
+		require.NoError(t, err)
+		offer.Signature, err = privateKeys[i].Sign(payload)
+		require.NoError(t, err)
+		offers = append(offers, offer)
+	}
+	terms := PaymentAttemptSettlementTerms{
+		Version: PaymentAttemptSettlementTermsVersion, OrderID: orderID, AttemptID: attemptID,
+		AssetID: railID, FundingAmount: fundingAmount, FundingTargetAddress: "bc1qfundingtarget0000000000000000000000000",
+		RouteBindingID: "route-moderated-bindings", BuyerPeerID: peerIDs[0].String(), SellerPeerID: peerIDs[1].String(),
+		ModeratorPeerID: peerIDs[2].String(), ModeratorFee: &PaymentAttemptSettlementFee{Address: moderatorAddr, Amount: moderatorAmount},
+		EscrowTimeoutHours: timeoutHours, SellerAddress: "bc1qsellerpayout00000000000000000000000000",
+		SellerGrossBasis: fundingAmount, PlatformReleaseFee: PaymentAttemptSettlementFee{Amount: "0"},
+		BuyerCancellationFee: PaymentAttemptSettlementFee{Amount: "0"}, DisputePolicy: DisputeScalingSellerAwardProRataFloor,
+	}
+	target := PaymentAttemptFundingTarget{
+		Version: PaymentAttemptFundingTargetVersion, AttemptID: attemptID, Type: PaymentAttemptFundingTargetAddress,
+		AssetID: railID, AmountAtomic: fundingAmount, Address: terms.FundingTargetAddress, RedeemScriptHex: "51",
+	}
+	_, targetHash, err := target.CanonicalBytesAndHash()
+	require.NoError(t, err)
+
+	buildAuthorization := func(t *testing.T, candidate PaymentAttemptSettlementTerms) PaymentAttemptSettlementAuthorization {
+		t.Helper()
+		payload, err := candidate.SellerSigningPayload()
+		require.NoError(t, err)
+		signature, err := privateKeys[1].Sign(payload)
+		require.NoError(t, err)
+		_, termsHash, err := candidate.CanonicalBytesAndHash()
+		require.NoError(t, err)
+		return PaymentAttemptSettlementAuthorization{
+			Version: SettlementAuthorizationVersion, Terms: candidate, Target: target,
+			Authorization: PaymentAttemptAuthorizationBundle{
+				Version: SettlementAuthorizationVersion, AuthorizationContextID: contextID,
+				OrderID: orderID, AttemptID: attemptID, RailID: railID,
+				SettlementTermsHash: termsHash, FundingTargetHash: targetHash,
+				RequiredRoles: []SettlementParticipantRole{SettlementParticipantBuyer, SettlementParticipantSeller, SettlementParticipantModerator},
+				Offers:        offers, SellerTermsSigner: peerIDs[1].String(), SellerTermsSignature: signature,
+			},
+		}
+	}
+	require.NoError(t, buildAuthorization(t, terms).Validate())
+
+	tests := []struct {
+		name   string
+		mutate func(*PaymentAttemptSettlementTerms)
+	}{
+		{name: "payout address", mutate: func(candidate *PaymentAttemptSettlementTerms) {
+			candidate.ModeratorFee = &PaymentAttemptSettlementFee{Address: candidate.SellerAddress, Amount: moderatorAmount}
+		}},
+		{name: "fee amount", mutate: func(candidate *PaymentAttemptSettlementTerms) {
+			candidate.ModeratorFee = &PaymentAttemptSettlementFee{Address: moderatorAddr, Amount: "1"}
+		}},
+		{name: "escrow timeout", mutate: func(candidate *PaymentAttemptSettlementTerms) {
+			candidate.EscrowTimeoutHours = 48
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := terms
+			test.mutate(&candidate)
+			err := buildAuthorization(t, candidate).Validate()
+			require.ErrorIs(t, err, ErrPaymentAttemptSettlementTermsConflict)
+		})
+	}
+}

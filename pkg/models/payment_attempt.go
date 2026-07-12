@@ -141,6 +141,9 @@ func (a *PaymentAttempt) validateAuthorizationBundle(bundle PaymentAttemptAuthor
 	if err := terms.VerifySellerAuthorization(a.SellerTermsSigner, a.SellerTermsSignature); err != nil {
 		return err
 	}
+	if err := ValidateSettlementTermsOfferBindings(*terms, bundle.Offers); err != nil {
+		return err
+	}
 	if bundle.AuthorizationContextID != a.AuthorizationContextID || bundle.OrderID != a.OrderID ||
 		bundle.AttemptID != a.AttemptID || bundle.RailID != a.Currency ||
 		bundle.SettlementTermsHash != a.SettlementTermsHash || bundle.SellerTermsSigner != a.SellerTermsSigner ||

@@ -314,6 +314,9 @@ func BuildCryptoPaymentAttemptAuthorizationBundle(
 	if err != nil {
 		return models.PaymentAttemptAuthorizationBundle{}, err
 	}
+	if err := models.ValidateSettlementTermsOfferBindings(terms, offers); err != nil {
+		return models.PaymentAttemptAuthorizationBundle{}, err
+	}
 	expectedPeers := map[models.SettlementParticipantRole]string{
 		models.SettlementParticipantBuyer:  terms.BuyerPeerID,
 		models.SettlementParticipantSeller: terms.SellerPeerID,

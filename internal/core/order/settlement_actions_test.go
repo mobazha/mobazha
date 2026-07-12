@@ -142,6 +142,57 @@ type fakeRefunderStrategy struct {
 	sellerDeclineCalls int
 }
 
+func TestValidateFrozenStandardOrderCompleteRelease_BindsFrozenOutputs(t *testing.T) {
+	terms := models.PaymentAttemptSettlementTerms{
+		ModeratorPeerID: "moderator", FundingAmount: "1000", SellerGrossBasis: "1000",
+		SellerAddress: "tb1seller", PlatformReleaseFee: models.PaymentAttemptSettlementFee{Address: "tb1platform", Amount: "100"},
+	}
+	target := models.PaymentAttemptFundingTarget{AmountAtomic: "1000"}
+	valid := &pb.EscrowRelease{
+		Outpoints: []*pb.Outpoint{{FromID: []byte{0x01}, Value: "1000"}},
+		ToAddress: "tb1seller", ToAmount: "890", PlatformAddress: "tb1platform", PlatformAmount: "100",
+		AffiliateAmount: "0", TransactionFee: "10",
+	}
+	require.NoError(t, validateFrozenStandardOrderCompleteRelease(valid, terms, target))
+
+	tests := []struct {
+		name   string
+		mutate func(*pb.EscrowRelease)
+	}{
+		{name: "redirect platform", mutate: func(release *pb.EscrowRelease) { release.PlatformAddress = "tb1attacker" }},
+		{name: "inflate seller", mutate: func(release *pb.EscrowRelease) { release.ToAmount = "900" }},
+		{name: "hide fee output", mutate: func(release *pb.EscrowRelease) { release.PlatformAmount = "0" }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := *valid
+			test.mutate(&candidate)
+			require.ErrorIs(t, validateFrozenStandardOrderCompleteRelease(&candidate, terms, target), models.ErrPaymentAttemptSettlementTermsConflict)
+		})
+	}
+}
+
+func TestValidateFrozenStandardOrderDisputeRelease_BindsModeratorPayout(t *testing.T) {
+	terms := models.PaymentAttemptSettlementTerms{
+		ModeratorPeerID: "moderator", FundingAmount: "1000",
+		ModeratorFee: &models.PaymentAttemptSettlementFee{Address: "tb1moderator", Amount: "100"},
+	}
+	target := models.PaymentAttemptFundingTarget{AmountAtomic: "1000"}
+	valid := &pb.DisputeClose_ModeratedEscrowRelease{
+		Outpoints:    []*pb.Outpoint{{FromID: []byte{0x01}, Value: "1000"}},
+		BuyerAddress: "tb1buyer", BuyerAmount: "400", VendorAddress: "tb1vendor", VendorAmount: "490",
+		ModeratorAddress: "tb1moderator", ModeratorAmount: "100", TransactionFee: "10",
+	}
+	require.NoError(t, validateFrozenStandardOrderDisputeRelease(valid, terms, target))
+
+	redirected := *valid
+	redirected.ModeratorAddress = "tb1attacker"
+	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(&redirected, terms, target), models.ErrPaymentAttemptSettlementTermsConflict)
+	underpaid := *valid
+	underpaid.ModeratorAmount = "1"
+	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(&underpaid, terms, target), models.ErrPaymentAttemptSettlementTermsConflict)
+}
+
 func (f *fakeRefunderStrategy) SellerDeclineRefund(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {
 	f.sellerDeclineCalls++
 	f.lastParams = params

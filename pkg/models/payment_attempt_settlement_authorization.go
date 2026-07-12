@@ -51,6 +51,9 @@ func (a PaymentAttemptSettlementAuthorization) Validate() error {
 	if err := a.Authorization.Validate(); err != nil {
 		return err
 	}
+	if err := ValidateSettlementTermsOfferBindings(a.Terms, a.Authorization.Offers); err != nil {
+		return err
+	}
 	if a.Terms.OrderID != a.Authorization.OrderID || a.Terms.AttemptID != a.Authorization.AttemptID ||
 		a.Terms.AssetID != a.Authorization.RailID || a.Target.AttemptID != a.Authorization.AttemptID ||
 		a.Target.AssetID != a.Authorization.RailID || a.Target.AmountAtomic != a.Terms.FundingAmount ||

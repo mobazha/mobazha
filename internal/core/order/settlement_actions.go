@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -143,16 +144,21 @@ func (s *OrderAppService) signFrozenStandardOrderUTXOAction(
 	}
 	switch release := params.ReleaseInfo.(type) {
 	case *pb.EscrowRelease:
+		if action != payment.SettlementActionComplete ||
+			validateFrozenStandardOrderCompleteRelease(release, *terms, *target) != nil {
+			return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
+		}
 		for _, outpoint := range release.Outpoints {
 			txn.From = append(txn.From, iwallet.SpendInfo{ID: outpoint.FromID, Amount: iwallet.NewAmount(outpoint.Value)})
 		}
 		appendOutput(release.ToAddress, release.ToAmount)
 		appendOutput(release.PlatformAddress, release.PlatformAmount)
 		appendOutput(release.AffiliateAddress, release.AffiliateAmount)
-		if action == payment.SettlementActionComplete && !payment.SameUTXOAddress(release.ToAddress, terms.SellerAddress) {
+	case *pb.DisputeClose_ModeratedEscrowRelease:
+		if action != payment.SettlementActionDisputeRelease ||
+			validateFrozenStandardOrderDisputeRelease(release, *terms, *target) != nil {
 			return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
 		}
-	case *pb.DisputeClose_ModeratedEscrowRelease:
 		for _, outpoint := range release.Outpoints {
 			txn.From = append(txn.From, iwallet.SpendInfo{ID: outpoint.FromID, Amount: iwallet.NewAmount(outpoint.Value)})
 		}
@@ -181,6 +187,132 @@ func (s *OrderAppService) signFrozenStandardOrderUTXOAction(
 	return out, true, nil
 }
 
+func validateFrozenStandardOrderCompleteRelease(
+	release *pb.EscrowRelease,
+	terms models.PaymentAttemptSettlementTerms,
+	target models.PaymentAttemptFundingTarget,
+) error {
+	if release == nil || terms.ModeratorPeerID == "" || terms.SellerGrossBasis != terms.FundingAmount ||
+		target.AmountAtomic != terms.FundingAmount || !payment.SameUTXOAddress(release.ToAddress, terms.SellerAddress) {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	inputTotal, err := settlementReleaseInputTotal(release.Outpoints)
+	if err != nil || inputTotal.String() != target.AmountAtomic {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	transactionFee, err := canonicalSettlementActionAmount(release.TransactionFee, false)
+	if err != nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	platformAmount, err := canonicalSettlementActionAmount(release.PlatformAmount, false)
+	if err != nil || platformAmount.String() != terms.PlatformReleaseFee.Amount ||
+		!sameSettlementActionAddress(release.PlatformAddress, terms.PlatformReleaseFee.Address, platformAmount) {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	affiliateAddress := ""
+	affiliateAmountRaw := "0"
+	if terms.Affiliate != nil {
+		affiliateAddress = terms.Affiliate.Address
+		affiliateAmountRaw = terms.Affiliate.Amount
+	}
+	affiliateAmount, err := canonicalSettlementActionAmount(release.AffiliateAmount, false)
+	if err != nil || affiliateAmount.String() != affiliateAmountRaw ||
+		!sameSettlementActionAddress(release.AffiliateAddress, affiliateAddress, affiliateAmount) {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	sellerAmount, err := canonicalSettlementActionAmount(release.ToAmount, true)
+	if err != nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	expectedSellerAmount := new(big.Int).Set(inputTotal)
+	expectedSellerAmount.Sub(expectedSellerAmount, transactionFee)
+	expectedSellerAmount.Sub(expectedSellerAmount, platformAmount)
+	expectedSellerAmount.Sub(expectedSellerAmount, affiliateAmount)
+	if expectedSellerAmount.Sign() <= 0 || sellerAmount.Cmp(expectedSellerAmount) != 0 {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	return nil
+}
+
+func validateFrozenStandardOrderDisputeRelease(
+	release *pb.DisputeClose_ModeratedEscrowRelease,
+	terms models.PaymentAttemptSettlementTerms,
+	target models.PaymentAttemptFundingTarget,
+) error {
+	if release == nil || terms.ModeratorPeerID == "" || terms.ModeratorFee == nil || terms.Affiliate != nil ||
+		target.AmountAtomic != terms.FundingAmount {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	inputTotal, err := settlementReleaseInputTotal(release.Outpoints)
+	if err != nil || inputTotal.String() != target.AmountAtomic {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	transactionFee, err := canonicalSettlementActionAmount(release.TransactionFee, false)
+	if err != nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	moderatorAmount, err := canonicalSettlementActionAmount(release.ModeratorAmount, false)
+	if err != nil || moderatorAmount.String() != terms.ModeratorFee.Amount ||
+		!sameSettlementActionAddress(release.ModeratorAddress, terms.ModeratorFee.Address, moderatorAmount) {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	buyerAmount, err := canonicalSettlementActionAmount(release.BuyerAmount, false)
+	if err != nil || (buyerAmount.Sign() > 0 && strings.TrimSpace(release.BuyerAddress) == "") {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	vendorAmount, err := canonicalSettlementActionAmount(release.VendorAmount, false)
+	if err != nil || (vendorAmount.Sign() > 0 && strings.TrimSpace(release.VendorAddress) == "") {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	expectedParticipantTotal := new(big.Int).Set(inputTotal)
+	expectedParticipantTotal.Sub(expectedParticipantTotal, transactionFee)
+	expectedParticipantTotal.Sub(expectedParticipantTotal, moderatorAmount)
+	actualParticipantTotal := new(big.Int).Add(buyerAmount, vendorAmount)
+	if expectedParticipantTotal.Sign() < 0 || actualParticipantTotal.Cmp(expectedParticipantTotal) != 0 {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	return nil
+}
+
+func settlementReleaseInputTotal(outpoints []*pb.Outpoint) (*big.Int, error) {
+	if len(outpoints) == 0 {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	total := new(big.Int)
+	for _, outpoint := range outpoints {
+		if outpoint == nil || len(outpoint.FromID) == 0 {
+			return nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		amount, err := canonicalSettlementActionAmount(outpoint.Value, true)
+		if err != nil {
+			return nil, err
+		}
+		total.Add(total, amount)
+	}
+	return total, nil
+}
+
+func canonicalSettlementActionAmount(raw string, positive bool) (*big.Int, error) {
+	raw = strings.TrimSpace(raw)
+	amount, ok := new(big.Int).SetString(raw, 10)
+	if !ok || amount.Sign() < 0 || (positive && amount.Sign() == 0) || amount.String() != raw {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	return amount, nil
+}
+
+func sameSettlementActionAddress(actual, expected string, amount *big.Int) bool {
+	if amount == nil {
+		return false
+	}
+	actual = strings.TrimSpace(actual)
+	expected = strings.TrimSpace(expected)
+	if amount.Sign() == 0 {
+		return actual == "" && expected == ""
+	}
+	return actual != "" && expected != "" && payment.SameUTXOAddress(actual, expected)
+}
+
 func (s *OrderAppService) frozenStandardOrderSettlementTerms(order *models.Order) (*models.PaymentAttemptSettlementTerms, error) {
 	if s == nil || s.db == nil || order == nil {
 		return nil, nil
@@ -204,6 +336,10 @@ func (s *OrderAppService) frozenStandardOrderSettlementTerms(order *models.Order
 	terms, err := attempts[0].GetSettlementTerms()
 	if err != nil {
 		return nil, err
+	}
+	bundle, err := attempts[0].GetAuthorizationBundle()
+	if err != nil || bundle == nil {
+		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	return terms, nil
 }

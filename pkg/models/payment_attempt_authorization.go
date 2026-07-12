@@ -327,6 +327,64 @@ func (b PaymentAttemptAuthorizationBundle) Validate() error {
 	return nil
 }
 
+// ValidateSettlementTermsOfferBindings verifies that seller-authored terms
+// preserve every economic and timeout fact signed by the settlement offers.
+func ValidateSettlementTermsOfferBindings(
+	terms PaymentAttemptSettlementTerms,
+	offers []SettlementKeyOffer,
+) error {
+	moderatorPeerID := strings.TrimSpace(terms.ModeratorPeerID)
+	var moderatorOffer *SettlementKeyOffer
+	for i := range offers {
+		offer := &offers[i]
+		if err := offer.Verify(); err != nil {
+			return err
+		}
+		if offer.OrderID != terms.OrderID || offer.AttemptID != terms.AttemptID || offer.RailID != terms.AssetID ||
+			strings.TrimSpace(offer.ExpectedModeratorPeerID) != moderatorPeerID {
+			return fmt.Errorf("%w: settlement terms do not match signed offer scope", ErrPaymentAttemptSettlementTermsConflict)
+		}
+		expectedParticipantPeerID := ""
+		switch offer.ParticipantRole {
+		case SettlementParticipantBuyer:
+			expectedParticipantPeerID = strings.TrimSpace(terms.BuyerPeerID)
+		case SettlementParticipantSeller:
+			expectedParticipantPeerID = strings.TrimSpace(terms.SellerPeerID)
+		case SettlementParticipantModerator:
+			expectedParticipantPeerID = moderatorPeerID
+		}
+		if strings.TrimSpace(offer.ParticipantPeerID) != expectedParticipantPeerID {
+			return fmt.Errorf("%w: settlement participant does not match signed offer", ErrPaymentAttemptSettlementTermsConflict)
+		}
+		if moderatorPeerID == "" {
+			if strings.TrimSpace(offer.AmountAtomic) != "" || offer.EscrowTimeoutHours != 0 {
+				return fmt.Errorf("%w: unmoderated terms contain moderated offer scope", ErrPaymentAttemptSettlementTermsConflict)
+			}
+		} else if strings.TrimSpace(offer.AmountAtomic) != strings.TrimSpace(terms.FundingAmount) ||
+			offer.EscrowTimeoutHours != terms.EscrowTimeoutHours {
+			return fmt.Errorf("%w: settlement amount or timeout does not match signed offers", ErrPaymentAttemptSettlementTermsConflict)
+		}
+		if offer.ParticipantRole == SettlementParticipantModerator {
+			if moderatorOffer != nil {
+				return fmt.Errorf("%w: duplicate moderator settlement offer", ErrPaymentAttemptSettlementTermsConflict)
+			}
+			moderatorOffer = offer
+		}
+	}
+	if moderatorPeerID == "" {
+		if moderatorOffer != nil || terms.ModeratorFee != nil || terms.EscrowTimeoutHours != 0 {
+			return fmt.Errorf("%w: unmoderated terms contain moderator payout facts", ErrPaymentAttemptSettlementTermsConflict)
+		}
+		return nil
+	}
+	if moderatorOffer == nil || terms.ModeratorFee == nil ||
+		terms.ModeratorFee.Address != moderatorOffer.ModeratorPayoutAddress ||
+		terms.ModeratorFee.Amount != moderatorOffer.ModeratorFeeAmount {
+		return fmt.Errorf("%w: moderator payout terms do not match signed moderator offer", ErrPaymentAttemptSettlementTermsConflict)
+	}
+	return nil
+}
+
 func validSettlementAuthorizationContextID(value string) bool {
 	value = strings.TrimSpace(value)
 	if len(value) != sha256.Size*2 || strings.ToLower(value) != value {

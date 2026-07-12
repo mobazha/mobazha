@@ -68,6 +68,27 @@ func TestPaymentSessionProjector_BuyerReadyExposesFundingTarget(t *testing.T) {
 	require.Equal(t, "0xmanagedescrow", session.FundingTarget.Address)
 }
 
+func TestPaymentSessionProjector_AuthorizationDraftRemainsNonActionable(t *testing.T) {
+	p := NewPaymentSessionProjector(nil)
+	readyAt := time.Now()
+	order := &models.Order{
+		ID:             "QmAuthorizationDraft",
+		MyRole:         string(models.RoleBuyer),
+		PaymentReadyAt: &readyAt,
+	}
+	attempt := &models.PaymentAttempt{
+		AttemptID: "attempt-draft",
+		Kind:      models.PaymentAttemptKindCryptoFundingTarget,
+		State:     models.PaymentAttemptAuthorizationDraft,
+	}
+
+	session, err := p.Project(&projectOrderInput{order: order, cryptoAttempt: attempt})
+	require.NoError(t, err)
+	require.Equal(t, pkpayment.PaymentReadinessAwaitingSellerReceipt, session.PaymentReadiness.Status)
+	require.Nil(t, session.PaymentReadiness.ReadyAt)
+	require.Empty(t, session.FundingTarget.Address)
+}
+
 func TestPaymentSessionProjector_FrozenAttemptTargetIsAuthoritative(t *testing.T) {
 	p := NewPaymentSessionProjector(nil)
 	readyAt := time.Now()
@@ -343,10 +364,15 @@ func TestPaymentSessionServiceImpl_AuthorizationDraftBlocksLegacyProvisioning(t 
 	require.NoError(t, err)
 	require.Empty(t, session.FundingTarget.Address)
 
-	_, err = svc.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
+	session, err = svc.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
 		OrderID: orderID, PaymentCoin: "crypto:eip155:56:native",
 	})
-	require.ErrorIs(t, err, ErrPaymentCoinMismatch)
+	require.NoError(t, err)
+	// A draft has not frozen an actionable target yet; in particular, the
+	// caller's replacement coin must not be projected into the session.
+	require.Empty(t, session.PaymentCoin)
+	require.Equal(t, pkpayment.PaymentReadinessAwaitingSellerReceipt, session.PaymentReadiness.Status)
+	require.Empty(t, session.FundingTarget.Address)
 }
 
 func TestPaymentSessionServiceImpl_CoinSwitchAuthorizesBeforeClearingExistingTarget(t *testing.T) {

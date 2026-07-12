@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"strings"
 
 	internalutxo "github.com/mobazha/mobazha/internal/chains/utxo"
 	"github.com/mobazha/mobazha/internal/logger"
@@ -24,7 +25,18 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 	}
 
 	if n.monitorService == nil {
-		monitor, err := internalutxo.CreateMonitor(context.Background(), n.UsingWalletTestnet())
+		var (
+			monitor *utxo.Monitor
+			err     error
+		)
+		overrides := n.electrumOverrides()
+		if len(overrides) > 0 {
+			monitor, err = utxo.NewMonitorWithElectrumOverrides(
+				context.Background(), n.UsingWalletTestnet(), overrides,
+			)
+		} else {
+			monitor, err = internalutxo.CreateMonitor(context.Background(), n.UsingWalletTestnet())
+		}
 		if err != nil {
 			logger.LogErrorWithIDf(log, n.nodeID, "Failed to create UTXO monitor: %v", err)
 			return
@@ -108,6 +120,27 @@ func (n *MobazhaNode) startUTXOPaymentMonitor() {
 	if n.guestOrderService != nil {
 		n.guestOrderService.RecoverGuestWalletAffiliateTransfers(context.Background())
 	}
+}
+
+func (n *MobazhaNode) electrumOverrides() map[iwallet.ChainType]utxo.ElectrumOverride {
+	if n == nil || len(n.electrumEndpoints) == 0 {
+		return nil
+	}
+	overrides := make(map[iwallet.ChainType]utxo.ElectrumOverride, len(n.electrumEndpoints))
+	for code, endpoint := range n.electrumEndpoints {
+		chain := iwallet.ChainType(strings.ToUpper(strings.TrimSpace(code)))
+		endpoint = strings.TrimSpace(endpoint)
+		if !chain.IsUTXOChain() || endpoint == "" {
+			continue
+		}
+		fingerprint := strings.TrimSpace(n.electrumFingerprints[strings.ToLower(strings.TrimSpace(code))])
+		overrides[chain] = utxo.ElectrumOverride{
+			Servers:        []string{endpoint},
+			UseTLS:         fingerprint != "",
+			TLSFingerprint: fingerprint,
+		}
+	}
+	return overrides
 }
 
 // StopUTXOPaymentMonitor stops the UTXO payment monitor.

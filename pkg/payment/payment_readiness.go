@@ -42,6 +42,13 @@ func DerivePaymentReadiness(order *models.Order, sellerReceiptTimeoutAt time.Tim
 		}
 		return view
 	}
+	return AwaitingSellerReceiptPaymentReadiness(sellerReceiptTimeoutAt)
+}
+
+// AwaitingSellerReceiptPaymentReadiness returns a non-actionable readiness
+// view while the seller acknowledgement or settlement authorization ceremony
+// is still in flight.
+func AwaitingSellerReceiptPaymentReadiness(sellerReceiptTimeoutAt time.Time) PaymentReadinessView {
 	timeout := sellerReceiptTimeoutAt
 	return PaymentReadinessView{
 		Status:                 PaymentReadinessAwaitingSellerReceipt,

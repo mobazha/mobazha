@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
@@ -137,12 +138,19 @@ func (c *CryptoPaymentFacade) CreateSession(
 		if !standardOrderUTXOAuthorizationEligible(coin, orderOpen) {
 			return nil, fmt.Errorf("crypto facade: cross-currency UTXO settlement authorization is not implemented")
 		}
+		setupParams, err := buildPaymentSetupParamsFromOrder(
+			order, orderOpen, coin, req.PayerAddress, refundAddr, moderator,
+			req.AuthorizedPaymentAmount, c.exchange,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("crypto facade: build settlement authorization params: %w", err)
+		}
 		if err := c.saveCreateSessionRefundAddress(ctx, coin, req.OrderID, refundAddr); err != nil {
 			return nil, err
 		}
 		if err := c.settlementStarter(ctx, StandardOrderSettlementAuthorizationStartRequest{
 			OrderID: req.OrderID, PaymentSelectionQuoteID: req.PaymentSelectionQuoteID,
-			RailID: req.PaymentCoin, AmountAtomic: req.AuthorizedPaymentAmount,
+			RailID: req.PaymentCoin, AmountAtomic: strconv.FormatUint(setupParams.Amount, 10),
 		}); err != nil {
 			return nil, fmt.Errorf("crypto facade: start settlement authorization: %w", err)
 		}

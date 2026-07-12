@@ -24,6 +24,7 @@ import (
 type frozenStandardOrderUTXOReleaseAuthorization struct {
 	attempt models.PaymentAttempt
 	target  models.PaymentAttemptFundingTarget
+	terms   models.PaymentAttemptSettlementTerms
 	offer   models.SettlementKeyOffer
 	role    models.SettlementParticipantRole
 	action  string
@@ -74,6 +75,18 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 	}
 
 	sellerAmount := totalOut.Sub(escrowFee)
+	frozenAuthorization, err := s.frozenStandardOrderUTXOReleaseAuthorization(order, params)
+	if err != nil {
+		return nil, nil, err
+	}
+	effectiveToAddress := params.ToAddress
+	if frozenAuthorization != nil {
+		address := frozenAuthorization.terms.SellerAddress
+		if frozenAuthorization.action == payment.SettlementActionCancel {
+			address = strings.TrimSpace(order.RefundAddress)
+		}
+		effectiveToAddress = iwallet.NewAddress(address, iwallet.CoinType(params.CoinCode))
+	}
 	var affiliateSpend *iwallet.SpendInfo
 	if params.AffiliatePayout != nil {
 		spend, err := cancelableAffiliateUTXOSpend(wallet, iwallet.CoinType(params.CoinCode), params.AffiliatePayout, sellerAmount)
@@ -84,17 +97,13 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 		affiliateSpend = &spend
 	}
 	txn.To = append(txn.To, iwallet.SpendInfo{
-		Address: params.ToAddress,
+		Address: effectiveToAddress,
 		Amount:  sellerAmount,
 	})
 	if affiliateSpend != nil {
 		txn.To = append(txn.To, *affiliateSpend)
 	}
 
-	frozenAuthorization, err := s.frozenStandardOrderUTXOReleaseAuthorization(order, params)
-	if err != nil {
-		return nil, nil, err
-	}
 	if frozenAuthorization != nil {
 		switch frozenAuthorization.action {
 		case payment.SettlementActionComplete:
@@ -182,7 +191,7 @@ func (s *SettlementService) ReleaseFromCancelableAddressWithParams(order *models
 	txn.Timestamp = time.Now()
 
 	logger.LogInfoWithIDf(log, s.nodeID, "Released escrow funds: txid=%s, to=%s, amount=%s",
-		txid, params.ToAddress, sellerAmount.String())
+		txid, effectiveToAddress, sellerAmount.String())
 
 	return dbTx, &txn, nil
 }
@@ -246,14 +255,13 @@ func (s *SettlementService) frozenStandardOrderUTXOReleaseAuthorization(
 	if order.Role() == models.RoleVendor {
 		role = models.SettlementParticipantSeller
 		action = payment.SettlementActionComplete
-		if params.FinishType != iwallet.ORDER_FINISH_COMPLETE ||
-			!payment.SameUTXOAddress(params.ToAddress.String(), terms.SellerAddress) {
+		if params.FinishType != iwallet.ORDER_FINISH_COMPLETE || strings.TrimSpace(terms.SellerAddress) == "" {
 			return nil, models.ErrPaymentAttemptSettlementTermsConflict
 		}
 	} else {
 		refundAddress := strings.TrimSpace(order.RefundAddress)
 		if order.Role() != models.RoleBuyer || params.FinishType != iwallet.ORDER_FINISH_CANCEL ||
-			refundAddress == "" || !payment.SameUTXOAddress(params.ToAddress.String(), refundAddress) {
+			refundAddress == "" {
 			return nil, models.ErrPaymentAttemptSettlementTermsConflict
 		}
 	}
@@ -268,7 +276,7 @@ func (s *SettlementService) frozenStandardOrderUTXOReleaseAuthorization(
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	return &frozenStandardOrderUTXOReleaseAuthorization{
-		attempt: *matched, target: *target, offer: *offer, role: role, action: action,
+		attempt: *matched, target: *target, terms: *terms, offer: *offer, role: role, action: action,
 	}, nil
 }
 

@@ -109,6 +109,10 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	caps := p.deriveCapabilities(status, productMode, settlementMode)
 
 	readiness := payment.DerivePaymentReadiness(order, expiresAt)
+	if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptAuthorizationDraft &&
+		order.Role() == models.RoleBuyer {
+		readiness = payment.AwaitingSellerReceiptPaymentReadiness(expiresAt)
+	}
 
 	session := &payment.PaymentSession{
 		SessionID:               sessionID,

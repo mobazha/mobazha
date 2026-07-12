@@ -130,8 +130,9 @@ func TestFrozenStandardOrderUTXOReleaseAuthorization_SelectsLocalRoleAndTerms(t 
 	require.Equal(t, []byte("seller-attempt-key"), authorization.offer.PublicKey)
 
 	params.ToAddress = iwallet.NewAddress("bc1qwrongpayout", iwallet.CoinType(attempt.Currency))
-	_, err = svc.frozenStandardOrderUTXOReleaseAuthorization(vendorOrder, params)
-	require.ErrorIs(t, err, models.ErrPaymentAttemptSettlementTermsConflict)
+	authorization, err = svc.frozenStandardOrderUTXOReleaseAuthorization(vendorOrder, params)
+	require.NoError(t, err)
+	require.Equal(t, sellerAddress, authorization.terms.SellerAddress)
 
 	buyerOrder := *vendorOrder
 	buyerOrder.MyRole = string(models.RoleBuyer)

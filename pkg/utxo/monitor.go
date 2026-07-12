@@ -136,9 +136,10 @@ type Monitor struct {
 }
 
 type seenTxState struct {
-	firstSeen time.Time
-	height    uint64
-	confirmed bool
+	firstSeen     time.Time
+	lastDelivered time.Time
+	height        uint64
+	confirmed     bool
 }
 
 // MonitorConfig holds configuration for the transaction monitor
@@ -593,22 +594,24 @@ func (m *Monitor) handleTransaction(wa *WatchedAddress, tx *iwallet.Transaction)
 	m.seenTxsMu.Lock()
 	state, seen := m.seenTxs[dedupeKey]
 	alreadyCounted := false
+	now := time.Now()
 	if seen {
-		if tx.Height == 0 || state.confirmed {
+		if tx.Height == 0 || (state.confirmed && now.Sub(state.lastDelivered) < m.confirmedRedeliveryInterval()) {
 			m.seenTxsMu.Unlock()
 			log.Debugf("Skipping duplicate transaction %s for address %s", tx.ID, wa.Address)
 			return
 		}
 		state.height = tx.Height
 		state.confirmed = true
+		state.lastDelivered = now
 		m.seenTxs[dedupeKey] = state
 		alreadyCounted = true
 	} else {
-		now := time.Now()
 		m.seenTxs[dedupeKey] = seenTxState{
-			firstSeen: now,
-			height:    tx.Height,
-			confirmed: tx.Height > 0,
+			firstSeen:     now,
+			lastDelivered: now,
+			height:        tx.Height,
+			confirmed:     tx.Height > 0,
 		}
 	}
 	m.seenTxsMu.Unlock()
@@ -636,6 +639,13 @@ func (m *Monitor) handleTransaction(wa *WatchedAddress, tx *iwallet.Transaction)
 
 	log.Infof("Transaction detected for %s (node=%s): txid=%s, amount=%s, status=%s",
 		wa.OrderID, wa.NodeID, tx.ID, tx.Value.String(), status.String())
+}
+
+func (m *Monitor) confirmedRedeliveryInterval() time.Duration {
+	if m.pollInterval > 0 {
+		return m.pollInterval
+	}
+	return DefaultMonitorConfig().PollInterval
 }
 
 // determinePaymentStatus determines the status of a payment using the

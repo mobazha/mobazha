@@ -57,7 +57,15 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		return nil, err
 	}
 
-	if err := op.validatePaymentSent(coinType, orderOpen, paymentSent); err != nil {
+	frozenAttempt, err := validateFrozenStandardOrderUTXOPaymentSent(dbtx, order, paymentSent)
+	if err != nil {
+		logger.LogInfoWithIDf(log, op.nodeID, "Failed to validate frozen payment sent message: %s", err)
+		return nil, err
+	}
+	if !frozenAttempt {
+		err = op.validatePaymentSent(coinType, orderOpen, paymentSent)
+	}
+	if err != nil {
 		logger.LogInfoWithIDf(log, op.nodeID, "Failed to validate payment sent message: %s", err)
 		return nil, err
 	}
@@ -109,6 +117,61 @@ func (op *OrderProcessor) processPaymentSentMessage(dbtx database.Tx, order *mod
 		OrderID: order.ID.String(),
 		Txid:    paymentSent.TransactionID,
 	}, nil
+}
+
+func validateFrozenStandardOrderUTXOPaymentSent(
+	dbtx database.Tx,
+	order *models.Order,
+	paymentSent *pb.PaymentSent,
+) (bool, error) {
+	if dbtx == nil || order == nil || paymentSent == nil ||
+		!dbtx.Read().Migrator().HasTable(&models.PaymentAttempt{}) {
+		return false, nil
+	}
+	var attempts []models.PaymentAttempt
+	if err := dbtx.Read().Where(
+		"tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+		strings.TrimSpace(order.TenantID), order.ID.String(),
+		models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptFundingTargetReady,
+	).Find(&attempts).Error; err != nil {
+		return false, err
+	}
+	if len(attempts) == 0 {
+		return false, nil
+	}
+	if len(attempts) > 1 {
+		return false, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	matched := false
+	for i := range attempts {
+		target, err := attempts[i].GetFundingTarget()
+		if err != nil || target == nil {
+			return false, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		terms, err := attempts[i].GetSettlementTerms()
+		if err != nil || terms == nil {
+			return false, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		bundle, err := attempts[i].GetAuthorizationBundle()
+		if err != nil || bundle == nil {
+			return false, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		if target.AssetID != strings.TrimSpace(paymentSent.Coin) ||
+			target.AmountAtomic != strings.TrimSpace(paymentSent.Amount) ||
+			!payment.SameUTXOAddress(target.Address, paymentSent.ToAddress) ||
+			!strings.EqualFold(target.RedeemScriptHex, strings.TrimSpace(paymentSent.Script)) ||
+			terms.AttemptID != target.AttemptID || bundle.AttemptID != target.AttemptID {
+			continue
+		}
+		if matched {
+			return false, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		matched = true
+	}
+	if !matched {
+		return false, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	return true, nil
 }
 
 func isDuplicatePaymentSent(incoming *pb.PaymentSent, serialized []byte) (bool, *pb.PaymentSent, error) {

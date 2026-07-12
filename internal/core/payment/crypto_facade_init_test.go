@@ -80,6 +80,23 @@ func TestBuildPaymentSetupParamsFromOrder_SameCurrencyUsesOrderOpenNumeric(t *te
 	}
 }
 
+func TestBuildPaymentSetupParamsFromOrder_SameCurrencySuppliesSettlementAuthorizationAmount(t *testing.T) {
+	coin, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainBitcoin)
+	if !ok {
+		t.Fatal("canonical Bitcoin rail unavailable")
+	}
+	order := &models.Order{ID: models.OrderID("order.btc")}
+	open := &porderpb.OrderOpen{Amount: "30976", PricingCoin: "BTC"}
+
+	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", "", "", noopRates{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Amount != 30976 {
+		t.Fatalf("settlement authorization amount = %d, want 30976", got.Amount)
+	}
+}
+
 func TestBuildPaymentSetupParamsFromOrder_ForwardsRefundAddress(t *testing.T) {
 	coin := iwallet.CoinType("crypto:solana:mainnet:native")
 	if err := coin.ValidateCanonicalPaymentCoin(); err != nil {

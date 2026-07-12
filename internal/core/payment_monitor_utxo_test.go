@@ -23,6 +23,23 @@ import (
 
 // ========== Mock Payment Source for Testing ==========
 
+func TestMobazhaNodeElectrumOverrides_MapsConfiguredUTXOEndpoints(t *testing.T) {
+	node := &MobazhaNode{chainFields: chainFields{
+		electrumEndpoints: map[string]string{
+			"btc": "electrs:50001",
+			"xmr": "ignored:50001",
+		},
+		electrumFingerprints: map[string]string{"btc": "abc123"},
+	}}
+
+	overrides := node.electrumOverrides()
+	require.Len(t, overrides, 1)
+	bitcoin := overrides[iwallet.ChainBitcoin]
+	assert.Equal(t, []string{"electrs:50001"}, bitcoin.Servers)
+	assert.True(t, bitcoin.UseTLS)
+	assert.Equal(t, "abc123", bitcoin.TLSFingerprint)
+}
+
 // mockUTXOPaymentSource is a mock implementation of pkgutxo.PaymentSource for testing
 type mockUTXOPaymentSource struct {
 	mu            sync.RWMutex

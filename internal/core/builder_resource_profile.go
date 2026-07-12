@@ -103,7 +103,11 @@ func newResourceProfileNode(ctx context.Context, cfg *repo.Config, nodeID string
 		networkFields: networkFields{
 			eventBus: bus,
 		},
-		chainFields: chainFields{sovereignPolicy: composition.Policy},
+		chainFields: chainFields{
+			sovereignPolicy:      composition.Policy,
+			electrumEndpoints:    cfg.ParseElectrumServers(),
+			electrumFingerprints: cfg.ParseElectrumTLSFingerprints(),
+		},
 		modeFlags: modeFlags{
 			testnet:   cfg.Testnet,
 			sovereign: true,

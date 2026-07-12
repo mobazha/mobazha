@@ -965,12 +965,22 @@ func TestMonitorHandleTransaction_ReemitsConfirmedDuplicateWithoutDoubleCounting
 	m.handleTransaction(wa, &confirmed)
 	m.handleTransaction(wa, &confirmed)
 
+	// Confirmed facts are periodically redelivered so an idempotent consumer
+	// can recover from a transient persistence failure without double-counting.
+	dedupeKey := wa.Address + ":" + string(confirmed.ID)
+	m.seenTxsMu.Lock()
+	state := m.seenTxs[dedupeKey]
+	state.lastDelivered = time.Now().Add(-m.confirmedRedeliveryInterval())
+	m.seenTxs[dedupeKey] = state
+	m.seenTxsMu.Unlock()
+	m.handleTransaction(wa, &confirmed)
+
 	confirmedAtLaterHeight := confirmed
 	confirmedAtLaterHeight.Height = 8
 	m.handleTransaction(wa, &confirmedAtLaterHeight)
 
-	if callbacks != 2 {
-		t.Fatalf("callbacks = %d, want 2 (mempool + first confirmed update)", callbacks)
+	if callbacks != 3 {
+		t.Fatalf("callbacks = %d, want 3 (mempool + first confirmation + periodic confirmed retry)", callbacks)
 	}
 	if wa.TotalPaid.Load() != 100000 {
 		t.Fatalf("TotalPaid = %d, want 100000 without duplicate confirmation counting", wa.TotalPaid.Load())

@@ -691,9 +691,17 @@ func buildAggregatedPaymentSent(
 	}
 
 	chaincode := orderOpen.GetChaincode()
-	coin, err := aggregatedPaymentCoin(order, rep)
-	if err != nil {
-		return nil, err
+	intent := resolveAggregatedPaymentIntent(order, rows)
+	if len(frozenIntent) > 0 && frozenIntent[0] != nil {
+		intent = *frozenIntent[0]
+	}
+	coin := strings.TrimSpace(intent.coin)
+	if coin == "" {
+		var err error
+		coin, err = aggregatedPaymentCoin(order, rep)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// The aggregated PaymentSent envelope must be byte-identical across buyer
@@ -701,10 +709,6 @@ func buildAggregatedPaymentSent(
 	// live in SharedPaymentIntent or an existing shared PaymentSent envelope.
 	refundAddr := aggregatedRefundAddress(order, sharedRefund)
 
-	intent := resolveAggregatedPaymentIntent(order, rows)
-	if len(frozenIntent) > 0 && frozenIntent[0] != nil {
-		intent = *frozenIntent[0]
-	}
 	if !intent.settlementSpecOK {
 		return nil, fmt.Errorf("missing settlement spec for pending escrow payment intent")
 	}
@@ -814,6 +818,7 @@ func frozenStandardOrderUTXOAggregatedPaymentIntent(
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	return &aggregatedPaymentIntent{
+		coin:           target.AssetID,
 		settlementSpec: paymentmetrics.NewUTXOSpec(false), settlementSpecOK: true,
 		script: target.RedeemScriptHex,
 	}, nil
@@ -893,6 +898,7 @@ func latestChainTxObservation(rows []models.PaymentObservation) (models.PaymentO
 }
 
 type aggregatedPaymentIntent struct {
+	coin               string
 	settlementSpec     paymentmetrics.SettlementSpec
 	settlementSpecOK   bool
 	contractAddress    string

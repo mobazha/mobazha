@@ -112,8 +112,8 @@ func (r distributionPaymentRegistry) UnregisterV2Batch(chains []iwallet.ChainTyp
 }
 
 func (n *MobazhaNode) registerDistributionPaymentModules() error {
-	modules := make([]distribution.PaymentModule, 0, len(n.paymentModules)+1)
-	modules = append(modules, newCoreFiatPaymentModule())
+	modules := make([]distribution.PaymentModule, 0, len(n.paymentModules)+2)
+	modules = append(modules, newCoreFiatPaymentModule(), newCoreNativeUTXOPaymentModule())
 	modules = append(modules, n.paymentModules...)
 	ctx := n.nodeCtx
 	if ctx == nil {
@@ -175,10 +175,10 @@ func (n *MobazhaNode) registerDistributionPaymentModules() error {
 // guest services exist but before the node starts. Direct-observed modules do
 // not contribute escrow strategies, so an otherwise empty registry is valid.
 func (n *MobazhaNode) registerSovereignPaymentModules() error {
-	if len(n.paymentModules) == 0 {
-		return nil
-	}
 	n.paymentRegistry = payment.NewRegistry()
+	modules := make([]distribution.PaymentModule, 0, len(n.paymentModules)+1)
+	modules = append(modules, newCoreNativeUTXOPaymentModule())
+	modules = append(modules, n.paymentModules...)
 	authority := distribution.NewPaymentRuntimeAuthority(
 		distribution.ManagedEVMRuntime{},
 		distribution.ManagedSolanaRuntime{},
@@ -190,7 +190,7 @@ func (n *MobazhaNode) registerSovereignPaymentModules() error {
 	manager, err := distribution.NewTrustedPaymentModuleManager(
 		authority,
 		distributionPaymentRegistry{registry: n.paymentRegistry},
-		n.paymentModules...,
+		modules...,
 	)
 	if err != nil {
 		return err

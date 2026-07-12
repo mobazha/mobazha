@@ -18,6 +18,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	paymentmetrics "github.com/mobazha/mobazha/pkg/payment"
 	postsPb "github.com/mobazha/mobazha/pkg/posts/pb"
 )
 
@@ -949,6 +950,33 @@ func TestBuildAggregatedPaymentSent_DoesNotUsePricingCoinAsSettlementCoin(t *tes
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot determine PaymentSent.Coin")
+}
+
+func TestBuildAggregatedPaymentSent_FrozenIntentSuppliesCanonicalCoin(t *testing.T) {
+	order := &models.Order{ID: models.OrderID("order-frozen-coin")}
+	orderOpen := &pb.OrderOpen{PricingCoin: "BTC", Amount: "1000"}
+	rows := []models.PaymentObservation{{
+		ID:             "obs-regtest",
+		OrderID:        "order-frozen-coin",
+		ChainNamespace: "bip122",
+		ChainReference: "bitcoin-regtest",
+		TxHash:         "regtest-tx",
+		EventType:      models.PaymentEventUTXOFunding,
+		ToAddress:      "tb1qfrozen",
+		Amount:         "1000",
+	}}
+	frozen := &aggregatedPaymentIntent{
+		coin:             "crypto:bip122:000000000019d6689c085ae165831e93:native",
+		settlementSpec:   paymentmetrics.NewUTXOSpec(false),
+		settlementSpecOK: true,
+		script:           "51ae",
+	}
+
+	ps, err := buildAggregatedPaymentSent(orderOpen, rows, big.NewInt(1000), order, "", time.Now(), frozen)
+
+	require.NoError(t, err)
+	require.Equal(t, frozen.coin, ps.Coin)
+	require.Equal(t, frozen.script, ps.Script)
 }
 
 func TestBuildAggregatedPaymentSent_PendingEscrowRequiresSettlementSpec(t *testing.T) {

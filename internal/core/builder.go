@@ -575,8 +575,10 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 			relayAPIBearer: cfg.RelayAPIBearer,
 		},
 		chainFields: chainFields{
-			evmChainConfigs: evmConfigs,
-			tronChainConfig: tronConfig,
+			evmChainConfigs:      evmConfigs,
+			tronChainConfig:      tronConfig,
+			electrumEndpoints:    cfg.ParseElectrumServers(),
+			electrumFingerprints: cfg.ParseElectrumTLSFingerprints(),
 		},
 		ipnsFields: ipnsFields{
 			netDB:     netDB,

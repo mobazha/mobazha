@@ -10,6 +10,7 @@ import (
 
 	"github.com/mobazha/mobazha/pkg/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // CreateCryptoPaymentAttemptDraft persists a non-actionable crypto attempt
@@ -35,7 +36,8 @@ func CreateCryptoPaymentAttemptDraft(
 	attempt.State = models.PaymentAttemptAuthorizationDraft
 	err := db.Transaction(func(tx *gorm.DB) error {
 		var existing models.PaymentAttempt
-		err := tx.Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&existing).Error
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			if attempt.AuthorizationContextID == "" {
 				contextID, err := models.NewSettlementAuthorizationContextID()
@@ -150,17 +152,32 @@ func FreezeCryptoPaymentAttempt(
 				return result.Error
 			}
 			if result.RowsAffected == 1 {
-				return nil
+				return deleteCryptoPaymentAttemptDraftOffers(tx, attempt.TenantID, attempt.AttemptID)
 			}
 			// Another transaction froze this draft after our read. Never overwrite
 			// it: accept only an identical durable snapshot for an idempotent retry.
 			if err := tx.Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&existing).Error; err != nil {
 				return fmt.Errorf("reload concurrently frozen crypto payment attempt: %w", err)
 			}
-			return verifyFrozenCryptoAttempt(existing, attempt)
+			if err := verifyFrozenCryptoAttempt(existing, attempt); err != nil {
+				return err
+			}
+			return deleteCryptoPaymentAttemptDraftOffers(tx, attempt.TenantID, attempt.AttemptID)
 		}
-		return verifyFrozenCryptoAttempt(existing, attempt)
+		if err := verifyFrozenCryptoAttempt(existing, attempt); err != nil {
+			return err
+		}
+		return deleteCryptoPaymentAttemptDraftOffers(tx, attempt.TenantID, attempt.AttemptID)
 	})
+}
+
+func deleteCryptoPaymentAttemptDraftOffers(tx *gorm.DB, tenantID, attemptID string) error {
+	result := tx.Where("tenant_id = ? AND attempt_id = ?", tenantID, attemptID).
+		Delete(&models.PaymentAttemptSettlementOffer{})
+	if result.Error != nil {
+		return fmt.Errorf("delete frozen payment attempt draft offers: %w", result.Error)
+	}
+	return nil
 }
 
 func sameCryptoPaymentAttemptIdentity(left, right models.PaymentAttempt) bool {

@@ -142,7 +142,7 @@ func cryptoAttemptFixture(t *testing.T) (
 func TestFreezeCryptoPaymentAttempt_PersistsAtomicSnapshotAndAcceptsRetry(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}))
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
 	attempt, route, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
 	attempt, err = CreateCryptoPaymentAttemptDraft(db, attempt, route)
 	require.NoError(t, err)
@@ -165,7 +165,7 @@ func TestFreezeCryptoPaymentAttempt_PersistsAtomicSnapshotAndAcceptsRetry(t *tes
 func TestFreezeCryptoPaymentAttempt_RejectsFrozenMutation(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-conflict-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}))
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
 	attempt, route, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
 	attempt, err = CreateCryptoPaymentAttemptDraft(db, attempt, route)
 	require.NoError(t, err)
@@ -182,7 +182,7 @@ func TestFreezeCryptoPaymentAttempt_RejectsFrozenMutation(t *testing.T) {
 func TestFreezeCryptoPaymentAttempt_DoesNotOverwriteConcurrentWinner(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-cas-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}))
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
 	attempt, route, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
 	attempt, err = CreateCryptoPaymentAttemptDraft(db, attempt, route)
 	require.NoError(t, err)
@@ -217,7 +217,7 @@ func TestFreezeCryptoPaymentAttempt_DoesNotOverwriteConcurrentWinner(t *testing.
 func TestFreezeCryptoPaymentAttempt_RejectsTargetBeforeValidSellerAuthorization(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-auth-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}))
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
 	attempt, route, terms, signer, _, bundle, target := cryptoAttemptFixture(t)
 	attempt, err = CreateCryptoPaymentAttemptDraft(db, attempt, route)
 	require.NoError(t, err)
@@ -234,7 +234,7 @@ func TestFreezeCryptoPaymentAttempt_RejectsTargetBeforeValidSellerAuthorization(
 func TestFreezeCryptoPaymentAttempt_RequiresPersistedDraft(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-draft-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}))
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
 	attempt, route, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
 
 	require.ErrorContains(
@@ -247,7 +247,7 @@ func TestFreezeCryptoPaymentAttempt_RequiresPersistedDraft(t *testing.T) {
 func TestCreateCryptoPaymentAttemptDraft_ReusesDurableContextOnRetry(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-context-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}))
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{}))
 	attempt, route, _, _, _, _, _ := cryptoAttemptFixture(t)
 	attempt.AuthorizationContextID = ""
 
@@ -300,6 +300,18 @@ func TestStoreCryptoPaymentAttemptSettlementKeyOffer_RetainsVerifiedDraftOffers(
 		StoreCryptoPaymentAttemptSettlementKeyOffer(db, attempt.TenantID, attempt.AttemptID, duplicateKeyOffer),
 		"already retained",
 	)
+	var sellerRecord models.PaymentAttemptSettlementOffer
+	require.NoError(t, db.Where(
+		"tenant_id = ? AND attempt_id = ? AND participant_role = ?",
+		attempt.TenantID, attempt.AttemptID, models.SettlementParticipantSeller,
+	).First(&sellerRecord).Error)
+	duplicateCanonical, duplicateHash, err := duplicateKeyOffer.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	require.Error(t, db.Create(&models.PaymentAttemptSettlementOffer{
+		TenantID: attempt.TenantID, AttemptID: attempt.AttemptID,
+		ParticipantRole: models.SettlementParticipantBuyer,
+		Offer:           duplicateCanonical, OfferHash: duplicateHash, PublicKeyHash: sellerRecord.PublicKeyHash,
+	}).Error)
 
 	require.NoError(t, StoreCryptoPaymentAttemptSettlementKeyOffer(db, attempt.TenantID, attempt.AttemptID, buyerOffer))
 	offers, err := ListCryptoPaymentAttemptSettlementKeyOffers(db, attempt.TenantID, attempt.AttemptID)
@@ -318,6 +330,11 @@ func TestStoreCryptoPaymentAttemptSettlementKeyOffer_RetainsVerifiedDraftOffers(
 	require.NoError(t, err)
 	require.Equal(t, expectedHash, actualHash)
 	require.NoError(t, FreezeCryptoPaymentAttempt(db, attempt, route, terms, signer, signature, builtBundle, target))
+	var retainedCount int64
+	require.NoError(t, db.Model(&models.PaymentAttemptSettlementOffer{}).
+		Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).
+		Count(&retainedCount).Error)
+	require.Zero(t, retainedCount)
 	_, err = ListCryptoPaymentAttemptSettlementKeyOffers(db, attempt.TenantID, attempt.AttemptID)
 	require.ErrorIs(t, err, models.ErrPaymentAttemptSettlementTermsConflict)
 }

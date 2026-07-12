@@ -77,6 +77,94 @@ func TestProvider_ProviderID(t *testing.T) {
 	assert.Equal(t, "paypal", p.ProviderID())
 }
 
+func TestProvider_Capabilities_DelayedDisbursementRequiresApprovedPartnerConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    Config
+		moderated bool
+	}{
+		{name: "direct", config: Config{Mode: ModeDirect, DelayedDisbursement: true, PartnerAttributionID: "BN-CODE"}},
+		{name: "flag disabled", config: Config{Mode: ModePartner, PartnerAttributionID: "BN-CODE"}},
+		{name: "missing attribution", config: Config{Mode: ModePartner, DelayedDisbursement: true}},
+		{name: "approved partner", config: Config{Mode: ModePartner, DelayedDisbursement: true, PartnerAttributionID: "BN-CODE"}, moderated: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			capabilities := NewProvider(test.config).Capabilities()
+			assert.Equal(t, test.moderated, capabilities.SupportsModerated())
+			if test.moderated {
+				assert.Equal(t, contracts.FiatModeratedModeDelayedDisbursement, capabilities.ModeratedMode)
+				assert.Equal(t, 28*24*time.Hour, capabilities.MaximumHold)
+				assert.True(t, capabilities.RequiresApproval)
+			}
+		})
+	}
+}
+
+func TestProvider_CreatePayment_ModeratedUsesDelayedDisbursement(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v2/checkout/orders", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "BN-MOBAZHA", r.Header.Get("PayPal-Partner-Attribution-Id"))
+		assert.NotEmpty(t, r.Header.Get("PayPal-Auth-Assertion"))
+		var req orderRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+		require.Len(t, req.PurchaseUnits, 1)
+		require.NotNil(t, req.PurchaseUnits[0].PaymentInstruction)
+		assert.Equal(t, "DELAYED", req.PurchaseUnits[0].PaymentInstruction.DisbursementMode)
+		json.NewEncoder(w).Encode(orderResponse{ID: "ORDER-MODERATED", Status: "CREATED"})
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+	p.config.Mode = ModePartner
+	p.config.DelayedDisbursement = true
+	p.config.PartnerAttributionID = "BN-MOBAZHA"
+
+	_, err := p.CreatePayment(context.Background(), contracts.CreatePaymentParams{
+		OrderID: "order-moderated", Amount: 2500, Currency: "USD",
+		SellerAccountID: "MERCHANT-123", ModeratorPeerID: "moderator-peer",
+	})
+	require.NoError(t, err)
+}
+
+func TestProvider_CreatePayment_ModeratedFailsClosedWithoutApproval(t *testing.T) {
+	p := NewProvider(Config{Mode: ModePartner, DelayedDisbursement: true})
+	_, err := p.CreatePayment(context.Background(), contracts.CreatePaymentParams{
+		OrderID: "order-moderated", Amount: 2500, Currency: "USD",
+		SellerAccountID: "MERCHANT-123", ModeratorPeerID: "moderator-peer",
+	})
+	require.ErrorContains(t, err, "delayed disbursement is not enabled")
+}
+
+func TestProvider_DisbursePayment(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/payments/referenced-payouts-items", func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "release-key", r.Header.Get("PayPal-Request-Id"))
+		assert.Equal(t, "BN-MOBAZHA", r.Header.Get("PayPal-Partner-Attribution-Id"))
+		assert.NotEmpty(t, r.Header.Get("PayPal-Auth-Assertion"))
+		var body map[string]string
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		assert.Equal(t, "CAPTURE-123", body["reference_id"])
+		assert.Equal(t, "TRANSACTION_ID", body["reference_type"])
+		json.NewEncoder(w).Encode(map[string]string{
+			"payout_item_id": "PAYOUT-123", "transaction_status": "SUCCESS",
+		})
+	})
+
+	ts, p := newTestServer(t, mux)
+	defer ts.Close()
+	p.config.Mode = ModePartner
+	p.config.DelayedDisbursement = true
+	p.config.PartnerAttributionID = "BN-MOBAZHA"
+	result, err := p.DisbursePayment(context.Background(), contracts.DisbursePaymentParams{
+		PaymentID: "CAPTURE-123", SellerAccountID: "MERCHANT-123", IdempotencyKey: "release-key",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "PAYOUT-123", result.DisbursementID)
+	assert.Equal(t, "success", result.Status)
+}
+
 func TestProvider_CreatePayment_Success(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v2/checkout/orders", func(w http.ResponseWriter, r *http.Request) {

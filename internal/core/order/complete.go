@@ -196,30 +196,36 @@ func (s *OrderAppService) CompleteOrder(orderID models.OrderID, txid iwallet.Tra
 
 	var releaseTx *iwallet.Transaction
 	if method, ok := payment.ResolvedPaymentMethod(&order, paymentSent); ok && payment.MethodIsModerated(method) {
-		if !orderRequiresMonitoredSettlementActions(&order, paymentSent, coinType, s.paymentRegistry) {
-			return errRetiredClientSignedModeratedSettlement("complete")
-		}
-		if _, err := requireBackendSubmittedSettlementSpec(&order, paymentSent); err != nil {
-			return err
-		}
+		if payment.IsFiatPaymentRoute(method, coinType) {
+			if _, err := s.disburseFiatPayment(context.Background(), &order, paymentSent, "complete"); err != nil {
+				return err
+			}
+		} else {
+			if !orderRequiresMonitoredSettlementActions(&order, paymentSent, coinType, s.paymentRegistry) {
+				return errRetiredClientSignedModeratedSettlement("complete")
+			}
+			if _, err := requireBackendSubmittedSettlementSpec(&order, paymentSent); err != nil {
+				return err
+			}
 
-		var releaseAlreadySubmitted bool
-		txid, releaseAlreadySubmitted, err = evaluateMonitoredSettlementRelease(&order, txid, "complete")
-		if err != nil {
-			return err
+			var releaseAlreadySubmitted bool
+			txid, releaseAlreadySubmitted, err = evaluateMonitoredSettlementRelease(&order, txid, "complete")
+			if err != nil {
+				return err
+			}
+			if !releaseAlreadySubmitted {
+				return errSettlementReleaseActionRequired(orderID, "complete")
+			}
+			release := ordersettlement.CloneEscrowRelease(shipments[0].ReleaseInfo)
+			if release == nil {
+				return fmt.Errorf("%w: shipment release info is missing", coreiface.ErrBadRequest)
+			}
+			if txid != "" {
+				release.Txid = txid.String()
+				releaseTx = &iwallet.Transaction{ID: txid}
+			}
+			completeMsg.ReleaseInfo = release
 		}
-		if !releaseAlreadySubmitted {
-			return errSettlementReleaseActionRequired(orderID, "complete")
-		}
-		release := ordersettlement.CloneEscrowRelease(shipments[0].ReleaseInfo)
-		if release == nil {
-			return fmt.Errorf("%w: shipment release info is missing", coreiface.ErrBadRequest)
-		}
-		if txid != "" {
-			release.Txid = txid.String()
-			releaseTx = &iwallet.Transaction{ID: txid}
-		}
-		completeMsg.ReleaseInfo = release
 	}
 	timing.next("release_complete_escrow_funds")
 

@@ -85,6 +85,10 @@ type providerCancelIntent struct {
 	PaymentID string `json:"paymentID"`
 }
 
+type providerDisburseIntent struct {
+	PaymentID string `json:"paymentID"`
+}
+
 func NewFiatPaymentAppService(
 	registry contracts.FiatProviderRegistry,
 	db database.Database,
@@ -647,6 +651,33 @@ func (s *FiatPaymentAppService) RefundPayment(
 	return result.Refund, nil
 }
 
+// DisbursePayment durably releases a provider-held moderated payment.
+func (s *FiatPaymentAppService) DisbursePayment(
+	ctx context.Context,
+	providerID string,
+	params contracts.DisbursePaymentParams,
+) (*contracts.DisbursePaymentResult, error) {
+	if strings.TrimSpace(params.IdempotencyKey) == "" {
+		return nil, fmt.Errorf("fiat disbursement requires an idempotency key")
+	}
+	action, err := s.prepareProviderAction(
+		providerID,
+		models.PaymentProviderActionDisburse,
+		params.PaymentID,
+		params.OrderID,
+		params.IdempotencyKey,
+		providerDisburseIntent{PaymentID: params.PaymentID},
+	)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.executeProviderAction(ctx, action)
+	if err != nil {
+		return nil, err
+	}
+	return result.Disburse, nil
+}
+
 // CancelPayment cancels a fiat payment session via the provider registry.
 // Implements contracts.FiatPaymentOperations.
 func (s *FiatPaymentAppService) CancelPayment(ctx context.Context, providerID string, paymentID string) error {
@@ -659,10 +690,11 @@ func (s *FiatPaymentAppService) CancelPayment(ctx context.Context, providerID st
 }
 
 type providerActionResult struct {
-	Capture         *contracts.PaymentResult `json:"capture,omitempty"`
-	Refund          *contracts.RefundResult  `json:"refund,omitempty"`
-	Canceled        bool                     `json:"canceled,omitempty"`
-	AlreadyRefunded bool                     `json:"alreadyRefunded,omitempty"`
+	Capture         *contracts.PaymentResult         `json:"capture,omitempty"`
+	Refund          *contracts.RefundResult          `json:"refund,omitempty"`
+	Disburse        *contracts.DisbursePaymentResult `json:"disburse,omitempty"`
+	Canceled        bool                             `json:"canceled,omitempty"`
+	AlreadyRefunded bool                             `json:"alreadyRefunded,omitempty"`
 }
 
 func (s *FiatPaymentAppService) prepareProviderAction(
@@ -832,6 +864,7 @@ func (s *FiatPaymentAppService) executeProviderActionWithTerminalRetry(
 			return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("decode refund intent: %w", err))
 		}
 		intent.Params.IdempotencyKey = action.IdempotencyKey
+		intent.Params.SellerAccountID = binding.ExternalAccountReference
 		intent.Params.Metadata = cloneStringMap(intent.Params.Metadata)
 		intent.Params.Metadata["connectedAccountID"] = binding.ExternalAccountReference
 		result.Refund, err = provider.RefundPayment(ctx, intent.Params)
@@ -840,6 +873,26 @@ func (s *FiatPaymentAppService) executeProviderActionWithTerminalRetry(
 			err = nil
 		} else if err == nil && result.Refund == nil {
 			err = fmt.Errorf("provider returned an empty refund result")
+		}
+	case models.PaymentProviderActionDisburse:
+		var intent providerDisburseIntent
+		if err := json.Unmarshal(action.IntentPayload, &intent); err != nil {
+			return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("decode disbursement intent: %w", err))
+		}
+		moderatedProvider, ok := provider.(contracts.FiatModeratedPaymentProvider)
+		if !ok {
+			return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("provider %s does not implement moderated disbursement", action.ProviderID))
+		}
+		capabilityReporter, ok := provider.(contracts.FiatProviderCapabilityReporter)
+		if !ok || capabilityReporter.Capabilities().ModeratedMode != contracts.FiatModeratedModeDelayedDisbursement {
+			return providerActionResult{}, s.markProviderActionFailed(action, fmt.Errorf("provider %s binding does not support delayed disbursement", action.ProviderID))
+		}
+		result.Disburse, err = moderatedProvider.DisbursePayment(ctx, contracts.DisbursePaymentParams{
+			PaymentID: intent.PaymentID, IdempotencyKey: action.IdempotencyKey,
+			SellerAccountID: binding.ExternalAccountReference,
+		})
+		if err == nil && result.Disburse == nil {
+			err = fmt.Errorf("provider returned an empty disbursement result")
 		}
 	case models.PaymentProviderActionCancel:
 		var intent providerCancelIntent
@@ -2109,6 +2162,10 @@ func defaultFiatProviderFactory(testnet bool) fiatProviderFactory {
 			}
 			if opts != nil && opts.PayPalPartnerID != "" {
 				cfg.PartnerID = opts.PayPalPartnerID
+			}
+			if opts != nil {
+				cfg.PartnerAttributionID = opts.PayPalPartnerAttributionID
+				cfg.DelayedDisbursement = opts.PayPalDelayedDisbursement
 			}
 			return paypal.NewProvider(cfg), nil
 		default:

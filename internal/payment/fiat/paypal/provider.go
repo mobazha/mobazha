@@ -2,6 +2,7 @@ package paypal
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,12 +33,14 @@ const (
 
 // Config holds PayPal provider configuration.
 type Config struct {
-	ClientID     string
-	ClientSecret string
-	WebhookID    string // PayPal webhook ID for signature verification
-	Mode         Mode
-	Sandbox      bool
-	PartnerID    string // PayPal partner merchant ID (SaaS only)
+	ClientID             string
+	ClientSecret         string
+	WebhookID            string // PayPal webhook ID for signature verification
+	Mode                 Mode
+	Sandbox              bool
+	PartnerID            string // PayPal partner merchant ID (SaaS only)
+	PartnerAttributionID string
+	DelayedDisbursement  bool
 }
 
 // Provider implements contracts.FiatPaymentProvider and contracts.FiatOnboardingProvider
@@ -68,12 +71,16 @@ func (p *Provider) OverrideBaseURL(url string) {
 func (p *Provider) ProviderID() string { return providerID }
 
 func (p *Provider) Capabilities() contracts.FiatProviderCapabilities {
-	return contracts.FiatProviderCapabilities{
+	capabilities := contracts.FiatProviderCapabilities{
 		FullRefund: true, PartialRefund: true,
-		// Partner mode alone is insufficient; delayed disbursement requires
-		// separate PayPal approval and seller feature onboarding.
 		ModeratedMode: contracts.FiatModeratedModeNone,
 	}
+	if p.config.Mode == ModePartner && p.config.DelayedDisbursement && strings.TrimSpace(p.config.PartnerAttributionID) != "" {
+		capabilities.ModeratedMode = contracts.FiatModeratedModeDelayedDisbursement
+		capabilities.MaximumHold = 28 * 24 * time.Hour
+		capabilities.RequiresApproval = true
+	}
+	return capabilities
 }
 
 func (p *Provider) CreatePayment(ctx context.Context, params contracts.CreatePaymentParams) (*contracts.FiatProviderSession, error) {
@@ -94,6 +101,12 @@ func (p *Provider) CreatePayment(ctx context.Context, params contracts.CreatePay
 	if p.config.Mode == ModePartner && params.SellerAccountID != "" {
 		pu.Payee = &payee{MerchantID: params.SellerAccountID}
 	}
+	if strings.TrimSpace(params.ModeratorPeerID) != "" {
+		if !p.Capabilities().SupportsModerated() {
+			return nil, fmt.Errorf("paypal: delayed disbursement is not enabled for this partner binding")
+		}
+		pu.PaymentInstruction = &paymentInstruction{DisbursementMode: "DELAYED"}
+	}
 
 	reqBody := orderRequest{
 		Intent:        "CAPTURE",
@@ -109,6 +122,9 @@ func (p *Provider) CreatePayment(ctx context.Context, params contracts.CreatePay
 
 	var resp orderResponse
 	headers := map[string]string{}
+	if err := p.applyPartnerHeaders(headers, params.SellerAccountID); err != nil {
+		return nil, err
+	}
 	if params.IdempotencyKey != "" {
 		headers["PayPal-Request-Id"] = params.IdempotencyKey
 	}
@@ -137,9 +153,68 @@ func (p *Provider) CreatePayment(ctx context.Context, params contracts.CreatePay
 	}, nil
 }
 
+func (p *Provider) applyPartnerHeaders(headers map[string]string, sellerAccountID string) error {
+	if p.config.Mode != ModePartner {
+		return nil
+	}
+	sellerAccountID = strings.TrimSpace(sellerAccountID)
+	if sellerAccountID == "" {
+		return fmt.Errorf("paypal: partner operation requires seller account")
+	}
+	headerJSON, err := json.Marshal(map[string]string{"alg": "none"})
+	if err != nil {
+		return err
+	}
+	payloadJSON, err := json.Marshal(map[string]string{"iss": p.config.ClientID, "payer_id": sellerAccountID})
+	if err != nil {
+		return err
+	}
+	encode := base64.RawURLEncoding.EncodeToString
+	headers["PayPal-Auth-Assertion"] = encode(headerJSON) + "." + encode(payloadJSON) + "."
+	if attributionID := strings.TrimSpace(p.config.PartnerAttributionID); attributionID != "" {
+		headers["PayPal-Partner-Attribution-Id"] = attributionID
+	}
+	return nil
+}
+
+// DisbursePayment releases a delayed PayPal capture to its seller.
+func (p *Provider) DisbursePayment(ctx context.Context, params contracts.DisbursePaymentParams) (*contracts.DisbursePaymentResult, error) {
+	if !p.Capabilities().SupportsModerated() {
+		return nil, fmt.Errorf("paypal: delayed disbursement is not enabled for this partner binding")
+	}
+	paymentID := strings.TrimSpace(params.PaymentID)
+	if paymentID == "" {
+		return nil, fmt.Errorf("paypal: disbursement requires capture ID")
+	}
+	headers := map[string]string{}
+	if err := p.applyPartnerHeaders(headers, params.SellerAccountID); err != nil {
+		return nil, err
+	}
+	if params.IdempotencyKey != "" {
+		headers["PayPal-Request-Id"] = params.IdempotencyKey
+	}
+	var response struct {
+		PayoutItemID      string `json:"payout_item_id"`
+		TransactionID     string `json:"transaction_id"`
+		TransactionStatus string `json:"transaction_status"`
+	}
+	body := map[string]string{"reference_id": paymentID, "reference_type": "TRANSACTION_ID"}
+	if err := p.client.doJSONWithHeaders(ctx, "POST", "/v1/payments/referenced-payouts-items", body, &response, headers); err != nil {
+		return nil, fmt.Errorf("paypal disburse: %w", classifyProviderActionError(err))
+	}
+	id := response.PayoutItemID
+	if id == "" {
+		id = response.TransactionID
+	}
+	return &contracts.DisbursePaymentResult{DisbursementID: id, Status: strings.ToLower(response.TransactionStatus)}, nil
+}
+
 func (p *Provider) CapturePayment(ctx context.Context, params contracts.CapturePaymentParams) (*contracts.PaymentResult, error) {
 	var resp orderResponse
 	headers := map[string]string{}
+	if err := p.applyPartnerHeaders(headers, params.SellerAccountID); err != nil {
+		return nil, err
+	}
 	if params.IdempotencyKey != "" {
 		headers["PayPal-Request-Id"] = params.IdempotencyKey
 	}
@@ -324,6 +399,9 @@ func (p *Provider) RefundPayment(ctx context.Context, params contracts.RefundPar
 
 	var resp refundResponse
 	headers := map[string]string{}
+	if err := p.applyPartnerHeaders(headers, params.SellerAccountID); err != nil {
+		return nil, err
+	}
 	if params.IdempotencyKey != "" {
 		headers["PayPal-Request-Id"] = params.IdempotencyKey
 	}
@@ -348,6 +426,8 @@ func (p *Provider) RefundPayment(ctx context.Context, params contracts.RefundPar
 
 	return result, nil
 }
+
+var _ contracts.FiatModeratedPaymentProvider = (*Provider)(nil)
 
 func mapRefundStatus(status string) string {
 	switch status {

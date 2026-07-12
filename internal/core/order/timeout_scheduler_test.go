@@ -432,6 +432,10 @@ func (m *mockFiatOps) RefundPayment(_ context.Context, _ string, _ contracts.Ref
 	return m.refundResult, m.refundErr
 }
 
+func (m *mockFiatOps) DisbursePayment(_ context.Context, _ string, _ contracts.DisbursePaymentParams) (*contracts.DisbursePaymentResult, error) {
+	return nil, nil
+}
+
 func (m *mockFiatOps) CancelPayment(_ context.Context, _ string, _ string) error {
 	m.cancelCalled = true
 	return m.cancelErr

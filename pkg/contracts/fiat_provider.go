@@ -88,6 +88,12 @@ type FiatPaymentProvider interface {
 	CancelPayment(ctx context.Context, params CancelPaymentParams) error
 }
 
+// FiatModeratedPaymentProvider is the optional money-out capability required
+// by delayed-disbursement provider bindings.
+type FiatModeratedPaymentProvider interface {
+	DisbursePayment(ctx context.Context, params DisbursePaymentParams) (*DisbursePaymentResult, error)
+}
+
 // CapturePaymentParams identifies one idempotent provider capture command.
 type CapturePaymentParams struct {
 	SessionID       string
@@ -180,6 +186,9 @@ type FiatService interface {
 	// RefundPayment issues a full or partial refund for a captured payment.
 	RefundPayment(ctx context.Context, providerID string, params RefundParams) (*RefundResult, error)
 
+	// DisbursePayment releases a provider-held moderated payment to the seller.
+	DisbursePayment(ctx context.Context, providerID string, params DisbursePaymentParams) (*DisbursePaymentResult, error)
+
 	// HandleWebhook processes a webhook event with idempotency guarantees.
 	HandleWebhook(ctx context.Context, providerID string, payload []byte, headers map[string]string) error
 
@@ -221,7 +230,9 @@ type FiatService interface {
 // PlatformProviderOpts holds provider-specific platform configuration
 // that varies by payment provider (e.g., PayPal Partner ID).
 type PlatformProviderOpts struct {
-	PayPalPartnerID string
+	PayPalPartnerID            string
+	PayPalPartnerAttributionID string
+	PayPalDelayedDisbursement  bool
 }
 
 // FiatPlatformConfigurer allows the hosting layer to inject platform-level
@@ -243,6 +254,7 @@ type FiatPlatformConfigurer interface {
 // Satisfied by FiatPaymentAppService; decouples order logic from fiat internals.
 type FiatPaymentOperations interface {
 	RefundPayment(ctx context.Context, providerID string, params RefundParams) (*RefundResult, error)
+	DisbursePayment(ctx context.Context, providerID string, params DisbursePaymentParams) (*DisbursePaymentResult, error)
 	CancelPayment(ctx context.Context, providerID string, paymentID string) error
 	GetPaymentStatus(ctx context.Context, providerID string, paymentID string) (string, error)
 }

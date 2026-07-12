@@ -30,28 +30,31 @@ import (
 // --- Mock provider ---
 
 type mockFiatProvider struct {
-	createMu      sync.Mutex
-	captureMu     sync.Mutex
-	id            string
-	parseErr      error
-	parsedEvent   *contracts.WebhookEvent
-	createResult  *contracts.FiatProviderSession
-	createErr     error
-	captureResult *contracts.PaymentResult
-	captureErr    error
-	captureCalls  []contracts.CapturePaymentParams
-	beforeCapture func(contracts.CapturePaymentParams)
-	getResult     *contracts.PaymentDetail
-	getErr        error
-	refundResult  *contracts.RefundResult
-	refundErr     error
-	refundCalls   []contracts.RefundParams
-	cancelErr     error
-	cancelCalls   []string
-	cancelParams  []contracts.CancelPaymentParams
-	createCalls   int
-	createParams  []contracts.CreatePaymentParams
-	capabilities  contracts.FiatProviderCapabilities
+	createMu       sync.Mutex
+	captureMu      sync.Mutex
+	id             string
+	parseErr       error
+	parsedEvent    *contracts.WebhookEvent
+	createResult   *contracts.FiatProviderSession
+	createErr      error
+	captureResult  *contracts.PaymentResult
+	captureErr     error
+	captureCalls   []contracts.CapturePaymentParams
+	beforeCapture  func(contracts.CapturePaymentParams)
+	getResult      *contracts.PaymentDetail
+	getErr         error
+	refundResult   *contracts.RefundResult
+	refundErr      error
+	refundCalls    []contracts.RefundParams
+	disburseResult *contracts.DisbursePaymentResult
+	disburseErr    error
+	disburseCalls  []contracts.DisbursePaymentParams
+	cancelErr      error
+	cancelCalls    []string
+	cancelParams   []contracts.CancelPaymentParams
+	createCalls    int
+	createParams   []contracts.CreatePaymentParams
+	capabilities   contracts.FiatProviderCapabilities
 }
 
 type mockWebhookProvider struct {
@@ -97,6 +100,11 @@ func (m *mockFiatProvider) GetPayment(_ context.Context, _ string) (*contracts.P
 func (m *mockFiatProvider) RefundPayment(_ context.Context, params contracts.RefundParams) (*contracts.RefundResult, error) {
 	m.refundCalls = append(m.refundCalls, params)
 	return m.refundResult, m.refundErr
+}
+
+func (m *mockFiatProvider) DisbursePayment(_ context.Context, params contracts.DisbursePaymentParams) (*contracts.DisbursePaymentResult, error) {
+	m.disburseCalls = append(m.disburseCalls, params)
+	return m.disburseResult, m.disburseErr
 }
 
 func (m *mockFiatProvider) CancelPayment(_ context.Context, params contracts.CancelPaymentParams) error {
@@ -179,6 +187,20 @@ func newFiatTestService(t *testing.T, reg contracts.FiatProviderRegistry) (*Fiat
 	svc := NewFiatPaymentAppService(reg, db, "test-node", false)
 	svc.SetProviderCredentialKeyProvider(testProviderCredentialKeys{})
 	return svc, db
+}
+
+func TestDefaultFiatProviderFactory_WiresApprovedPayPalDelayedDisbursement(t *testing.T) {
+	provider, err := defaultFiatProviderFactory(true)("paypal", providerCredentialMaterial{
+		PublicKey: "client-id", SecretKey: "client-secret",
+	}, true, &contracts.PlatformProviderOpts{
+		PayPalPartnerID: "PARTNER-1", PayPalPartnerAttributionID: "BN-MOBAZHA", PayPalDelayedDisbursement: true,
+	})
+	require.NoError(t, err)
+	reporter, ok := provider.(contracts.FiatProviderCapabilityReporter)
+	require.True(t, ok)
+	capabilities := reporter.Capabilities()
+	assert.Equal(t, contracts.FiatModeratedModeDelayedDisbursement, capabilities.ModeratedMode)
+	assert.True(t, capabilities.RequiresApproval)
 }
 
 func subscribeProviderPaymentRisk(t *testing.T, svc *FiatPaymentAppService) events.Subscription {
@@ -1052,6 +1074,37 @@ func TestFiatService_CapturePayment_PersistsIntentBeforeProviderAndReturnsComple
 	assert.Empty(t, action.LeaseOwner)
 	assert.Nil(t, action.LeaseExpiresAt)
 	require.NotNil(t, action.CompletedAt)
+}
+
+func TestFiatService_DisbursePayment_IsDurableIdempotentAndUsesFrozenSeller(t *testing.T) {
+	provider := &mockFiatProvider{
+		id:             "paypal",
+		capabilities:   contracts.FiatProviderCapabilities{ModeratedMode: contracts.FiatModeratedModeDelayedDisbursement},
+		disburseResult: &contracts.DisbursePaymentResult{DisbursementID: "PAYOUT-1", Status: "success"},
+	}
+	reg := newMockFiatRegistry()
+	reg.Register(provider)
+	svc, db := newFiatTestService(t, reg)
+	seedProviderActionAttempt(t, svc, db, "paypal", "order-disburse", "CAPTURE-1")
+
+	params := contracts.DisbursePaymentParams{
+		PaymentID: "CAPTURE-1", OrderID: "order-disburse", IdempotencyKey: "complete-order-disburse",
+	}
+	result, err := svc.DisbursePayment(context.Background(), "paypal", params)
+	require.NoError(t, err)
+	assert.Equal(t, "PAYOUT-1", result.DisbursementID)
+	result, err = svc.DisbursePayment(context.Background(), "paypal", params)
+	require.NoError(t, err)
+	assert.Equal(t, "PAYOUT-1", result.DisbursementID)
+	require.Len(t, provider.disburseCalls, 1)
+	assert.Equal(t, "acct_action_paypal", provider.disburseCalls[0].SellerAccountID)
+	assert.NotEqual(t, params.IdempotencyKey, provider.disburseCalls[0].IdempotencyKey)
+	assert.NotEmpty(t, provider.disburseCalls[0].IdempotencyKey)
+
+	var action models.PaymentProviderAction
+	require.NoError(t, db.View(func(tx database.Tx) error { return tx.Read().First(&action).Error }))
+	assert.Equal(t, models.PaymentProviderActionDisburse, action.ActionKind)
+	assert.Equal(t, models.PaymentProviderActionCompleted, action.State)
 }
 
 func TestFiatService_ExecuteProviderAction_ConcurrentWorkersUseSingleLease(t *testing.T) {

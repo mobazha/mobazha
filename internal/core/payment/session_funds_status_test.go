@@ -64,6 +64,21 @@ func TestDeriveFundsStatus_ProjectsChainAndProviderLifecycles(t *testing.T) {
 			provider: &models.PaymentProviderAction{ActionID: "fpa-accepted", ActionKind: models.PaymentProviderActionRefund, State: models.PaymentProviderActionCompleted, ResultPayload: []byte(`{"refund":{"status":"pending"}}`), UpdatedAt: now},
 			want:     pkpayment.FundsStateRefundPending,
 		},
+		{
+			name: "provider disbursement pending", funding: pkpayment.FundingStateFullyFunded,
+			provider: &models.PaymentProviderAction{ActionID: "fpa-release-pending", ActionKind: models.PaymentProviderActionDisburse, State: models.PaymentProviderActionPendingExternal, UpdatedAt: now},
+			want:     pkpayment.FundsStateReleasePending, retryable: true,
+		},
+		{
+			name: "provider disbursement completed", funding: pkpayment.FundingStateFullyFunded,
+			provider: &models.PaymentProviderAction{ActionID: "fpa-release-complete", ActionKind: models.PaymentProviderActionDisburse, State: models.PaymentProviderActionCompleted, ResultPayload: []byte(`{"disburse":{"status":"success"}}`), UpdatedAt: now},
+			want:     pkpayment.FundsStateReleased,
+		},
+		{
+			name: "provider accepted pending disbursement", funding: pkpayment.FundingStateFullyFunded,
+			provider: &models.PaymentProviderAction{ActionID: "fpa-release-accepted", ActionKind: models.PaymentProviderActionDisburse, State: models.PaymentProviderActionCompleted, ResultPayload: []byte(`{"disburse":{"status":"pending"}}`), UpdatedAt: now},
+			want:     pkpayment.FundsStateReleasePending,
+		},
 	}
 
 	for _, tt := range tests {

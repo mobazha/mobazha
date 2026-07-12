@@ -1102,6 +1102,42 @@ func (s *OrderAppService) refundFiatPayment(
 	return result, nil
 }
 
+func (s *OrderAppService) disburseFiatPayment(
+	ctx context.Context,
+	order *models.Order,
+	paymentSent *pb.PaymentSent,
+	reason string,
+) (*contracts.DisbursePaymentResult, error) {
+	if s.fiatOps == nil {
+		return nil, fmt.Errorf("%w: fiat disbursement not configured", coreiface.ErrBadRequest)
+	}
+	providerID := resolveFiatProvider(order, paymentSent)
+	if providerID == "" {
+		return nil, fmt.Errorf("%w: fiat provider not resolved from payment", coreiface.ErrBadRequest)
+	}
+	paymentID := strings.TrimSpace(paymentSent.TransactionID)
+	if paymentID == "" {
+		return nil, fmt.Errorf("%w: payment transaction ID not set", coreiface.ErrBadRequest)
+	}
+	result, err := s.fiatOps.DisbursePayment(ctx, providerID, contracts.DisbursePaymentParams{
+		PaymentID:      paymentID,
+		OrderID:        order.ID.String(),
+		IdempotencyKey: "order-disburse:" + order.ID.String() + ":" + strings.TrimSpace(reason),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fiat disbursement for order %s: %w", order.ID, err)
+	}
+	if result == nil {
+		return nil, fmt.Errorf("fiat disbursement for order %s returned no result", order.ID)
+	}
+	switch strings.ToLower(strings.TrimSpace(result.Status)) {
+	case "success", "succeeded", "completed", "released", "pending", "processing", "unclaimed", "onhold":
+		return result, nil
+	default:
+		return nil, fmt.Errorf("fiat disbursement for order %s entered terminal status %q", order.ID, result.Status)
+	}
+}
+
 func (s *OrderAppService) buildFiatRefundMessage(order *models.Order, result *contracts.RefundResult) (*npb.OrderMessage, error) {
 	refundMsg := &pb.Refund{
 		RefundInfo: &pb.Refund_TransactionID{TransactionID: result.RefundID},

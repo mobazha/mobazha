@@ -224,22 +224,47 @@ func fundsStatusFromProviderAction(base payment.FundsStatusView, action *models.
 	base.ProviderID = strings.TrimSpace(action.ProviderID)
 	base.LastError = strings.TrimSpace(action.LastError)
 	base.UpdatedAt = &updatedAt
-	if action.ActionKind != models.PaymentProviderActionRefund {
+	if action.ActionKind != models.PaymentProviderActionRefund && action.ActionKind != models.PaymentProviderActionDisburse {
 		return base
 	}
 	switch action.State {
 	case models.PaymentProviderActionCompleted:
-		base.State = completedProviderRefundFundsState(action.ResultPayload)
+		if action.ActionKind == models.PaymentProviderActionRefund {
+			base.State = completedProviderRefundFundsState(action.ResultPayload)
+		} else {
+			base.State = completedProviderDisbursementFundsState(action.ResultPayload)
+		}
 	case models.PaymentProviderActionFailed:
 		base.State = payment.FundsStateFailedTerminal
 	case models.PaymentProviderActionReconcileRequired:
 		base.State = payment.FundsStateFailedRecoverable
 		base.Retryable = true
 	default:
-		base.State = payment.FundsStateRefundPending
+		if action.ActionKind == models.PaymentProviderActionRefund {
+			base.State = payment.FundsStateRefundPending
+		} else {
+			base.State = payment.FundsStateReleasePending
+		}
 		base.Retryable = true
 	}
 	return base
+}
+
+func completedProviderDisbursementFundsState(payload []byte) payment.FundsState {
+	var result struct {
+		Disburse *contracts.DisbursePaymentResult `json:"disburse"`
+	}
+	if len(payload) == 0 || json.Unmarshal(payload, &result) != nil || result.Disburse == nil {
+		return payment.FundsStateFailedRecoverable
+	}
+	switch strings.ToLower(strings.TrimSpace(result.Disburse.Status)) {
+	case "success", "succeeded", "completed", "released":
+		return payment.FundsStateReleased
+	case "failed", "canceled", "cancelled", "denied", "blocked":
+		return payment.FundsStateFailedTerminal
+	default:
+		return payment.FundsStateReleasePending
+	}
 }
 
 func completedProviderRefundFundsState(payload []byte) payment.FundsState {
@@ -892,8 +917,8 @@ func (p *PaymentSessionProjector) loadLatestFundsActions(
 			return nil
 		}
 		return read.Where(
-			"tenant_id = ? AND attempt_id IN ? AND action_kind = ?",
-			tenantID, attemptIDs, models.PaymentProviderActionRefund,
+			"tenant_id = ? AND attempt_id IN ? AND action_kind IN ?",
+			tenantID, attemptIDs, []string{models.PaymentProviderActionRefund, models.PaymentProviderActionDisburse},
 		).
 			Order("updated_at DESC, action_id DESC").
 			Limit(1).

@@ -44,6 +44,15 @@ type mockFiatOpsForOrderTest struct {
 	lastParams     contracts.RefundParams
 	refundResult   *contracts.RefundResult
 	refundErr      error
+	disburseResult *contracts.DisbursePaymentResult
+	disburseErr    error
+	disburseParams contracts.DisbursePaymentParams
+}
+
+func (m *mockFiatOpsForOrderTest) DisbursePayment(_ context.Context, providerID string, params contracts.DisbursePaymentParams) (*contracts.DisbursePaymentResult, error) {
+	m.lastProviderID = providerID
+	m.disburseParams = params
+	return m.disburseResult, m.disburseErr
 }
 
 func (m *mockFiatOpsForOrderTest) RefundPayment(_ context.Context, providerID string, params contracts.RefundParams) (*contracts.RefundResult, error) {
@@ -133,4 +142,30 @@ func TestRefundFiatPayment_RequiresResolvedProvider(t *testing.T) {
 	_, err = svc.refundFiatPayment(context.Background(), order, paymentSent, "requested_by_customer")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "fiat provider not resolved from payment")
+}
+
+func TestDisburseFiatPayment_BindsOrderAndCapture(t *testing.T) {
+	order := &models.Order{ID: "order-disburse"}
+	paymentSent := &pb.PaymentSent{TransactionID: "CAPTURE-123", Coin: "fiat:paypal:USD"}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+	ops := &mockFiatOpsForOrderTest{disburseResult: &contracts.DisbursePaymentResult{DisbursementID: "PAYOUT-123", Status: "success"}}
+	svc.SetFiatOps(ops)
+
+	result, err := svc.disburseFiatPayment(context.Background(), order, paymentSent, "complete")
+	require.NoError(t, err)
+	assert.Equal(t, "PAYOUT-123", result.DisbursementID)
+	assert.Equal(t, "paypal", ops.lastProviderID)
+	assert.Equal(t, "CAPTURE-123", ops.disburseParams.PaymentID)
+	assert.Equal(t, "order-disburse", ops.disburseParams.OrderID)
+	assert.Equal(t, "order-disburse:order-disburse:complete", ops.disburseParams.IdempotencyKey)
+}
+
+func TestDisburseFiatPayment_RejectsTerminalProviderStatus(t *testing.T) {
+	order := &models.Order{ID: "order-disburse-failed"}
+	paymentSent := &pb.PaymentSent{TransactionID: "CAPTURE-FAILED", Coin: "fiat:paypal:USD"}
+	svc := newTestOrderAppService(t, OrderAppServiceConfig{})
+	svc.SetFiatOps(&mockFiatOpsForOrderTest{disburseResult: &contracts.DisbursePaymentResult{Status: "FAILED"}})
+
+	_, err := svc.disburseFiatPayment(context.Background(), order, paymentSent, "complete")
+	require.ErrorContains(t, err, "terminal status")
 }

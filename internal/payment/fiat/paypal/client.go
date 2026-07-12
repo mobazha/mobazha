@@ -159,11 +159,16 @@ type orderRequest struct {
 }
 
 type purchaseUnit struct {
-	ReferenceID string `json:"reference_id,omitempty"`
-	Amount      amount `json:"amount"`
-	Description string `json:"description,omitempty"`
-	CustomID    string `json:"custom_id,omitempty"`
-	Payee       *payee `json:"payee,omitempty"`
+	ReferenceID        string              `json:"reference_id,omitempty"`
+	Amount             amount              `json:"amount"`
+	Description        string              `json:"description,omitempty"`
+	CustomID           string              `json:"custom_id,omitempty"`
+	Payee              *payee              `json:"payee,omitempty"`
+	PaymentInstruction *paymentInstruction `json:"payment_instruction,omitempty"`
+}
+
+type paymentInstruction struct {
+	DisbursementMode string `json:"disbursement_mode"`
 }
 
 type amount struct {

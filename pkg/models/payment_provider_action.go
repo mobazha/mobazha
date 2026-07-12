@@ -3,9 +3,10 @@ package models
 import "time"
 
 const (
-	PaymentProviderActionCapture = "capture"
-	PaymentProviderActionRefund  = "refund"
-	PaymentProviderActionCancel  = "cancel"
+	PaymentProviderActionCapture  = "capture"
+	PaymentProviderActionRefund   = "refund"
+	PaymentProviderActionCancel   = "cancel"
+	PaymentProviderActionDisburse = "disburse"
 
 	PaymentProviderActionPendingExternal   = "pending_external"
 	PaymentProviderActionReconcileRequired = "reconcile_required"

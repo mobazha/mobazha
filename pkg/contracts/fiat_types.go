@@ -251,6 +251,11 @@ type RefundParams struct {
 	//   PayPal: Capture ID
 	PaymentID string
 
+	// SellerAccountID is resolved internally from the payment attempt's frozen
+	// route binding. Partner providers use it to scope money-out operations to
+	// the seller that originally received the payment.
+	SellerAccountID string
+
 	// IdempotencyKey is required for durable refund commands. Reusing the key
 	// with different parameters is rejected by the service and provider.
 	IdempotencyKey string
@@ -289,4 +294,20 @@ type RefundResult struct {
 
 	// Currency is the ISO 4217 currency code.
 	Currency string `json:"currency"`
+}
+
+// DisbursePaymentParams releases one provider-held moderated payment to its
+// seller after a valid order or dispute decision.
+type DisbursePaymentParams struct {
+	PaymentID       string
+	OrderID         string
+	SellerAccountID string
+	IdempotencyKey  string
+}
+
+// DisbursePaymentResult is the provider acknowledgement for a delayed
+// disbursement release.
+type DisbursePaymentResult struct {
+	DisbursementID string `json:"disbursementID"`
+	Status         string `json:"status"`
 }

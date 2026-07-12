@@ -200,7 +200,7 @@ func (n *MobazhaNode) applyManagedRelayReceipt(ctx context.Context, client relay
 		})
 		return
 	}
-	if row.ActionKind == payment.ManagedEscrowGuestSettlementAction {
+	if managedRelayActionRequiresEscrowReceiptValidation(row.ActionKind) {
 		if err := n.validateManagedEscrowReceipt(ctx, row, txHash, receipt); err != nil {
 			n.recordSettlementActionStatus(row, SettlementActionStatusUpdate{
 				State:         "failed",
@@ -222,6 +222,20 @@ func (n *MobazhaNode) applyManagedRelayReceipt(ctx context.Context, client relay
 		confirmed.TxHash = txHash.Hex()
 		n.notifyGuestManagedEscrowSettlementConfirmed(confirmed)
 		n.emitOrderAutoConfirmAfterManagedRelayConfirm(confirmed)
+	}
+}
+
+func managedRelayActionRequiresEscrowReceiptValidation(action string) bool {
+	switch strings.TrimSpace(action) {
+	case payment.ManagedEscrowGuestSettlementAction,
+		payment.SettlementActionConfirm,
+		payment.SettlementActionCancel,
+		payment.SettlementActionSellerDeclineRefund,
+		payment.SettlementActionComplete,
+		payment.SettlementActionDisputeRelease:
+		return true
+	default:
+		return false
 	}
 }
 

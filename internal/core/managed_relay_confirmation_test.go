@@ -235,6 +235,53 @@ func TestValidateManagedEscrowReceiptDelegatesToBoundValidator(t *testing.T) {
 	require.EqualError(t, (&MobazhaNode{}).validateManagedEscrowReceipt(context.Background(), row, txHash, receipt), "managed escrow receipt validator is unavailable")
 }
 
+func TestManagedRelayActionRequiresEscrowReceiptValidation(t *testing.T) {
+	for _, action := range []string{
+		payment.ManagedEscrowGuestSettlementAction,
+		payment.SettlementActionConfirm,
+		payment.SettlementActionCancel,
+		payment.SettlementActionSellerDeclineRefund,
+		payment.SettlementActionComplete,
+		payment.SettlementActionDisputeRelease,
+	} {
+		require.True(t, managedRelayActionRequiresEscrowReceiptValidation(action), action)
+	}
+	require.False(t, managedRelayActionRequiresEscrowReceiptValidation("safe_deploy"))
+	require.False(t, managedRelayActionRequiresEscrowReceiptValidation("collateral_allocate"))
+}
+
+func TestApplyManagedRelayReceipt_SettlementExecutionFailureMarksFailed(t *testing.T) {
+	db, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	require.NoError(t, dbgorm.MigrateSettlementActionModels(db))
+
+	txHash := common.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	row := models.SettlementAction{
+		ActionID: "act-safe-failure", OrderID: "order-safe-failure",
+		ActionKind: payment.SettlementActionConfirm, ChainID: 56,
+		To:    "0x1111111111111111111111111111111111111111",
+		State: "submitted", TxHash: txHash.Hex(), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	require.NoError(t, db.Update(func(tx database.Tx) error { return tx.Save(&row) }))
+	validator := &recordingManagedEscrowReceiptValidator{err: errors.New("escrow emitted ExecutionFailure")}
+	node := &MobazhaNode{
+		storageFields: storageFields{db: db},
+		walletFields:  walletFields{managedEscrowReceiptValidator: validator},
+	}
+	receipt := &types.Receipt{Status: types.ReceiptStatusSuccessful, TxHash: txHash, BlockNumber: big.NewInt(10)}
+	client := managedRelayConfirmationClient{head: 11}
+
+	node.applyManagedRelayReceipt(context.Background(), client, row, txHash, receipt)
+
+	var got models.SettlementAction
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("action_id = ?", row.ActionID).First(&got).Error
+	}))
+	require.Equal(t, "failed", got.State)
+	require.Equal(t, "escrow emitted ExecutionFailure", got.LastError)
+	require.Equal(t, row.ActionID, validator.request.ActionID)
+}
+
 func TestResubmitDroppedManagedRelayAction_UpdatesHashAndAttempt(t *testing.T) {
 	db, err := dbstore.NewMemoryDB(t.TempDir())
 	require.NoError(t, err)
@@ -363,6 +410,7 @@ func TestReconcileManagedRelayAttempts_PrefersSuccessfulPreviousHash(t *testing.
 	node := &MobazhaNode{
 		identityFields: identityFields{nodeID: "test-node"},
 		storageFields:  storageFields{db: db},
+		walletFields:   walletFields{managedEscrowReceiptValidator: &recordingManagedEscrowReceiptValidator{}},
 	}
 
 	result, ok := node.reconcileManagedRelayAttempts(context.Background(), client, row)

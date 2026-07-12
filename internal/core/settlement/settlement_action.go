@@ -1,6 +1,7 @@
 package settlement
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 
 	nodepayment "github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/internal/orderextensions"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -173,6 +175,9 @@ func (s *SettlementService) executeSettlementActionForOrderLocked(
 			out = toAddress.String()
 		}
 		params.PayoutAddr = out
+		if err := s.applyFrozenSettlementAttemptActionParams(ctx, strategy, order, coinType, &params); err != nil {
+			return nil, coinType, err
+		}
 		result, cerr := strategy.Confirm(ctx, params)
 		return s.normalizeSettlementActionResult(result, coinType, cerr)
 
@@ -202,6 +207,9 @@ func (s *SettlementService) executeSettlementActionForOrderLocked(
 			out = refundResult.Address
 		}
 		params.PayoutAddr = out
+		if err := s.applyFrozenSettlementAttemptActionParams(ctx, strategy, order, coinType, &params); err != nil {
+			return nil, coinType, err
+		}
 		result, cerr := strategy.Cancel(ctx, params)
 		return s.normalizeSettlementActionResult(result, coinType, cerr)
 
@@ -236,6 +244,9 @@ func (s *SettlementService) executeSettlementActionForOrderLocked(
 			out = refundResult.Address
 		}
 		params.PayoutAddr = out
+		if err := s.applyFrozenSettlementAttemptActionParams(ctx, strategy, order, coinType, &params); err != nil {
+			return nil, coinType, err
+		}
 		var result *payment.ActionResult
 		var rerr error
 		if ok {
@@ -253,6 +264,97 @@ func (s *SettlementService) executeSettlementActionForOrderLocked(
 	default:
 		return nil, coinType, fmt.Errorf("%w: unsupported settlement action", coreiface.ErrBadRequest)
 	}
+}
+
+func (s *SettlementService) applyFrozenSettlementAttemptActionParams(
+	ctx context.Context,
+	strategy payment.ChainEscrowV2,
+	order *models.Order,
+	coinType iwallet.CoinType,
+	params *payment.ActionParams,
+) error {
+	if _, ok := strategy.(payment.AttemptSettlementActionAuthorizer); !ok || s == nil || s.db == nil || order == nil || params == nil {
+		return nil
+	}
+	tenantID := strings.TrimSpace(order.TenantID)
+	if tenantID == "" {
+		tenantID = strings.TrimSpace(s.nodeID)
+	}
+	var attempts []models.PaymentAttempt
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+			tenantID, order.ID.String(), models.PaymentAttemptKindCryptoFundingTarget,
+			models.PaymentAttemptFundingTargetReady,
+		).Find(&attempts).Error
+	}); err != nil {
+		return err
+	}
+	if len(attempts) == 0 {
+		return nil
+	}
+	if len(attempts) != 1 || attempts[0].Currency != coinType.String() || s.settlementSigner == nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	attempt := attempts[0]
+	terms, err := attempt.GetSettlementTerms()
+	if err != nil || terms == nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	target, err := attempt.GetFundingTarget()
+	if err != nil || target == nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	bundle, err := attempt.GetAuthorizationBundle()
+	if err != nil || bundle == nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	authorization := models.PaymentAttemptSettlementAuthorization{
+		Version: models.SettlementAuthorizationVersion,
+		Terms:   *terms, Target: *target, Authorization: *bundle,
+	}
+	if err := authorization.Validate(); err != nil {
+		return err
+	}
+	var localRole models.SettlementParticipantRole
+	var expectedPeerID string
+	switch order.Role() {
+	case models.RoleBuyer:
+		localRole = models.SettlementParticipantBuyer
+		expectedPeerID = terms.BuyerPeerID
+	case models.RoleVendor:
+		localRole = models.SettlementParticipantSeller
+		expectedPeerID = terms.SellerPeerID
+	default:
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	var localOffer *models.SettlementKeyOffer
+	for i := range bundle.Offers {
+		if bundle.Offers[i].ParticipantRole == localRole && bundle.Offers[i].ParticipantPeerID == expectedPeerID {
+			localOffer = &bundle.Offers[i]
+			break
+		}
+	}
+	if localOffer == nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	keyRef := contracts.SettlementKeyRef{
+		TenantID: attempt.TenantID, RailID: attempt.Currency,
+		Purpose:     contracts.StandardOrderSettlementKeyPurpose + ":" + string(localRole),
+		ReferenceID: attempt.AuthorizationContextID,
+	}
+	publicKey, err := s.settlementSigner.PublicKey(ctx, keyRef)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(publicKey, localOffer.PublicKey) {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	params.AttemptAuthorization = &authorization
+	params.AttemptTenantID = attempt.TenantID
+	params.AttemptLocalRole = localRole
+	params.AttemptSequence = 1
+	return nil
 }
 
 func (s *SettlementService) sellerAffiliateSettlementPayout(ctx context.Context, orderID models.OrderID, coinType iwallet.CoinType) (*models.AffiliateSettlementPayout, error) {

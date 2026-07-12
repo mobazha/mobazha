@@ -196,7 +196,12 @@ func (s *OrderAppService) runUTXOSyncSettlementDisputeRelease(
 		s.failSyncBackendSettlementAction(actionID, err.Error())
 		return nil, nil, true, err
 	}
-	if err := s.confirmSyncBackendSettlementAction(actionID, releaseTx.ID.String()); err != nil {
+	plannedLines, err := syncUTXOSettlementPayoutLines(&releaseTx, string(coinType), affiliatePayout)
+	if err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, true, err
+	}
+	if err := s.recordSyncBackendSettlementSubmission(actionID, releaseTx.ID.String(), plannedLines); err != nil {
 		s.failSyncBackendSettlementAction(actionID, err.Error())
 		return nil, nil, true, err
 	}

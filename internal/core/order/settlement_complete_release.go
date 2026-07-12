@@ -215,7 +215,22 @@ func (s *OrderAppService) runUTXOSyncSettlementComplete(
 	} else if release != nil {
 		txHash = release.Txid
 	}
-	if err := s.confirmSyncBackendSettlementAction(actionID, txHash); err != nil {
+	affiliatePayout, err := affiliateUTXOPayoutFromEscrowRelease(releaseInfo)
+	if err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, nil, true, fmt.Errorf("read seller-signed affiliate UTXO payout: %w", err)
+	}
+	executionPayout, err := executableAffiliatePayout(affiliatePayout)
+	if err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, nil, true, fmt.Errorf("validate seller-signed affiliate UTXO payout: %w", err)
+	}
+	plannedLines, err := syncUTXOSettlementPayoutLines(tx, string(coinType), executionPayout)
+	if err != nil {
+		s.failSyncBackendSettlementAction(actionID, err.Error())
+		return nil, nil, nil, true, err
+	}
+	if err := s.recordSyncBackendSettlementSubmission(actionID, txHash, plannedLines); err != nil {
 		s.failSyncBackendSettlementAction(actionID, err.Error())
 		return nil, nil, nil, true, err
 	}

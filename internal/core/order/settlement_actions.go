@@ -208,25 +208,65 @@ reserve:
 	return actionID, "", nil
 }
 
-func (s *OrderAppService) confirmSyncBackendSettlementAction(actionID, txHash string) error {
+func (s *OrderAppService) recordSyncBackendSettlementSubmission(
+	actionID, txHash string,
+	plannedLines []models.SettlementPayoutLine,
+) error {
 	if s == nil || s.db == nil {
 		return fmt.Errorf("database not initialized")
 	}
 	if txHash == "" {
-		return fmt.Errorf("settlement action %s confirmed without tx hash", actionID)
+		return fmt.Errorf("settlement action %s submitted without tx hash", actionID)
+	}
+	if len(plannedLines) == 0 {
+		return fmt.Errorf("settlement action %s submitted without planned payout lines", actionID)
 	}
 	now := time.Now().UTC()
 	return s.db.Update(func(tx database.Tx) error {
 		_, err := tx.UpdateColumns(map[string]interface{}{
-			"state":        "confirmed",
-			"tx_hash":      txHash,
-			"confirmed_at": now,
-			"updated_at":   now,
+			"state":             "submitted",
+			"tx_hash":           txHash,
+			"attempt_tx_hashes": txHash,
+			"planned_lines":     models.EncodeSettlementPayoutLines(plannedLines),
+			"last_error":        "",
+			"confirmed_at":      nil,
+			"updated_at":        now,
 		}, map[string]interface{}{
 			"action_id = ?": actionID,
 		}, &models.SettlementAction{})
 		return err
 	})
+}
+
+func syncUTXOSettlementPayoutLines(
+	tx *iwallet.Transaction,
+	coin string,
+	affiliatePayout *models.AffiliateSettlementPayout,
+) ([]models.SettlementPayoutLine, error) {
+	if tx == nil || len(tx.To) == 0 {
+		return nil, errors.New("UTXO settlement release has no payout outputs")
+	}
+	coin = strings.TrimSpace(coin)
+	affiliateOutputIndex := -1
+	if affiliatePayout != nil {
+		affiliateOutputIndex = len(tx.To) - 1
+		output := tx.To[affiliateOutputIndex]
+		if output.Address.String() != strings.TrimSpace(affiliatePayout.Address) ||
+			output.Amount.String() != strings.TrimSpace(affiliatePayout.Amount) {
+			return nil, errors.New("UTXO settlement release does not contain the frozen affiliate payout")
+		}
+	}
+	lines := make([]models.SettlementPayoutLine, 0, len(tx.To))
+	for i, output := range tx.To {
+		lineType := "recipient"
+		if i == affiliateOutputIndex {
+			lineType = "affiliate"
+		}
+		lines = append(lines, models.SettlementPayoutLine{
+			Type: lineType, Amount: output.Amount.String(), Address: output.Address.String(), Coin: coin,
+		})
+	}
+	return lines, nil
 }
 
 func (s *OrderAppService) failSyncBackendSettlementAction(actionID, reason string) {

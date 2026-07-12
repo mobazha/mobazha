@@ -1094,6 +1094,55 @@ func TestBeginSyncBackendSettlementAction_AllowsRetryAfterFailure(t *testing.T) 
 	require.Equal(t, actionID, actionID3)
 }
 
+func TestRecordSyncBackendSettlementSubmission_PersistsPlannedAffiliateOutput(t *testing.T) {
+	t.Parallel()
+
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	require.NoError(t, intdb.MigrateSettlementActionModels(db))
+	t.Cleanup(func() { _ = db.Close() })
+
+	svc := &OrderAppService{db: db}
+	actionID, existingTx, err := svc.beginSyncBackendSettlementAction("utxo-projection-order", "complete", "BCH", "1000")
+	require.NoError(t, err)
+	require.Empty(t, existingTx)
+
+	tx := &iwallet.Transaction{To: []iwallet.SpendInfo{
+		{Address: iwallet.NewAddress("seller-address", "BCH"), Amount: iwallet.NewAmount("900")},
+		{Address: iwallet.NewAddress("affiliate-address", "BCH"), Amount: iwallet.NewAmount("100")},
+	}}
+	planned, err := syncUTXOSettlementPayoutLines(tx, "BCH", &models.AffiliateSettlementPayout{
+		Address: "affiliate-address", Amount: "100",
+	})
+	require.NoError(t, err)
+	require.NoError(t, svc.recordSyncBackendSettlementSubmission(actionID, "tx-affiliate", planned))
+
+	var row models.SettlementAction
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("action_id = ?", actionID).First(&row).Error
+	}))
+	require.Equal(t, "submitted", row.State)
+	require.Equal(t, "tx-affiliate", row.TxHash)
+	require.Nil(t, row.ConfirmedAt)
+	require.Equal(t, "tx-affiliate", row.AttemptTxHashes)
+	require.Equal(t, []models.SettlementPayoutLine{
+		{Type: "recipient", Amount: "900", Address: "seller-address", Coin: "BCH"},
+		{Type: "affiliate", Amount: "100", Address: "affiliate-address", Coin: "BCH"},
+	}, models.DecodeSettlementPayoutLines(row.PlannedLines))
+}
+
+func TestSyncUTXOSettlementPayoutLines_RejectsMissingAffiliateOutput(t *testing.T) {
+	t.Parallel()
+
+	tx := &iwallet.Transaction{To: []iwallet.SpendInfo{
+		{Address: iwallet.NewAddress("seller-address", "BTC"), Amount: iwallet.NewAmount("1000")},
+	}}
+	_, err := syncUTXOSettlementPayoutLines(tx, "BTC", &models.AffiliateSettlementPayout{
+		Address: "affiliate-address", Amount: "100",
+	})
+	require.Error(t, err)
+}
+
 func TestErrBalanceMonitoredEscrowRequiresSettlementAction_UsesPaymentSentWhenOrderNil(t *testing.T) {
 	ps := &pb.PaymentSent{
 		SettlementSpec: &pb.PaymentSent_SettlementSpec{

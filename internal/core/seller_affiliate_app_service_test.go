@@ -297,6 +297,16 @@ func TestSellerAffiliateAppService_ReissueLinkRotatesFutureSessionsOnly(t *testi
 	assert.Equal(t, newEVM, newSession.PromoterPayoutAddress)
 	assert.Equal(t, newUTXO, newSession.PromoterUTXOPayoutAddresses)
 	assert.True(t, newDestinations.Equal(newSession.PromoterPayoutDestinations))
+
+	links, err := service.ListLinks(ctx)
+	require.NoError(t, err)
+	require.Len(t, links, 1)
+	assert.Equal(t, link.ID, links[0].ID)
+	revoked, err := service.RevokeLink(ctx, link.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AffiliateLinkStatusRevoked, revoked.Status)
+	_, err = service.CreateReferralSession(ctx, revoked.PublicToken, time.Now().UTC())
+	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
 }
 
 func TestGormSellerAffiliateStore_IsTenantScoped(t *testing.T) {

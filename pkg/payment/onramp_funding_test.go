@@ -3,7 +3,10 @@
 
 package payment
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func src(status string, toWallet bool) *OnrampFundingSourceView {
 	return &OnrampFundingSourceView{ProviderID: "mock-onramp", OnrampOrderID: "o-1", Status: status, DeliverToBuyerWallet: toWallet}
@@ -69,10 +72,10 @@ func TestOnrampFundingStatesMapToAwaitingFunds(t *testing.T) {
 	// equivalent guarantee at the model layer: the new states are not any of the
 	// funded/verified/terminal states the projector special-cases.
 	advanced := map[FundingState]bool{
-		FundingStateFullyFunded:     true,
-		FundingStateOverfunded:      true,
-		FundingStatePartiallyFunded: true,
-		FundingStateExpiredUnfunded: true,
+		FundingStateFullyFunded:        true,
+		FundingStateOverfunded:         true,
+		FundingStatePartiallyFunded:    true,
+		FundingStateExpiredUnfunded:    true,
 		FundingStateProviderProcessing: true,
 	}
 	for _, s := range []FundingState{
@@ -82,6 +85,51 @@ func TestOnrampFundingStatesMapToAwaitingFunds(t *testing.T) {
 		if advanced[s] {
 			t.Fatalf("onramp state %q must not collide with an advancing funding state", s)
 		}
+	}
+}
+
+func TestSelectOnrampFundingSource(t *testing.T) {
+	ts := func(sec int64) *time.Time {
+		v := time.Unix(sec, 0)
+		return &v
+	}
+	view := func(id, status string, toWallet bool, at *time.Time) OnrampFundingSourceView {
+		return OnrampFundingSourceView{ProviderID: "mock-onramp", OnrampOrderID: id, Status: status, DeliverToBuyerWallet: toWallet, UpdatedAt: at}
+	}
+
+	if got := SelectOnrampFundingSource(nil); got != nil {
+		t.Fatalf("empty history must select nil")
+	}
+
+	// Active wins over everything, latest active wins among actives.
+	got := SelectOnrampFundingSource([]OnrampFundingSourceView{
+		view("o1", "failed", false, ts(30)),
+		view("o2", "processing", false, ts(10)),
+		view("o3", "awaiting_payment", false, ts(20)),
+		view("o4", "delivered", true, ts(40)),
+	})
+	if got == nil || got.OnrampOrderID != "o3" {
+		t.Fatalf("expected latest active o3, got %+v", got)
+	}
+
+	// No active: latest delivered-to-wallet drives the forwarding phase.
+	got = SelectOnrampFundingSource([]OnrampFundingSourceView{
+		view("o1", "delivered", true, ts(10)),
+		view("o2", "delivered", true, ts(20)),
+		view("o3", "reversed", true, ts(30)),
+	})
+	if got == nil || got.OnrampOrderID != "o2" {
+		t.Fatalf("expected latest delivered-to-wallet o2, got %+v", got)
+	}
+
+	// Delivered-to-target and terminal records never drive funding state.
+	got = SelectOnrampFundingSource([]OnrampFundingSourceView{
+		view("o1", "delivered", false, ts(10)),
+		view("o2", "failed", false, ts(20)),
+		view("o3", "reversed", false, ts(30)),
+	})
+	if got != nil {
+		t.Fatalf("expected nil selection, got %+v", got)
 	}
 }
 

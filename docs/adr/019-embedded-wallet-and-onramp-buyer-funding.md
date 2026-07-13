@@ -97,20 +97,38 @@ Delivered and tested (unit + contract; existing `pkg/payment` and
 - the onramp `FundingState` values, `OnrampFundingSourceView`, and the pure
   `RefineFundingStateForOnramp` function with invariant tests.
 
-Deliberately **not** in this change (sequenced for review, they touch the live
-checkout path and persistence):
+Also delivered (2026-07-13, second change set — after independent review of the
+persistence design):
 
-1. **Projector wiring** — call `RefineFundingStateForOnramp` at the
-   `deriveFundingState` site in `session_projector.go`, reading the onramp
-   source from the projector input. Additive: nil source ⇒ identical behavior.
-2. **Persistence** — a durable `onramp_funding_source` record keyed to the
-   attempt, and its repo.
-3. **Resume app-service + endpoint** — initiate/resume an onramp funding source
-   from an authenticated buyer, returning the session projection.
-4. **Embedded-wallet forwarding** — buyer-wallet→target delivery via EIP-3009
+- **Persistence** — `models.PaymentAttemptOnrampFundingSource`
+  (`payment_attempt_onramp_funding_sources`), migrated in
+  `MigrateFiatModels`. Cardinality is deliberately **1:N per attempt**: failed
+  and reversed purchases are retained for reconciliation and dispute forensics
+  (a fiat-leg reversal after on-chain delivery must stay auditable), while a
+  partial unique index on `(tenant_id, attempt_id) WHERE active` — the same
+  technique `PaymentAttempt` already uses — enforces at most one purchase in
+  flight. `SetStatus` is the only supported status writer and keeps the
+  `active` flag consistent. An idempotency unique index
+  `(tenant_id, attempt_id, idempotency_key)` backs leave-and-resume.
+- **Selection** — `payment.SelectOnrampFundingSource` picks the record the
+  projection surfaces: latest active, else latest delivered-to-buyer-wallet
+  (forwarding pending), else nil (terminal history and delivered-to-target
+  never drive funding state).
+- **Projector wiring** — the projector input loads the attempt's history
+  (`HasTable`-guarded, nil-safe) and applies `RefineFundingStateForOnramp`
+  after `deriveProgress`; the session view exposes the source as
+  `onrampFunding`. The full pre-existing `internal/core/payment` suite passes
+  unchanged.
+
+Deliberately **not** in this change (sequenced next):
+
+1. **Initiate/resume app-service + endpoint** — create or resume an onramp
+   purchase for an authenticated buyer against a frozen attempt, writing the
+   side table through `OnrampProvider.InitiatePurchase`.
+2. **Embedded-wallet forwarding** — buyer-wallet→target delivery via EIP-3009
    `transferWithAuthorization` and the platform relayer, driving the
    `onramp_forwarding` state.
-5. **Buyer checkout UX** (mobazha-unified) — the email-buyer funding flow.
+3. **Buyer checkout UX** (mobazha-unified) — the email-buyer funding flow.
 
 ## Consequences
 

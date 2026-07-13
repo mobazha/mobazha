@@ -122,6 +122,48 @@ func RefineFundingStateForOnramp(base FundingState, observedAmount string, sourc
 	}
 }
 
+// SelectOnrampFundingSource picks, from an attempt's onramp purchase history
+// (1:N — failed/reversed records are retained for reconciliation), the single
+// record the session projection surfaces:
+//
+//  1. the most recently updated ACTIVE purchase, if any (at most one exists by
+//     the storage constraint, but selection stays order-defined regardless);
+//  2. otherwise the most recent delivered purchase whose delivery went to the
+//     buyer wallet — its forwarding step is still pending pre-observation;
+//  3. otherwise nil: terminal failed/reversed history never drives funding
+//     state, and delivered-to-target resolves through the chain observation.
+func SelectOnrampFundingSource(sources []OnrampFundingSourceView) *OnrampFundingSourceView {
+	var active, forwarding *OnrampFundingSourceView
+	for i := range sources {
+		s := &sources[i]
+		switch {
+		case s.Active():
+			if active == nil || laterThan(s.UpdatedAt, active.UpdatedAt) {
+				active = s
+			}
+		case s.Status == onrampStatusDelivered && s.DeliverToBuyerWallet:
+			if forwarding == nil || laterThan(s.UpdatedAt, forwarding.UpdatedAt) {
+				forwarding = s
+			}
+		}
+	}
+	if active != nil {
+		return active
+	}
+	return forwarding
+}
+
+// laterThan compares two optional timestamps; a set timestamp beats nil.
+func laterThan(a, b *time.Time) bool {
+	if a == nil {
+		return false
+	}
+	if b == nil {
+		return true
+	}
+	return a.After(*b)
+}
+
 // hasObservedFunds reports whether a positive amount has been observed at the
 // frozen target. Amount strings use the same unit as FundingTargetView.Amount;
 // an empty, zero, or unparseable value counts as no funds.

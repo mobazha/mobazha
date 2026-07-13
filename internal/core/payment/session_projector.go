@@ -55,6 +55,9 @@ type projectOrderInput struct {
 	observations      []models.PaymentObservation
 	settlementAction  *models.SettlementAction
 	providerAction    *models.PaymentProviderAction
+	// onrampSource is the attempt's selected onramp funding source, or nil.
+	// It only refines the pre-observation awaiting_funds window (ADR-019).
+	onrampSource *payment.OnrampFundingSourceView
 }
 
 // Project builds a payment.PaymentSession for the given order.
@@ -121,6 +124,13 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	}
 	progress := p.deriveProgress(order, expectedAmountRaw, paymentCoin, observedAmountRaw, obsCount, lastObsAt, progressRows)
 
+	// Onramp funding-source refinement (ADR-019): only refines the
+	// pre-observation awaiting_funds window; any observed funds or an already
+	// advanced funding state win unchanged, and the refined states map back to
+	// SessionStatusAwaitingFunds below.
+	progress.FundingState = payment.RefineFundingStateForOnramp(
+		progress.FundingState, observedAmountRaw, input.onrampSource)
+
 	// ── Session status ────────────────────────────────────────────────────
 	status := deriveSessionStatus(order.PaymentVerificationStatus, progress.FundingState)
 
@@ -153,6 +163,7 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 		Capabilities:            caps,
 		PaymentReadiness:        readiness,
 		UserActionRequest:       nil, // Phase B: no user action required for address_monitored
+		OnrampFunding:           input.onrampSource,
 	}
 	if input.settlementAction == nil && input.providerAction == nil &&
 		input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptRefunded {
@@ -895,6 +906,7 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 	}
 	input.cryptoAttempt = cryptoAttempt
 	input.frozenTarget = frozenTarget
+	input.onrampSource = p.loadOnrampFundingSource(order.TenantID, cryptoAttempt)
 
 	// Observation progress includes pending rows so payment sessions can show
 	// mempool-detected funds without marking the order chain-verified.

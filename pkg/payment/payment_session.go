@@ -352,4 +352,9 @@ type PaymentSession struct {
 	// UserActionRequest is non-nil only when the backend requires an
 	// explicit user wallet action to proceed.
 	UserActionRequest *UserActionRequestView `json:"userActionRequest"`
+
+	// OnrampFunding is non-nil only when an onramp purchase is the session's
+	// selected pre-observation funding source (ADR-019). It is descriptive:
+	// funded/verified still require the on-chain funding observation.
+	OnrampFunding *OnrampFundingSourceView `json:"onrampFunding,omitempty"`
 }

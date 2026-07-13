@@ -213,7 +213,7 @@ func TestReleaseFromCancelableAddress_UsesFrozenAttemptOpaqueSigner(t *testing.T
 	require.Error(t, err)
 }
 
-func TestCancelPartialPayment_UsesFrozenAttemptMonitorAndAbandonsTarget(t *testing.T) {
+func TestCancelPartialPayment_UsesFrozenAttemptMonitorAndRecordsRefund(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
@@ -287,8 +287,9 @@ func TestCancelPartialPayment_UsesFrozenAttemptMonitorAndAbandonsTarget(t *testi
 			"tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID,
 		).First(&stored).Error
 	}))
-	require.Equal(t, models.PaymentAttemptAbandoned, stored.State)
-	require.Equal(t, "buyer cancelled partial funding", stored.LastError)
+	require.Equal(t, models.PaymentAttemptRefunded, stored.State)
+	require.Equal(t, "attempt-release-tx", stored.ExternalReference)
+	require.Empty(t, stored.LastError)
 }
 
 func attemptOrderID(value string) models.OrderID { return models.OrderID(value) }

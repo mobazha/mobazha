@@ -23,8 +23,12 @@ const (
 	PaymentAttemptExpired             = "expired"
 	PaymentAttemptAbandoning          = "abandoning"
 	PaymentAttemptAbandoned           = "abandoned"
-	PaymentAttemptAuthorizationDraft  = "authorization_draft"
-	PaymentAttemptFundingTargetReady  = "funding_target_ready"
+	// PaymentAttemptRefunded is a terminal funding-attempt outcome. Unlike
+	// abandoned, it proves observed funds left the frozen target through a
+	// successful refund transaction.
+	PaymentAttemptRefunded           = "refunded"
+	PaymentAttemptAuthorizationDraft = "authorization_draft"
+	PaymentAttemptFundingTargetReady = "funding_target_ready"
 )
 
 // PaymentAttempt is Core's durable claim for one concrete payment provisioning

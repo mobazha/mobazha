@@ -89,6 +89,10 @@ const (
 // release, dispute, and refund execution.
 type FundsState string
 
+// FundsActionPartialRefund identifies a pre-PaymentSent refund of observed
+// funds from an attempt-scoped funding target.
+const FundsActionPartialRefund = "partial_refund"
+
 const (
 	FundsStateUnfunded          FundsState = "unfunded"
 	FundsStatePartiallyFunded   FundsState = "partially_funded"

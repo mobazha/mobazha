@@ -644,7 +644,9 @@ func (s *SettlementService) cancelFrozenStandardOrderPartialPayment(
 		return "", 0, fmt.Errorf("commit frozen partial payment cancellation: %w", err)
 	}
 	if err := s.db.Update(func(tx database.Tx) error {
+		refundTxID := ""
 		if releaseTx != nil {
+			refundTxID = releaseTx.ID.String()
 			if err := order.PutTransaction(*releaseTx); err != nil && !models.IsDuplicateTransactionError(err) {
 				return fmt.Errorf("save frozen partial payment release: %w", err)
 			}
@@ -653,13 +655,13 @@ func (s *SettlementService) cancelFrozenStandardOrderPartialPayment(
 			"tenant_id = ? AND attempt_id = ? AND state = ?",
 			attempt.TenantID, attempt.AttemptID, models.PaymentAttemptFundingTargetReady,
 		).Updates(map[string]any{
-			"state": models.PaymentAttemptAbandoned, "last_error": "buyer cancelled partial funding",
+			"state": models.PaymentAttemptRefunded, "external_reference": refundTxID, "last_error": "",
 		})
 		if result.Error != nil {
-			return fmt.Errorf("abandon frozen partial payment attempt: %w", result.Error)
+			return fmt.Errorf("record frozen partial payment refund: %w", result.Error)
 		}
 		if result.RowsAffected != 1 {
-			return fmt.Errorf("abandon frozen partial payment attempt: state changed concurrently")
+			return fmt.Errorf("record frozen partial payment refund: state changed concurrently")
 		}
 		return tx.Save(order)
 	}); err != nil {

@@ -181,6 +181,7 @@ EXISTS (
 		[]string{
 			models.PaymentAttemptExpired,
 			models.PaymentAttemptAbandoned,
+			models.PaymentAttemptRefunded,
 			models.PaymentAttemptFundingTargetReady,
 		},
 	).Delete(&models.PaymentAttemptSettlementOffer{})

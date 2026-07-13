@@ -88,6 +88,13 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 			productMode = payment.ProductModeModerated
 		}
 	}
+	if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptRefunded {
+		paymentCoin = normalizeCoinBestEffort(input.cryptoAttempt.Currency)
+		productMode = payment.ProductModeCancelable
+		if strings.TrimSpace(input.cryptoAttempt.ExpectedModeratorPeerID) != "" {
+			productMode = payment.ProductModeModerated
+		}
+	}
 
 	// ── Expected amount ───────────────────────────────────────────────────
 	// Use the order's canonical expected-amount resolver so address-monitored
@@ -96,6 +103,8 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	expectedAmountRaw := strings.TrimSpace(order.ExpectedPaymentAmountString())
 	if input.frozenTarget != nil {
 		expectedAmountRaw = strings.TrimSpace(input.frozenTarget.AmountAtomic)
+	} else if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptRefunded {
+		expectedAmountRaw = strings.TrimSpace(input.cryptoAttempt.AmountValue)
 	}
 	expectedAmount := payment.FormatSessionAmount(expectedAmountRaw, paymentCoin)
 
@@ -104,6 +113,12 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 
 	// ── Payment progress ──────────────────────────────────────────────────
 	progressRows, observedAmountRaw, obsCount, lastObsAt := progressObservationSnapshot(order, input)
+	if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptRefunded {
+		// Observations remain visible as immutable funding history, but the
+		// refunded target has no spendable balance and must not keep the session
+		// in partially_funded.
+		observedAmountRaw = "0"
+	}
 	progress := p.deriveProgress(order, expectedAmountRaw, paymentCoin, observedAmountRaw, obsCount, lastObsAt, progressRows)
 
 	// ── Session status ────────────────────────────────────────────────────
@@ -139,6 +154,10 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 		PaymentReadiness:        readiness,
 		UserActionRequest:       nil, // Phase B: no user action required for address_monitored
 	}
+	if input.settlementAction == nil && input.providerAction == nil &&
+		input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptRefunded {
+		session.FundsStatus = fundsStatusFromRefundedAttempt(input.cryptoAttempt)
+	}
 	if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptFundingTargetReady {
 		terms, err := input.cryptoAttempt.GetSettlementTerms()
 		if err != nil || terms == nil {
@@ -149,6 +168,17 @@ func (p *PaymentSessionProjector) Project(input *projectOrderInput) (*payment.Pa
 	applyRefundProjection(p.db, session, input, paymentCoin)
 	payment.ApplyBuyerPaymentReadinessGate(session)
 	return session, nil
+}
+
+func fundsStatusFromRefundedAttempt(attempt *models.PaymentAttempt) payment.FundsStatusView {
+	if attempt == nil || attempt.State != models.PaymentAttemptRefunded {
+		return payment.FundsStatusView{}
+	}
+	updatedAt := attempt.UpdatedAt
+	return payment.FundsStatusView{
+		State: payment.FundsStateRefunded, Action: payment.FundsActionPartialRefund,
+		ActionID: attempt.AttemptID, TxHash: strings.TrimSpace(attempt.ExternalReference), UpdatedAt: &updatedAt,
+	}
 }
 
 func deriveFundsStatus(
@@ -859,7 +889,7 @@ func (p *PaymentSessionProjector) fetchProjectInput(orderID string) (*projectOrd
 		input.paymentSent = ps
 	}
 
-	cryptoAttempt, frozenTarget, err := p.loadActiveCryptoAttempt(order.TenantID, orderID)
+	cryptoAttempt, frozenTarget, err := p.loadCryptoAttemptProjection(order.TenantID, orderID)
 	if err != nil {
 		return nil, err
 	}
@@ -938,18 +968,23 @@ func (p *PaymentSessionProjector) loadLatestFundsActions(
 	return settlementResult, providerResult, nil
 }
 
-func (p *PaymentSessionProjector) loadActiveCryptoAttempt(
+func (p *PaymentSessionProjector) loadCryptoAttemptProjection(
 	tenantID, orderID string,
 ) (*models.PaymentAttempt, *models.PaymentAttemptFundingTarget, error) {
 	if p == nil || p.db == nil || strings.TrimSpace(orderID) == "" {
 		return nil, nil, nil
+	}
+	tenantID = strings.TrimSpace(tenantID)
+	if tenantID == "" {
+		tenantID = database.StandaloneTenantID
 	}
 	var attempts []models.PaymentAttempt
 	err := p.db.View(func(tx database.Tx) error {
 		if !tx.Read().Migrator().HasTable(&models.PaymentAttempt{}) {
 			return nil
 		}
-		return tx.Read().
+		read := tx.Read()
+		if err := read.
 			Where("tenant_id = ? AND order_id = ? AND kind = ? AND state IN ?",
 				tenantID, orderID, models.PaymentAttemptKindCryptoFundingTarget, []string{
 					models.PaymentAttemptAuthorizationDraft,
@@ -957,16 +992,28 @@ func (p *PaymentSessionProjector) loadActiveCryptoAttempt(
 				}).
 			Order("created_at DESC, attempt_id DESC").
 			Limit(2).
-			Find(&attempts).Error
+			Find(&attempts).Error; err != nil {
+			return err
+		}
+		if len(attempts) != 0 {
+			return nil
+		}
+		return tx.Read().Where(
+			"tenant_id = ? AND order_id = ? AND kind = ? AND state = ?",
+			tenantID, orderID, models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptRefunded,
+		).Order("updated_at DESC, attempt_id DESC").Limit(1).Find(&attempts).Error
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("payment session projector: load active crypto attempt: %w", err)
+		return nil, nil, fmt.Errorf("payment session projector: load crypto attempt projection: %w", err)
 	}
 	if len(attempts) == 0 {
 		return nil, nil, nil
 	}
 	if len(attempts) > 1 {
 		return nil, nil, fmt.Errorf("payment session projector: multiple active crypto attempts for order %s", orderID)
+	}
+	if attempts[0].State == models.PaymentAttemptRefunded {
+		return &attempts[0], nil, nil
 	}
 	if attempts[0].State == models.PaymentAttemptAuthorizationDraft {
 		return &attempts[0], nil, nil

@@ -471,6 +471,8 @@ func TestPruneStaleRetainedSettlementKeyOffers(t *testing.T) {
 	createAttempt("tenant-a", "expired", models.PaymentAttemptExpired)
 	createOffer("tenant-a", "abandoned", fresh)
 	createAttempt("tenant-a", "abandoned", models.PaymentAttemptAbandoned)
+	createOffer("tenant-a", "refunded", fresh)
+	createAttempt("tenant-a", "refunded", models.PaymentAttemptRefunded)
 	createOffer("tenant-a", "frozen", fresh)
 	createAttempt("tenant-a", "frozen", models.PaymentAttemptFundingTargetReady)
 	createOffer("tenant-b", "other-orphan-old", old)
@@ -481,7 +483,7 @@ func TestPruneStaleRetainedSettlementKeyOffers(t *testing.T) {
 
 	deleted, err := PruneStaleRetainedSettlementKeyOffers(db.Where("tenant_id = ?", "tenant-a"), cutoff)
 	require.NoError(t, err)
-	require.Equal(t, int64(4), deleted)
+	require.Equal(t, int64(5), deleted)
 
 	for _, scope := range []struct {
 		tenantID  string
@@ -493,6 +495,7 @@ func TestPruneStaleRetainedSettlementKeyOffers(t *testing.T) {
 		{tenantID: "tenant-a", attemptID: "draft-old", retained: true},
 		{tenantID: "tenant-a", attemptID: "expired", retained: false},
 		{tenantID: "tenant-a", attemptID: "abandoned", retained: false},
+		{tenantID: "tenant-a", attemptID: "refunded", retained: false},
 		{tenantID: "tenant-a", attemptID: "frozen", retained: false},
 		{tenantID: "tenant-b", attemptID: "other-orphan-old", retained: true},
 		{tenantID: "tenant-b", attemptID: "orphan-old", retained: true},

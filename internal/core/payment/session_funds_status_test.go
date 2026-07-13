@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 	pkpayment "github.com/mobazha/mobazha/pkg/payment"
 	"github.com/stretchr/testify/require"
@@ -89,6 +90,39 @@ func TestDeriveFundsStatus_ProjectsChainAndProviderLifecycles(t *testing.T) {
 			require.Equal(t, tt.retryable, got.Retryable)
 		})
 	}
+}
+
+func TestFundsStatusFromRefundedAttempt_ProjectsDurablePartialRefund(t *testing.T) {
+	now := time.Date(2026, 7, 13, 9, 0, 0, 0, time.UTC)
+	got := fundsStatusFromRefundedAttempt(&models.PaymentAttempt{
+		AttemptID: "attempt-refunded", State: models.PaymentAttemptRefunded,
+		ExternalReference: "refund-tx", UpdatedAt: now,
+	})
+	require.Equal(t, pkpayment.FundsStateRefunded, got.State)
+	require.Equal(t, pkpayment.FundsActionPartialRefund, got.Action)
+	require.Equal(t, "attempt-refunded", got.ActionID)
+	require.Equal(t, "refund-tx", got.TxHash)
+	require.Equal(t, now, *got.UpdatedAt)
+}
+
+func TestLoadCryptoAttemptProjection_ReturnsLatestRefundedAttemptWithoutTarget(t *testing.T) {
+	db := newVerifierTestDB(t)
+	require.NoError(t, db.gormDB.AutoMigrate(&models.PaymentAttempt{}))
+	now := time.Now().UTC()
+	require.NoError(t, db.gormDB.Create(&models.PaymentAttempt{
+		TenantID: database.StandaloneTenantID, AttemptID: "attempt-refund", Kind: models.PaymentAttemptKindCryptoFundingTarget,
+		PaymentSessionID: "ps-refund", OrderID: "order-refund", RouteBindingID: "route-refund",
+		IdempotencyKey: "attempt-key-refund", State: models.PaymentAttemptRefunded,
+		Currency: "crypto:bip122:000000000019d6689c085ae165831e93:native", AmountValue: "500",
+		ExternalReference: "refund-tx", UpdatedAt: now,
+	}).Error)
+
+	attempt, target, err := NewPaymentSessionProjector(db).loadCryptoAttemptProjection("", "order-refund")
+	require.NoError(t, err)
+	require.NotNil(t, attempt)
+	require.Equal(t, models.PaymentAttemptRefunded, attempt.State)
+	require.Equal(t, "refund-tx", attempt.ExternalReference)
+	require.Nil(t, target)
 }
 
 func TestLoadLatestFundsActions_IsTenantAndOrderScoped(t *testing.T) {

@@ -924,21 +924,20 @@ func (p *PaymentSessionProjector) loadLatestFundsActions(
 	var settlementAction models.SettlementAction
 	var providerAction models.PaymentProviderAction
 	err := p.db.View(func(tx database.Tx) error {
-		read := tx.Read()
-		if read.Migrator().HasTable(&models.SettlementAction{}) {
-			if err := read.Where("tenant_id = ? AND order_id = ?", tenantID, orderID).
+		if tx.Read().Migrator().HasTable(&models.SettlementAction{}) {
+			if err := tx.Read().Where("tenant_id = ? AND order_id = ?", tenantID, orderID).
 				Order("updated_at DESC, action_id DESC").
 				Limit(1).
 				Find(&settlementAction).Error; err != nil {
 				return err
 			}
 		}
-		if !read.Migrator().HasTable(&models.PaymentAttempt{}) ||
-			!read.Migrator().HasTable(&models.PaymentProviderAction{}) {
+		if !tx.Read().Migrator().HasTable(&models.PaymentAttempt{}) ||
+			!tx.Read().Migrator().HasTable(&models.PaymentProviderAction{}) {
 			return nil
 		}
 		var attemptIDs []string
-		if err := read.Model(&models.PaymentAttempt{}).
+		if err := tx.Read().Model(&models.PaymentAttempt{}).
 			Where("tenant_id = ? AND order_id = ?", tenantID, orderID).
 			Pluck("attempt_id", &attemptIDs).Error; err != nil {
 			return err
@@ -946,7 +945,7 @@ func (p *PaymentSessionProjector) loadLatestFundsActions(
 		if len(attemptIDs) == 0 {
 			return nil
 		}
-		return read.Where(
+		return tx.Read().Where(
 			"tenant_id = ? AND attempt_id IN ? AND action_kind IN ?",
 			tenantID, attemptIDs, []string{models.PaymentProviderActionRefund, models.PaymentProviderActionDisburse},
 		).

@@ -210,6 +210,35 @@ func deleteCryptoPaymentAttemptDraftOffers(tx *gorm.DB, tenantID, attemptID stri
 	return nil
 }
 
+// AbandonCryptoPaymentAttemptDraft atomically retires a non-actionable draft
+// and its retained participant offers. Frozen/actionable attempts are never
+// downgraded. This is used when an order-level economic policy must stay on the
+// legacy settlement path and an older client already entered authorization.
+func AbandonCryptoPaymentAttemptDraft(db *gorm.DB, tenantID, orderID, attemptID string) (bool, error) {
+	if db == nil || strings.TrimSpace(tenantID) == "" || strings.TrimSpace(orderID) == "" || strings.TrimSpace(attemptID) == "" {
+		return false, fmt.Errorf("abandon crypto payment attempt draft: scope is required")
+	}
+	abandoned := false
+	err := db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.PaymentAttempt{}).
+			Where("tenant_id = ? AND order_id = ? AND attempt_id = ? AND kind = ? AND state = ?",
+				tenantID, orderID, attemptID, models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptAuthorizationDraft).
+			Updates(map[string]interface{}{"state": models.PaymentAttemptAbandoned, "last_error": "unsupported attempt settlement economics"})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return nil
+		}
+		abandoned = true
+		return deleteCryptoPaymentAttemptDraftOffers(tx, tenantID, attemptID)
+	})
+	if err != nil {
+		return false, fmt.Errorf("abandon crypto payment attempt draft: %w", err)
+	}
+	return abandoned, nil
+}
+
 func sameCryptoPaymentAttemptIdentity(left, right models.PaymentAttempt) bool {
 	return left.TenantID == right.TenantID && left.AttemptID == right.AttemptID &&
 		left.Kind == right.Kind && left.PaymentSessionID == right.PaymentSessionID &&

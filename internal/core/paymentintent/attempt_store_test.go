@@ -512,6 +512,37 @@ func TestPruneStaleRetainedSettlementKeyOffers(t *testing.T) {
 	}
 }
 
+func TestAbandonCryptoPaymentAttemptDraft_RetiresOnlyMatchingDraftAndOffers(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-abandon-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentAttemptSettlementOffer{}))
+	attempt := models.PaymentAttempt{
+		TenantID: "tenant-a", AttemptID: "attempt-a", Kind: models.PaymentAttemptKindCryptoFundingTarget,
+		PaymentSessionID: "session-a", OrderID: "order-a", RouteBindingID: "route-a",
+		IdempotencyKey: "idempotency-a", State: models.PaymentAttemptAuthorizationDraft,
+	}
+	require.NoError(t, db.Create(&attempt).Error)
+	require.NoError(t, db.Create(&models.PaymentAttemptSettlementOffer{
+		TenantID: attempt.TenantID, AttemptID: attempt.AttemptID, ParticipantRole: models.SettlementParticipantBuyer,
+		OrderID: attempt.OrderID, AuthorizationContextID: "context-a", RailID: "crypto:eip155:1:native",
+		Offer: []byte("offer"), OfferHash: "hash", PublicKeyHash: "public-key", CreatedAt: time.Now().UTC(),
+	}).Error)
+
+	abandoned, err := AbandonCryptoPaymentAttemptDraft(db, attempt.TenantID, attempt.OrderID, attempt.AttemptID)
+	require.NoError(t, err)
+	require.True(t, abandoned)
+	require.NoError(t, db.First(&attempt, "tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).Error)
+	require.Equal(t, models.PaymentAttemptAbandoned, attempt.State)
+	var offers int64
+	require.NoError(t, db.Model(&models.PaymentAttemptSettlementOffer{}).
+		Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).Count(&offers).Error)
+	require.Zero(t, offers)
+
+	abandoned, err = AbandonCryptoPaymentAttemptDraft(db, attempt.TenantID, attempt.OrderID, attempt.AttemptID)
+	require.NoError(t, err)
+	require.False(t, abandoned)
+}
+
 func TestNewSettlementSignRequest_UsesOnlyFrozenAttemptBindings(t *testing.T) {
 	attempt, _, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
 	attempt.TenantID = "tenant-a"

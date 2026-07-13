@@ -163,6 +163,18 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 	if err != nil {
 		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
 	}
+	if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptAuthorizationDraft && s.crypto != nil {
+		abandoned, abandonErr := s.crypto.abandonUnsupportedSettlementAuthorizationDraft(ctx, input.order, input.cryptoAttempt)
+		if abandonErr != nil {
+			return nil, abandonErr
+		}
+		if abandoned {
+			input, err = s.projector.fetchProjectInput(req.OrderID)
+			if err != nil {
+				return nil, fmt.Errorf("payment session: reload recovered authorization draft: %w", err)
+			}
+		}
+	}
 	selectionQuote, err := s.resolveDealPaymentSelectionQuote(ctx, input.order, input.orderOpen, req)
 	if err != nil {
 		return nil, err
@@ -341,10 +353,8 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 					return nil, fmt.Errorf("%w: draft=%q requested=%q",
 						ErrPaymentCoinMismatch, input.cryptoAttempt.Currency, req.PaymentCoin)
 				}
-				// The authorization ceremony owns provisioning once its durable
-				// draft exists. Returning the non-actionable projection prevents
-				// the legacy setup facade from publishing a target before freeze.
-				return view, nil
+				// Re-enter the idempotent starter so a draft whose earlier seller
+				// finalization failed can republish its offer after an upgrade.
 			}
 			created, err := s.crypto.CreateSession(ctx, req)
 			if err != nil {

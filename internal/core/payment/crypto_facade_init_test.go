@@ -318,3 +318,15 @@ func TestStandardOrderSettlementAuthorizationStartRequest_BindsModerator(t *test
 		t.Fatalf("start request does not preserve moderated authorization facts: %+v", request)
 	}
 }
+
+func TestStandardOrderSettlementAuthorizationEconomicEligible_RejectsNonZeroCancelFee(t *testing.T) {
+	if !standardOrderSettlementAuthorizationEconomicEligible(&models.Order{}) {
+		t.Fatal("empty cancellation fee should be attempt eligible")
+	}
+	if !standardOrderSettlementAuthorizationEconomicEligible(&models.Order{CancelFeeAmount: "0"}) {
+		t.Fatal("zero cancellation fee should be attempt eligible")
+	}
+	if standardOrderSettlementAuthorizationEconomicEligible(&models.Order{CancelFeeAmount: "1"}) {
+		t.Fatal("non-zero cancellation fee must remain on legacy settlement")
+	}
+}

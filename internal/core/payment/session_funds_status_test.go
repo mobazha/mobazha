@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mobazha/mobazha/internal/database/dbstore"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 	pkpayment "github.com/mobazha/mobazha/pkg/payment"
@@ -157,6 +158,46 @@ func TestLoadLatestFundsActions_IsTenantAndOrderScoped(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, settlement)
 	require.Equal(t, "settle-a", settlement.ActionID)
+	require.NotNil(t, provider)
+	require.Equal(t, "refund-a", provider.ActionID)
+}
+
+func TestLoadLatestFundsActions_UsesFreshTenantScopedQueryPerModel(t *testing.T) {
+	shared := newVerifierTestDB(t)
+	require.NoError(t, shared.gormDB.AutoMigrate(
+		&models.PaymentAttempt{}, &models.PaymentProviderAction{}, &models.SettlementAction{},
+	))
+	tenantDB, err := dbstore.NewTenantDBWithPublicData(shared.gormDB, "tenant-a", database.PublicData(nil))
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	require.NoError(t, tenantDB.Update(func(tx database.Tx) error {
+		if err := tx.Create(&models.PaymentAttempt{
+			AttemptID: "attempt-a", PaymentSessionID: "ps-a", OrderID: "order-a",
+			Kind: models.PaymentAttemptKindProviderSession, RouteBindingID: "route-a",
+			IdempotencyKey: "attempt-key-a", State: models.PaymentAttemptExternalCreated,
+			CreatedAt: now,
+		}); err != nil {
+			return err
+		}
+		if err := tx.Create(&models.PaymentProviderAction{
+			ActionID: "refund-a", ActionKind: models.PaymentProviderActionRefund,
+			AttemptID: "attempt-a", RouteBindingID: "route-a", ProviderBindingID: "binding-a",
+			ProviderID: "paypal", ExternalReference: "capture-a", IdempotencyKey: "provider-key-a",
+			IntentFingerprint: "fingerprint-a", IntentPayload: []byte(`{}`),
+			State: models.PaymentProviderActionCompleted, UpdatedAt: now,
+		}); err != nil {
+			return err
+		}
+		return tx.Create(&models.SettlementAction{
+			ActionID: "complete-a", OrderID: "order-a", ActionKind: "complete",
+			State: "confirmed", UpdatedAt: now,
+		})
+	}))
+
+	settlement, provider, err := NewPaymentSessionProjector(tenantDB).loadLatestFundsActions("tenant-a", "order-a")
+	require.NoError(t, err)
+	require.NotNil(t, settlement)
+	require.Equal(t, "complete-a", settlement.ActionID)
 	require.NotNil(t, provider)
 	require.Equal(t, "refund-a", provider.ActionID)
 }

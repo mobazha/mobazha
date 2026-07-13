@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha/internal/core/paymentintent"
 	"github.com/mobazha/mobazha/internal/wallet"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
@@ -148,27 +149,29 @@ func (c *CryptoPaymentFacade) CreateSession(
 		if !standardOrderSettlementAuthorizationEligible(coin, orderOpen) {
 			return nil, fmt.Errorf("crypto facade: cross-currency settlement authorization is not implemented")
 		}
-		setupParams, err := buildPaymentSetupParamsFromOrder(
-			order, orderOpen, coin, req.PayerAddress, refundAddr, moderator,
-			req.AuthorizedPaymentAmount, c.exchange,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("crypto facade: build settlement authorization params: %w", err)
+		if standardOrderSettlementAuthorizationEconomicEligible(order) {
+			setupParams, err := buildPaymentSetupParamsFromOrder(
+				order, orderOpen, coin, req.PayerAddress, refundAddr, moderator,
+				req.AuthorizedPaymentAmount, c.exchange,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("crypto facade: build settlement authorization params: %w", err)
+			}
+			if err := c.saveCreateSessionRefundAddress(ctx, coin, req.OrderID, refundAddr); err != nil {
+				return nil, err
+			}
+			startRequest := standardOrderSettlementAuthorizationStartRequest(
+				req, strconv.FormatUint(setupParams.Amount, 10), moderator, refundAddr,
+			)
+			if err := c.settlementStarter(ctx, startRequest); err != nil {
+				return nil, fmt.Errorf("crypto facade: start settlement authorization: %w", err)
+			}
+			updated, err := c.projector.fetchProjectInput(req.OrderID)
+			if err != nil {
+				return nil, fmt.Errorf("crypto facade: re-load settlement authorization draft: %w", err)
+			}
+			return c.projector.Project(updated)
 		}
-		if err := c.saveCreateSessionRefundAddress(ctx, coin, req.OrderID, refundAddr); err != nil {
-			return nil, err
-		}
-		startRequest := standardOrderSettlementAuthorizationStartRequest(
-			req, strconv.FormatUint(setupParams.Amount, 10), moderator, refundAddr,
-		)
-		if err := c.settlementStarter(ctx, startRequest); err != nil {
-			return nil, fmt.Errorf("crypto facade: start settlement authorization: %w", err)
-		}
-		updated, err := c.projector.fetchProjectInput(req.OrderID)
-		if err != nil {
-			return nil, fmt.Errorf("crypto facade: re-load settlement authorization draft: %w", err)
-		}
-		return c.projector.Project(updated)
 	}
 
 	setupParams, err := buildPaymentSetupParamsFromOrder(order, orderOpen, coin,
@@ -223,6 +226,33 @@ func standardOrderSettlementAuthorizationEligible(coin iwallet.CoinType, orderOp
 		return false
 	}
 	return coin.MatchesPricingCurrency(orderOpen.PricingCoin)
+}
+
+func standardOrderSettlementAuthorizationEconomicEligible(order *models.Order) bool {
+	if order == nil {
+		return false
+	}
+	cancelFee := strings.TrimSpace(order.CancelFeeAmount)
+	return cancelFee == "" || cancelFee == "0"
+}
+
+func (c *CryptoPaymentFacade) abandonUnsupportedSettlementAuthorizationDraft(
+	ctx context.Context, order *models.Order, attempt *models.PaymentAttempt,
+) (bool, error) {
+	if c == nil || order == nil || attempt == nil || standardOrderSettlementAuthorizationEconomicEligible(order) {
+		return false, nil
+	}
+	rawProvider, ok := c.db.(rawDBProvider)
+	if !ok || rawProvider.RawDB() == nil {
+		return false, fmt.Errorf("crypto facade: raw database is unavailable for draft recovery")
+	}
+	tenantID := strings.TrimSpace(order.TenantID)
+	if tenantID == "" {
+		tenantID = database.StandaloneTenantID
+	}
+	return paymentintent.AbandonCryptoPaymentAttemptDraft(
+		rawProvider.RawDB().WithContext(ctx), tenantID, order.ID.String(), attempt.AttemptID,
+	)
 }
 
 func standardOrderNativeUTXORail(coin iwallet.CoinType) bool {

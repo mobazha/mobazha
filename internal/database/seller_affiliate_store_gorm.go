@@ -148,6 +148,15 @@ func (s *GormSellerAffiliateStore) GetAffiliateLinkByPromoter(_ context.Context,
 	return &link, nil
 }
 
+// ListAffiliateLinks returns the program's links for seller management.
+func (s *GormSellerAffiliateStore) ListAffiliateLinks(_ context.Context, programID string) ([]models.AffiliateLink, error) {
+	links := make([]models.AffiliateLink, 0)
+	err := s.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().Where("program_id = ?", programID).Order("created_at DESC").Find(&links).Error
+	})
+	return links, err
+}
+
 // CreateAffiliateReferralSession inserts one immutable referral session.
 func (s *GormSellerAffiliateStore) CreateAffiliateReferralSession(_ context.Context, session *models.AffiliateReferralSession) error {
 	if session == nil {
@@ -425,7 +434,8 @@ func sameAffiliateOrderSnapshot(existing models.AffiliateAttribution, storedLine
 		existing.GuestBuyerID != requested.Attribution.GuestBuyerID || existing.PromoterPeerID != requested.Attribution.PromoterPeerID ||
 		existing.CommissionRateBPSSnapshot != requested.Attribution.CommissionRateBPSSnapshot ||
 		existing.PromoterPayoutAddress != requested.Attribution.PromoterPayoutAddress ||
-		!existing.PromoterUTXOPayoutAddresses.Equal(requested.Attribution.PromoterUTXOPayoutAddresses) || len(storedLines) != len(requested.Lines) {
+		!existing.PromoterUTXOPayoutAddresses.Equal(requested.Attribution.PromoterUTXOPayoutAddresses) ||
+		!existing.PromoterPayoutDestinations.Equal(requested.Attribution.PromoterPayoutDestinations) || len(storedLines) != len(requested.Lines) {
 		return false
 	}
 	requestedLines := append([]models.AffiliateCommissionLine(nil), requested.Lines...)

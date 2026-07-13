@@ -38,10 +38,11 @@ func TestSellerAffiliateAppService_AutomatesMinimalCommissionLifecycle(t *testin
 
 	payoutAddress := "0x1111111111111111111111111111111111111111"
 	utxoPayoutAddresses := affiliateTestUTXOPayoutAddresses()
-	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-promoter-a", payoutAddress, utxoPayoutAddresses)
+	payoutDestinations := affiliateTestPayoutDestinations(t, payoutAddress, utxoPayoutAddresses)
+	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-promoter-a", payoutDestinations)
 	require.NoError(t, err)
 	assert.Equal(t, program.ID, link.ProgramID)
-	replayedLink, err := service.CreateLink(ctx, promoterPeerID, "ignored-token-on-retry", payoutAddress, utxoPayoutAddresses)
+	replayedLink, err := service.CreateLink(ctx, promoterPeerID, "ignored-token-on-retry", payoutDestinations)
 	require.NoError(t, err)
 	assert.Equal(t, link, replayedLink)
 
@@ -106,7 +107,7 @@ func TestSellerAffiliateAppService_GuestIdentityPersistsInCallerTransaction(t *t
 		CommissionRateBPS: 500, AttributionWindowSeconds: 3600,
 	})
 	require.NoError(t, err)
-	link, err := service.CreateLink(ctx, promoterPeerID, "guest-link", "0x1111111111111111111111111111111111111111", affiliateTestUTXOPayoutAddresses())
+	link, err := service.CreateLink(ctx, promoterPeerID, "guest-link", affiliateTestPayoutDestinations(t, "0x1111111111111111111111111111111111111111", affiliateTestUTXOPayoutAddresses()))
 	require.NoError(t, err)
 	session, err := service.CreateReferralSession(ctx, link.PublicToken, time.Now().UTC())
 	require.NoError(t, err)
@@ -142,7 +143,7 @@ func TestSellerAffiliateAppService_RejectsDeterministicSelfAttribution(t *testin
 		CommissionRateBPS: 1000, AttributionWindowSeconds: 3600,
 	})
 	require.NoError(t, err)
-	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-self-check", "0x1111111111111111111111111111111111111111", affiliateTestUTXOPayoutAddresses())
+	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-self-check", affiliateTestPayoutDestinations(t, "0x1111111111111111111111111111111111111111", affiliateTestUTXOPayoutAddresses()))
 	require.NoError(t, err)
 	issuedAt := time.Now().UTC().Add(-time.Minute)
 	session, err := service.CreateReferralSession(ctx, link.PublicToken, issuedAt)
@@ -176,11 +177,14 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	})
 	require.NoError(t, err)
 	payoutAddress := "0x1111111111111111111111111111111111111111"
+	settlementCoin := "crypto:eip155:1:erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7"
 	utxoPayoutAddresses := affiliateTestUTXOPayoutAddresses()
-	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-frozen-payout", payoutAddress, utxoPayoutAddresses)
+	payoutDestinations := affiliateTestPayoutDestinations(t, payoutAddress, utxoPayoutAddresses)
+	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-frozen-payout", payoutDestinations)
 	require.NoError(t, err)
 	assert.Equal(t, payoutAddress, link.PromoterPayoutAddress)
 	assert.Equal(t, utxoPayoutAddresses, link.PromoterUTXOPayoutAddresses)
+	assert.True(t, payoutDestinations.Equal(link.PromoterPayoutDestinations))
 
 	issuedAt := time.Now().UTC().Add(-time.Minute)
 	session, err := service.CreateReferralSession(ctx, link.PublicToken, issuedAt)
@@ -188,6 +192,7 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	assert.Equal(t, uint32(1250), session.CommissionRateBPSSnapshot)
 	assert.Equal(t, payoutAddress, session.PromoterPayoutAddress)
 	assert.Equal(t, utxoPayoutAddresses, session.PromoterUTXOPayoutAddresses)
+	assert.True(t, payoutDestinations.Equal(session.PromoterPayoutDestinations))
 
 	program.CommissionRateBPS = 5000
 	_, err = service.PutProgram(ctx, program)
@@ -195,20 +200,21 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	result, err := service.AttributeOrder(ctx, models.AffiliateOrderFacts{
 		OrderID: "order-frozen-payout", SellerPeerID: sellerPeerID, BuyerPeerID: buyerPeerID,
 		ReferralSessionID: session.ID, AttributedAt: issuedAt.Add(time.Minute),
-		Lines: []models.AffiliateOrderLineFact{{OrderLineID: "order-frozen-payout:0", NetMerchandiseAtomic: "1000", Currency: "USDT"}},
+		Lines: []models.AffiliateOrderLineFact{{OrderLineID: "order-frozen-payout:0", NetMerchandiseAtomic: "1000", Currency: settlementCoin}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, uint32(1250), result.Attribution.CommissionRateBPSSnapshot)
 	assert.Equal(t, payoutAddress, result.Attribution.PromoterPayoutAddress)
 	assert.Equal(t, utxoPayoutAddresses, result.Attribution.PromoterUTXOPayoutAddresses)
+	assert.True(t, payoutDestinations.Equal(result.Attribution.PromoterPayoutDestinations))
 	assert.Equal(t, "125", result.Lines[0].CommissionAtomic)
-	payout, err := service.SettlementPayout(ctx, "order-frozen-payout", "USDT")
+	payout, err := service.SettlementPayout(ctx, "order-frozen-payout", settlementCoin)
 	require.NoError(t, err)
 	require.NotNil(t, payout)
 	assert.Equal(t, payoutAddress, payout.Address)
 	assert.Equal(t, "125", payout.Amount)
-	attemptTerm, err := service.SettlementAttemptTerm(ctx, "order-frozen-payout", "USDT")
+	attemptTerm, err := service.SettlementAttemptTerm(ctx, "order-frozen-payout", settlementCoin)
 	require.NoError(t, err)
 	require.NotNil(t, attemptTerm)
 	assert.Equal(t, session.ID, attemptTerm.ReferralSessionID)
@@ -226,15 +232,15 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	zeroResult, err := service.AttributeOrder(ctx, models.AffiliateOrderFacts{
 		OrderID: "order-zero-commission", SellerPeerID: sellerPeerID, BuyerPeerID: buyerPeerID,
 		ReferralSessionID: session.ID, AttributedAt: issuedAt.Add(2 * time.Minute),
-		Lines: []models.AffiliateOrderLineFact{{OrderLineID: "order-zero-commission:0", NetMerchandiseAtomic: "1", Currency: "USDT"}},
+		Lines: []models.AffiliateOrderLineFact{{OrderLineID: "order-zero-commission:0", NetMerchandiseAtomic: "1", Currency: settlementCoin}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, zeroResult)
 	assert.Equal(t, "0", zeroResult.Lines[0].CommissionAtomic)
-	zeroPayout, err := service.SettlementPayout(ctx, "order-zero-commission", "USDT")
+	zeroPayout, err := service.SettlementPayout(ctx, "order-zero-commission", settlementCoin)
 	require.NoError(t, err)
 	assert.Nil(t, zeroPayout)
-	zeroAttemptTerm, err := service.SettlementAttemptTerm(ctx, "order-zero-commission", "USDT")
+	zeroAttemptTerm, err := service.SettlementAttemptTerm(ctx, "order-zero-commission", settlementCoin)
 	require.NoError(t, err)
 	require.NotNil(t, zeroAttemptTerm)
 	assert.Equal(t, "0", zeroAttemptTerm.Amount)
@@ -245,7 +251,7 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	_, err = service.SettlementPayout(ctx, "order-frozen-payout", "ETH")
 	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
 
-	_, err = service.CreateLink(ctx, promoterPeerID, "ignored-token", "0x2222222222222222222222222222222222222222", utxoPayoutAddresses)
+	_, err = service.CreateLink(ctx, promoterPeerID, "ignored-token", affiliateTestPayoutDestinations(t, "0x2222222222222222222222222222222222222222", utxoPayoutAddresses))
 	require.ErrorIs(t, err, models.ErrSellerAffiliateConflict)
 }
 
@@ -264,7 +270,8 @@ func TestSellerAffiliateAppService_ReissueLinkRotatesFutureSessionsOnly(t *testi
 	require.NoError(t, err)
 	oldEVM := "0x1111111111111111111111111111111111111111"
 	oldUTXO := affiliateTestUTXOPayoutAddresses()
-	link, err := service.CreateLink(ctx, affiliateTestPeerID(t), "affiliate-token-before-rotation", oldEVM, oldUTXO)
+	oldDestinations := affiliateTestPayoutDestinations(t, oldEVM, oldUTXO)
+	link, err := service.CreateLink(ctx, affiliateTestPeerID(t), "affiliate-token-before-rotation", oldDestinations)
 	require.NoError(t, err)
 	oldSession, err := service.CreateReferralSession(ctx, link.PublicToken, time.Now().UTC())
 	require.NoError(t, err)
@@ -272,11 +279,13 @@ func TestSellerAffiliateAppService_ReissueLinkRotatesFutureSessionsOnly(t *testi
 	newEVM := "0x2222222222222222222222222222222222222222"
 	newUTXO := oldUTXO.Clone()
 	newUTXO[models.AffiliatePayoutRailBitcoin] = "bc1qrotatedaffiliatepayoutdestination000000000"
-	reissued, err := service.ReissueLink(ctx, link.ID, "affiliate-token-after-rotation", newEVM, newUTXO)
+	newDestinations := affiliateTestPayoutDestinations(t, newEVM, newUTXO)
+	reissued, err := service.ReissueLink(ctx, link.ID, "affiliate-token-after-rotation", newDestinations)
 	require.NoError(t, err)
 	assert.Equal(t, link.ID, reissued.ID)
 	assert.Equal(t, newEVM, reissued.PromoterPayoutAddress)
 	assert.Equal(t, newUTXO, reissued.PromoterUTXOPayoutAddresses)
+	assert.True(t, newDestinations.Equal(reissued.PromoterPayoutDestinations))
 
 	_, err = service.GetLinkByToken(ctx, "affiliate-token-before-rotation")
 	require.Error(t, err)
@@ -284,8 +293,10 @@ func TestSellerAffiliateAppService_ReissueLinkRotatesFutureSessionsOnly(t *testi
 	require.NoError(t, err)
 	assert.Equal(t, oldEVM, oldSession.PromoterPayoutAddress)
 	assert.Equal(t, oldUTXO, oldSession.PromoterUTXOPayoutAddresses)
+	assert.True(t, oldDestinations.Equal(oldSession.PromoterPayoutDestinations))
 	assert.Equal(t, newEVM, newSession.PromoterPayoutAddress)
 	assert.Equal(t, newUTXO, newSession.PromoterUTXOPayoutAddresses)
+	assert.True(t, newDestinations.Equal(newSession.PromoterPayoutDestinations))
 }
 
 func TestGormSellerAffiliateStore_IsTenantScoped(t *testing.T) {
@@ -310,9 +321,11 @@ func TestGormSellerAffiliateStore_IsTenantScoped(t *testing.T) {
 }
 
 func TestAffiliatePayoutAddressForSettlementCoin_UsesFrozenNativeRail(t *testing.T) {
+	destinations := affiliateTestPayoutDestinations(t, "0x1111111111111111111111111111111111111111", affiliateTestUTXOPayoutAddresses())
 	attribution := &models.AffiliateAttribution{
 		PromoterPayoutAddress:       "0x1111111111111111111111111111111111111111",
 		PromoterUTXOPayoutAddresses: affiliateTestUTXOPayoutAddresses(),
+		PromoterPayoutDestinations:  destinations,
 	}
 	tests := []struct {
 		name  string
@@ -334,6 +347,48 @@ func TestAffiliatePayoutAddressForSettlementCoin_UsesFrozenNativeRail(t *testing
 			assert.Equal(t, expected, address)
 		})
 	}
+}
+
+func TestAffiliatePayoutAddressForSettlementCoin_UsesFrozenSolanaRail(t *testing.T) {
+	destinations := affiliateTestPayoutDestinations(t, "0x1111111111111111111111111111111111111111", affiliateTestUTXOPayoutAddresses())
+	solanaRail, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainSolana)
+	require.NoError(t, err)
+	expected, ok := destinations.DestinationForRail(solanaRail.String())
+	require.True(t, ok)
+	address, err := affiliatePayoutAddressForSettlementCoin(&models.AffiliateAttribution{PromoterPayoutDestinations: destinations}, solanaRail.String())
+	require.NoError(t, err)
+	assert.Equal(t, expected.Address, address)
+}
+
+func TestAffiliatePayoutAddressForSettlementCoin_GenericSnapshotMissingRailFailsClosed(t *testing.T) {
+	destinations := affiliateTestPayoutDestinations(t, "0x1111111111111111111111111111111111111111", affiliateTestUTXOPayoutAddresses())
+	bscRail, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBSC)
+	require.NoError(t, err)
+	filtered := destinations.Destinations[:0]
+	for _, destination := range destinations.Destinations {
+		if destination.RailID != bscRail.String() {
+			filtered = append(filtered, destination)
+		}
+	}
+	destinations.Destinations = filtered
+
+	_, err = affiliatePayoutAddressForSettlementCoin(&models.AffiliateAttribution{
+		PromoterPayoutAddress:      "0x1111111111111111111111111111111111111111",
+		PromoterPayoutDestinations: destinations,
+	}, bscRail.String())
+	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
+}
+
+func TestAffiliatePayoutAddressForSettlementCoin_LegacySnapshotStillFallsBack(t *testing.T) {
+	bscRail, err := iwallet.RequireCanonicalNativeCoinType(iwallet.ChainBSC)
+	require.NoError(t, err)
+	const legacyAddress = "0x1111111111111111111111111111111111111111"
+
+	address, err := affiliatePayoutAddressForSettlementCoin(&models.AffiliateAttribution{
+		PromoterPayoutAddress: legacyAddress,
+	}, bscRail.String())
+	require.NoError(t, err)
+	assert.Equal(t, legacyAddress, address)
 }
 
 func TestSameAffiliateSettlementCoin_NormalizesLegacyNativeTicker(t *testing.T) {
@@ -427,4 +482,28 @@ func affiliateTestUTXOPayoutAddresses() models.AffiliateUTXOPayoutAddresses {
 		models.AffiliatePayoutRailBitcoinCash: "bitcoincash:qpromoter",
 		models.AffiliatePayoutRailLitecoin:    "ltc1qpromoter",
 	}
+}
+
+func affiliateTestPayoutDestinations(t *testing.T, evm string, utxo models.AffiliateUTXOPayoutAddresses) models.PayoutDestinationSet {
+	t.Helper()
+	entries := []struct {
+		chain   iwallet.ChainType
+		address string
+	}{
+		{iwallet.ChainBitcoin, utxo[models.AffiliatePayoutRailBitcoin]},
+		{iwallet.ChainBitcoinCash, utxo[models.AffiliatePayoutRailBitcoinCash]},
+		{iwallet.ChainLitecoin, utxo[models.AffiliatePayoutRailLitecoin]},
+		{iwallet.ChainEthereum, evm},
+		{iwallet.ChainBSC, evm},
+		{iwallet.ChainPolygon, evm},
+		{iwallet.ChainBase, evm},
+		{iwallet.ChainSolana, "4Nd1mYjLrS1gN33Zf3Yc6wNwVozN5K6oNUwG3XhYhXyd"},
+	}
+	set := models.PayoutDestinationSet{Destinations: make([]models.PayoutDestination, 0, len(entries))}
+	for _, entry := range entries {
+		railID, err := iwallet.RequireCanonicalNativeCoinType(entry.chain)
+		require.NoError(t, err)
+		set.Destinations = append(set.Destinations, models.PayoutDestination{RailID: railID.String(), Address: entry.address, Version: 1})
+	}
+	return set
 }

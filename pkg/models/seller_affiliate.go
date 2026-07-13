@@ -151,6 +151,7 @@ type AffiliateLink struct {
 	PromoterPeerID              string                       `json:"promoterPeerID" gorm:"column:promoter_peer_id;type:text;not null;index;uniqueIndex:idx_affiliate_link_promoter,priority:3"`
 	PromoterPayoutAddress       string                       `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
 	PromoterUTXOPayoutAddresses AffiliateUTXOPayoutAddresses `json:"promoterUTXOPayoutAddresses" gorm:"column:promoter_utxo_payout_addresses;serializer:json;type:text;not null"`
+	PromoterPayoutDestinations  PayoutDestinationSet         `json:"promoterPayoutDestinations" gorm:"column:promoter_payout_destinations;serializer:json;type:text"`
 	PublicToken                 string                       `json:"publicToken" gorm:"column:public_token;type:text;not null;uniqueIndex:idx_affiliate_link_token,priority:2"`
 	Status                      AffiliateLinkStatus          `json:"status" gorm:"type:text;not null;index"`
 	CreatedAt                   time.Time                    `json:"createdAt" gorm:"column:created_at;not null;autoCreateTime:false"`
@@ -163,7 +164,7 @@ func (AffiliateLink) TableName() string { return "affiliate_links" }
 func (l *AffiliateLink) Validate() error {
 	if l == nil || !validAffiliateID(l.ID) || !validAffiliateID(l.ProgramID) ||
 		!validAffiliatePeerID(l.PromoterPeerID) || !validAffiliateID(l.PublicToken) ||
-		!validAffiliateEVMPayoutAddress(l.PromoterPayoutAddress) || !l.PromoterUTXOPayoutAddresses.Valid() ||
+		!validAffiliatePayoutSnapshot(l.PromoterPayoutDestinations, l.PromoterPayoutAddress, l.PromoterUTXOPayoutAddresses) ||
 		(l.Status != AffiliateLinkStatusActive && l.Status != AffiliateLinkStatusRevoked) ||
 		l.CreatedAt.IsZero() || l.UpdatedAt.IsZero() {
 		return ErrInvalidSellerAffiliate
@@ -182,6 +183,7 @@ type AffiliateReferralSession struct {
 	CommissionRateBPSSnapshot   uint32                       `json:"commissionRateBPSSnapshot" gorm:"column:commission_rate_bps_snapshot;not null"`
 	PromoterPayoutAddress       string                       `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
 	PromoterUTXOPayoutAddresses AffiliateUTXOPayoutAddresses `json:"promoterUTXOPayoutAddresses" gorm:"column:promoter_utxo_payout_addresses;serializer:json;type:text;not null"`
+	PromoterPayoutDestinations  PayoutDestinationSet         `json:"promoterPayoutDestinations" gorm:"column:promoter_payout_destinations;serializer:json;type:text"`
 	IssuedAt                    time.Time                    `json:"issuedAt" gorm:"column:issued_at;not null;index"`
 	ExpiresAt                   time.Time                    `json:"expiresAt" gorm:"column:expires_at;not null;index"`
 	RevokedAt                   *time.Time                   `json:"revokedAt,omitempty" gorm:"column:revoked_at"`
@@ -196,7 +198,7 @@ func (s *AffiliateReferralSession) Validate() error {
 		!validAffiliateID(s.ProgramID) || !validAffiliatePeerID(s.SellerPeerID) ||
 		!validAffiliatePeerID(s.PromoterPeerID) || s.IssuedAt.IsZero() ||
 		s.CommissionRateBPSSnapshot == 0 || s.CommissionRateBPSSnapshot > 10000 ||
-		!validAffiliateEVMPayoutAddress(s.PromoterPayoutAddress) || !s.PromoterUTXOPayoutAddresses.Valid() ||
+		!validAffiliatePayoutSnapshot(s.PromoterPayoutDestinations, s.PromoterPayoutAddress, s.PromoterUTXOPayoutAddresses) ||
 		s.ExpiresAt.IsZero() || !s.ExpiresAt.After(s.IssuedAt) || s.CreatedAt.IsZero() {
 		return ErrInvalidSellerAffiliate
 	}
@@ -223,6 +225,7 @@ type AffiliateAttribution struct {
 	CommissionRateBPSSnapshot   uint32                       `json:"commissionRateBPSSnapshot" gorm:"column:commission_rate_bps_snapshot;not null"`
 	PromoterPayoutAddress       string                       `json:"promoterPayoutAddress" gorm:"column:promoter_payout_address;type:text;not null"`
 	PromoterUTXOPayoutAddresses AffiliateUTXOPayoutAddresses `json:"promoterUTXOPayoutAddresses" gorm:"column:promoter_utxo_payout_addresses;serializer:json;type:text;not null"`
+	PromoterPayoutDestinations  PayoutDestinationSet         `json:"promoterPayoutDestinations" gorm:"column:promoter_payout_destinations;serializer:json;type:text"`
 	AttributedAt                time.Time                    `json:"attributedAt" gorm:"column:attributed_at;not null;index"`
 }
 
@@ -235,11 +238,21 @@ func (a *AffiliateAttribution) Validate() error {
 		!validAffiliatePeerID(a.SellerPeerID) || !a.validBuyerIdentity() ||
 		!validAffiliatePeerID(a.PromoterPeerID) || a.CommissionRateBPSSnapshot == 0 ||
 		a.CommissionRateBPSSnapshot > 10000 ||
-		!validAffiliateEVMPayoutAddress(a.PromoterPayoutAddress) || !a.PromoterUTXOPayoutAddresses.Valid() ||
+		!validAffiliatePayoutSnapshot(a.PromoterPayoutDestinations, a.PromoterPayoutAddress, a.PromoterUTXOPayoutAddresses) ||
 		a.AttributedAt.IsZero() {
 		return ErrInvalidSellerAffiliate
 	}
 	return nil
+}
+
+// validAffiliatePayoutSnapshot accepts the generic rail-keyed snapshot used by
+// all new links. The legacy EVM/UTXO pair remains readable only so existing
+// persisted referrals can settle while deployments migrate in place.
+func validAffiliatePayoutSnapshot(destinations PayoutDestinationSet, legacyEVM string, legacyUTXO AffiliateUTXOPayoutAddresses) bool {
+	if len(destinations.Destinations) > 0 {
+		return destinations.Valid()
+	}
+	return validAffiliateEVMPayoutAddress(legacyEVM) && legacyUTXO.Valid()
 }
 
 // AffiliateBuyerKind identifies whether attribution belongs to a peer order or
@@ -380,6 +393,9 @@ var (
 	ErrSellerAffiliateNotFound = errors.New("seller affiliate resource not found")
 	// ErrSellerAffiliateConflict indicates an immutable binding or lifecycle conflict.
 	ErrSellerAffiliateConflict = errors.New("seller affiliate conflict")
+	// ErrSellerAffiliatePaymentRailUnsupported rejects a payment rail before
+	// provisioning when it cannot execute the frozen affiliate payout.
+	ErrSellerAffiliatePaymentRailUnsupported = errors.New("seller affiliate payment rail is unsupported")
 )
 
 func validAffiliateID(value string) bool {

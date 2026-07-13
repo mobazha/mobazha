@@ -73,15 +73,11 @@ func (s *SellerAffiliateAppService) GetProgram(ctx context.Context) (*models.Aff
 
 // CreateLink creates a link with the promoter's immutable settlement destinations.
 // Every enabled settlement rail must have a destination before a referral exists.
-func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeerID, publicToken, payoutAddress string, utxoPayoutAddresses models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error) {
-	payoutAddress, err := normalizeAffiliateEVMPayoutAddress(payoutAddress)
+func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeerID, publicToken string, payoutDestinations models.PayoutDestinationSet) (*models.AffiliateLink, error) {
+	payoutDestinations, err := normalizeAffiliatePayoutDestinations(payoutDestinations)
 	if err != nil {
 		return nil, err
 	}
-	if !utxoPayoutAddresses.Valid() {
-		return nil, models.ErrInvalidSellerAffiliate
-	}
-	utxoPayoutAddresses = utxoPayoutAddresses.Clone()
 	if s == nil || s.store == nil {
 		return nil, errors.New("seller affiliate store not configured")
 	}
@@ -95,8 +91,7 @@ func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeer
 	}
 	existing, err := s.store.GetAffiliateLinkByPromoter(ctx, program.ID, promoterPeerID)
 	if err == nil {
-		existingAddress, normalizeErr := normalizeAffiliateEVMPayoutAddress(existing.PromoterPayoutAddress)
-		if normalizeErr != nil || existingAddress != payoutAddress || !existing.PromoterUTXOPayoutAddresses.Equal(utxoPayoutAddresses) {
+		if !existing.PromoterPayoutDestinations.Equal(payoutDestinations) {
 			return nil, models.ErrSellerAffiliateConflict
 		}
 		return existing, nil
@@ -105,12 +100,14 @@ func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeer
 		return nil, err
 	}
 	now := time.Now().UTC()
+	legacyEVM, legacyUTXO := legacyAffiliatePayouts(payoutDestinations)
 	link := &models.AffiliateLink{
 		ID:                          uuid.NewString(),
 		ProgramID:                   program.ID,
 		PromoterPeerID:              promoterPeerID,
-		PromoterPayoutAddress:       payoutAddress,
-		PromoterUTXOPayoutAddresses: utxoPayoutAddresses,
+		PromoterPayoutAddress:       legacyEVM,
+		PromoterUTXOPayoutAddresses: legacyUTXO,
+		PromoterPayoutDestinations:  payoutDestinations.Clone(),
 		PublicToken:                 strings.TrimSpace(publicToken),
 		Status:                      models.AffiliateLinkStatusActive,
 		CreatedAt:                   now,
@@ -127,20 +124,20 @@ func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeer
 
 // ReissueLink rotates the public token and destination snapshot used by new
 // referral sessions. Previously issued sessions and accepted orders are not rewritten.
-func (s *SellerAffiliateAppService) ReissueLink(ctx context.Context, linkID, publicToken, payoutAddress string, utxoPayoutAddresses models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error) {
+func (s *SellerAffiliateAppService) ReissueLink(ctx context.Context, linkID, publicToken string, payoutDestinations models.PayoutDestinationSet) (*models.AffiliateLink, error) {
 	if s == nil || s.store == nil {
 		return nil, errors.New("seller affiliate store not configured")
 	}
-	payoutAddress, err := normalizeAffiliateEVMPayoutAddress(payoutAddress)
-	if err != nil || !utxoPayoutAddresses.Valid() || strings.TrimSpace(publicToken) == "" {
+	payoutDestinations, err := normalizeAffiliatePayoutDestinations(payoutDestinations)
+	if err != nil || strings.TrimSpace(publicToken) == "" {
 		return nil, models.ErrInvalidSellerAffiliate
 	}
 	link, err := s.store.GetAffiliateLink(ctx, strings.TrimSpace(linkID))
 	if err != nil {
 		return nil, err
 	}
-	link.PromoterPayoutAddress = payoutAddress
-	link.PromoterUTXOPayoutAddresses = utxoPayoutAddresses.Clone()
+	link.PromoterPayoutAddress, link.PromoterUTXOPayoutAddresses = legacyAffiliatePayouts(payoutDestinations)
+	link.PromoterPayoutDestinations = payoutDestinations.Clone()
 	link.PublicToken = strings.TrimSpace(publicToken)
 	link.Status = models.AffiliateLinkStatusActive
 	link.UpdatedAt = time.Now().UTC()
@@ -164,6 +161,39 @@ func (s *SellerAffiliateAppService) GetLinkByToken(ctx context.Context, token st
 		return nil, errors.New("seller affiliate store not configured")
 	}
 	return s.store.GetAffiliateLinkByToken(ctx, strings.TrimSpace(token))
+}
+
+// ListLinks returns every direct promoter link in the tenant's current program.
+func (s *SellerAffiliateAppService) ListLinks(ctx context.Context) ([]models.AffiliateLink, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	program, err := s.store.GetAffiliateProgram(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.store.ListAffiliateLinks(ctx, program.ID)
+}
+
+// RevokeLink prevents new sessions and attribution from a promoter link. The
+// link and its historical order facts remain queryable for auditability.
+func (s *SellerAffiliateAppService) RevokeLink(ctx context.Context, linkID string) (*models.AffiliateLink, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	link, err := s.store.GetAffiliateLink(ctx, strings.TrimSpace(linkID))
+	if err != nil {
+		return nil, err
+	}
+	if link.Status == models.AffiliateLinkStatusRevoked {
+		return link, nil
+	}
+	link.Status = models.AffiliateLinkStatusRevoked
+	link.UpdatedAt = time.Now().UTC()
+	if err := s.store.UpdateAffiliateLink(ctx, link); err != nil {
+		return nil, err
+	}
+	return link, nil
 }
 
 // CreateReferralSession creates an expiring seller-scoped checkout reference.
@@ -196,6 +226,7 @@ func (s *SellerAffiliateAppService) CreateReferralSession(ctx context.Context, p
 		CommissionRateBPSSnapshot:   program.CommissionRateBPS,
 		PromoterPayoutAddress:       link.PromoterPayoutAddress,
 		PromoterUTXOPayoutAddresses: link.PromoterUTXOPayoutAddresses.Clone(),
+		PromoterPayoutDestinations:  link.PromoterPayoutDestinations.Clone(),
 		IssuedAt:                    issuedAt,
 		ExpiresAt:                   issuedAt.Add(time.Duration(program.AttributionWindowSeconds) * time.Second),
 		CreatedAt:                   issuedAt,
@@ -274,6 +305,7 @@ func (s *SellerAffiliateAppService) PrepareOrderAttribution(ctx context.Context,
 			CommissionRateBPSSnapshot:   session.CommissionRateBPSSnapshot,
 			PromoterPayoutAddress:       session.PromoterPayoutAddress,
 			PromoterUTXOPayoutAddresses: session.PromoterUTXOPayoutAddresses.Clone(),
+			PromoterPayoutDestinations:  session.PromoterPayoutDestinations.Clone(),
 			AttributedAt:                facts.AttributedAt,
 		},
 		Lines: make([]models.AffiliateCommissionLine, 0, len(facts.Lines)),
@@ -327,6 +359,63 @@ func normalizeAffiliateEVMPayoutAddress(value string) (string, error) {
 		return "", models.ErrInvalidSellerAffiliate
 	}
 	return common.HexToAddress(value).Hex(), nil
+}
+
+func normalizeAffiliatePayoutDestinations(value models.PayoutDestinationSet) (models.PayoutDestinationSet, error) {
+	if len(value.Destinations) == 0 || !value.Valid() {
+		return models.PayoutDestinationSet{}, models.ErrInvalidSellerAffiliate
+	}
+	normalized := value.Clone()
+	for index := range normalized.Destinations {
+		destination := &normalized.Destinations[index]
+		destination.RailID = strings.TrimSpace(destination.RailID)
+		destination.Address = strings.TrimSpace(destination.Address)
+		destination.Tag = strings.TrimSpace(destination.Tag)
+		info, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(destination.RailID))
+		if err != nil {
+			return models.PayoutDestinationSet{}, models.ErrInvalidSellerAffiliate
+		}
+		canonical, ok := iwallet.CanonicalNativeCoinType(info.Chain)
+		if !ok || string(canonical) != destination.RailID {
+			return models.PayoutDestinationSet{}, models.ErrInvalidSellerAffiliate
+		}
+		if info.IsEthTypeChain() {
+			destination.Address, err = normalizeAffiliateEVMPayoutAddress(destination.Address)
+			if err != nil {
+				return models.PayoutDestinationSet{}, err
+			}
+		}
+	}
+	sort.Slice(normalized.Destinations, func(i, j int) bool {
+		return normalized.Destinations[i].RailID < normalized.Destinations[j].RailID
+	})
+	return normalized, nil
+}
+
+func legacyAffiliatePayouts(destinations models.PayoutDestinationSet) (string, models.AffiliateUTXOPayoutAddresses) {
+	legacyUTXO := make(models.AffiliateUTXOPayoutAddresses)
+	for _, entry := range []struct {
+		chain iwallet.ChainType
+		rail  string
+	}{
+		{iwallet.ChainBitcoin, models.AffiliatePayoutRailBitcoin},
+		{iwallet.ChainBitcoinCash, models.AffiliatePayoutRailBitcoinCash},
+		{iwallet.ChainLitecoin, models.AffiliatePayoutRailLitecoin},
+	} {
+		canonical, ok := iwallet.CanonicalNativeCoinType(entry.chain)
+		if !ok {
+			continue
+		}
+		if destination, found := destinations.DestinationForRail(string(canonical)); found {
+			legacyUTXO[entry.rail] = destination.Address
+		}
+	}
+	canonicalEVM, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainEthereum)
+	if !ok {
+		return "", legacyUTXO
+	}
+	destination, _ := destinations.DestinationForRail(string(canonicalEVM))
+	return destination.Address, legacyUTXO
 }
 
 // TransitionCommission advances all order lines using an objective order fact.
@@ -724,8 +813,21 @@ func sameAffiliateSettlementCoin(lineCurrency, settlementCoin string) bool {
 }
 
 func affiliatePayoutAddressForSettlementCoin(attribution *models.AffiliateAttribution, settlementCoin string) (string, error) {
-	coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(settlementCoin))
+	coinInfo, err := settlementpayment.SettlementCoinInfoForCoin(iwallet.CoinType(settlementCoin))
 	if err == nil {
+		if len(attribution.PromoterPayoutDestinations.Destinations) > 0 {
+			canonical, ok := iwallet.CanonicalNativeCoinType(coinInfo.Chain)
+			if !ok {
+				return "", models.ErrInvalidSellerAffiliate
+			}
+			destination, found := attribution.PromoterPayoutDestinations.DestinationForRail(string(canonical))
+			if !found {
+				return "", models.ErrInvalidSellerAffiliate
+			}
+			return destination.Address, nil
+		}
+		// Compatibility for immutable attributions issued before generic,
+		// rail-keyed payout snapshots were introduced.
 		switch coinInfo.Chain {
 		case iwallet.ChainBitcoin:
 			return affiliateUTXOPayoutAddress(attribution.PromoterUTXOPayoutAddresses, models.AffiliatePayoutRailBitcoin)
@@ -733,9 +835,11 @@ func affiliatePayoutAddressForSettlementCoin(attribution *models.AffiliateAttrib
 			return affiliateUTXOPayoutAddress(attribution.PromoterUTXOPayoutAddresses, models.AffiliatePayoutRailBitcoinCash)
 		case iwallet.ChainLitecoin:
 			return affiliateUTXOPayoutAddress(attribution.PromoterUTXOPayoutAddresses, models.AffiliatePayoutRailLitecoin)
+		case iwallet.ChainEthereum, iwallet.ChainBSC, iwallet.ChainPolygon, iwallet.ChainBase:
+			return normalizeAffiliateEVMPayoutAddress(attribution.PromoterPayoutAddress)
 		}
 	}
-	return normalizeAffiliateEVMPayoutAddress(attribution.PromoterPayoutAddress)
+	return "", models.ErrInvalidSellerAffiliate
 }
 
 func affiliateUTXOPayoutAddress(addresses models.AffiliateUTXOPayoutAddresses, rail string) (string, error) {

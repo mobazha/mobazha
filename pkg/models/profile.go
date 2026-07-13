@@ -65,6 +65,35 @@ type PayoutDestinationSet struct {
 	Destinations []PayoutDestination `json:"destinations,omitempty"`
 }
 
+// Clone returns an independent destination snapshot. Payout destinations are
+// order facts once a referral session is issued and must never alias mutable
+// profile data.
+func (s PayoutDestinationSet) Clone() PayoutDestinationSet {
+	clone := PayoutDestinationSet{Destinations: make([]PayoutDestination, len(s.Destinations))}
+	copy(clone.Destinations, s.Destinations)
+	return clone
+}
+
+// Equal reports whether two sets contain the same versioned destination for
+// every rail. Ordering is deliberately irrelevant.
+func (s PayoutDestinationSet) Equal(other PayoutDestinationSet) bool {
+	if len(s.Destinations) != len(other.Destinations) {
+		return false
+	}
+	byRail := make(map[string]PayoutDestination, len(s.Destinations))
+	for _, destination := range s.Destinations {
+		byRail[strings.TrimSpace(destination.RailID)] = destination
+	}
+	for _, destination := range other.Destinations {
+		stored, ok := byRail[strings.TrimSpace(destination.RailID)]
+		if !ok || strings.TrimSpace(stored.Address) != strings.TrimSpace(destination.Address) ||
+			strings.TrimSpace(stored.Tag) != strings.TrimSpace(destination.Tag) || stored.Version != destination.Version {
+			return false
+		}
+	}
+	return true
+}
+
 // DestinationForRail returns the published destination for one canonical rail.
 func (s PayoutDestinationSet) DestinationForRail(railID string) (PayoutDestination, bool) {
 	railID = strings.TrimSpace(railID)

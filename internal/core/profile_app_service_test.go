@@ -236,19 +236,16 @@ func TestProfileAppService_SetProfile_PublishesWalletManagedAffiliateDestination
 	require.NoError(t, svc.SetProfile(profile, nil))
 	got, err := svc.GetMyProfile()
 	require.NoError(t, err)
-	require.Len(t, got.PayoutDestinationSet.Destinations, 4)
+	require.Len(t, got.PayoutDestinationSet.Destinations, 8)
 	_, injected := got.PayoutDestinationSet.DestinationForRail("caller-injected")
 	assert.False(t, injected)
-	assert.Equal(t, []contracts.WalletAccountRole{
-		contracts.AccountAffiliate, contracts.AccountAffiliate,
-		contracts.AccountAffiliate, contracts.AccountAffiliate,
-	}, accounts.roles)
-	assert.Equal(t, []string{
-		"affiliate:crypto:bip122:000000000019d6689c085ae165831e93:native",
-		"affiliate:crypto:bitcoincash:mainnet:native",
-		"affiliate:crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native",
-		"affiliate:crypto:eip155:1:native",
-	}, accounts.references)
+	require.Len(t, accounts.roles, 8)
+	for _, role := range accounts.roles {
+		assert.Equal(t, contracts.AccountAffiliate, role)
+	}
+	solanaRail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainSolana)
+	require.True(t, ok)
+	assert.Contains(t, accounts.references, "affiliate:"+solanaRail.String())
 }
 
 func TestProfileAppService_SetProfile_ToleratesOneUnavailableAffiliateRail(t *testing.T) {
@@ -264,7 +261,7 @@ func TestProfileAppService_SetProfile_ToleratesOneUnavailableAffiliateRail(t *te
 	got, err := svc.GetMyProfile()
 	require.NoError(t, err)
 	assert.Equal(t, "Test", got.Name)
-	require.Len(t, got.PayoutDestinationSet.Destinations, 3, "the unavailable rail is omitted, not fatal")
+	require.Len(t, got.PayoutDestinationSet.Destinations, 7, "the unavailable rail is omitted, not fatal")
 	_, hasFailingRail := got.PayoutDestinationSet.DestinationForRail(string(failingRail))
 	assert.False(t, hasFailingRail)
 }

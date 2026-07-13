@@ -1545,13 +1545,17 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 	svc.AddProvisioningPolicy(policy)
 	capabilityPolicy := effectivePaymentProvisioningPolicy{node: obNode}
 	svc.AddProvisioningPolicy(capabilityPolicy)
+	affiliatePolicy := sellerAffiliatePaymentProvisioningPolicy{terms: obNode.sellerAffiliateService}
+	svc.AddProvisioningPolicy(affiliatePolicy)
 	if obNode.paymentService != nil {
 		obNode.paymentService.AddProvisioningPolicy(policy)
 		obNode.paymentService.AddProvisioningPolicy(capabilityPolicy)
+		obNode.paymentService.AddProvisioningPolicy(affiliatePolicy)
 	}
 	if obNode.fiatPaymentService != nil {
 		obNode.fiatPaymentService.AddProvisioningPolicy(policy)
 		obNode.fiatPaymentService.AddProvisioningPolicy(capabilityPolicy)
+		obNode.fiatPaymentService.AddProvisioningPolicy(affiliatePolicy)
 	}
 
 	// Phase B3: inject FiatPaymentFacade when fiat payments are available.

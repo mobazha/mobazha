@@ -20,6 +20,7 @@ type SellerAffiliateStore interface {
 	GetAffiliateLink(ctx context.Context, id string) (*models.AffiliateLink, error)
 	GetAffiliateLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error)
 	GetAffiliateLinkByPromoter(ctx context.Context, programID, promoterPeerID string) (*models.AffiliateLink, error)
+	ListAffiliateLinks(ctx context.Context, programID string) ([]models.AffiliateLink, error)
 	CreateAffiliateReferralSession(ctx context.Context, session *models.AffiliateReferralSession) error
 	GetAffiliateReferralSession(ctx context.Context, id string) (*models.AffiliateReferralSession, error)
 	RecordAffiliateOrder(ctx context.Context, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error)
@@ -56,10 +57,12 @@ type SellerAffiliateService interface {
 	SellerAffiliateSettlementPayoutProvider
 	PutProgram(ctx context.Context, program *models.AffiliateProgram) (*models.AffiliateProgram, error)
 	GetProgram(ctx context.Context) (*models.AffiliateProgram, error)
-	CreateLink(ctx context.Context, promoterPeerID, publicToken, payoutAddress string, utxoPayoutAddresses models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error)
-	ReissueLink(ctx context.Context, linkID, publicToken, payoutAddress string, utxoPayoutAddresses models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error)
+	CreateLink(ctx context.Context, promoterPeerID, publicToken string, payoutDestinations models.PayoutDestinationSet) (*models.AffiliateLink, error)
+	ReissueLink(ctx context.Context, linkID, publicToken string, payoutDestinations models.PayoutDestinationSet) (*models.AffiliateLink, error)
 	GetLink(ctx context.Context, linkID string) (*models.AffiliateLink, error)
 	GetLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error)
+	ListLinks(ctx context.Context) ([]models.AffiliateLink, error)
+	RevokeLink(ctx context.Context, linkID string) (*models.AffiliateLink, error)
 	CreateReferralSession(ctx context.Context, publicToken string, issuedAt time.Time) (*models.AffiliateReferralSession, error)
 	AttributeOrder(ctx context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error)
 	TransitionCommission(ctx context.Context, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)

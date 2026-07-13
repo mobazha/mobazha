@@ -37,16 +37,22 @@ func (*recordingSellerAffiliateService) PutProgram(context.Context, *models.Affi
 func (*recordingSellerAffiliateService) GetProgram(context.Context) (*models.AffiliateProgram, error) {
 	return nil, nil
 }
-func (*recordingSellerAffiliateService) CreateLink(context.Context, string, string, string, models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error) {
+func (*recordingSellerAffiliateService) CreateLink(context.Context, string, string, models.PayoutDestinationSet) (*models.AffiliateLink, error) {
 	return nil, nil
 }
-func (*recordingSellerAffiliateService) ReissueLink(context.Context, string, string, string, models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error) {
+func (*recordingSellerAffiliateService) ReissueLink(context.Context, string, string, models.PayoutDestinationSet) (*models.AffiliateLink, error) {
 	return nil, nil
 }
 func (*recordingSellerAffiliateService) GetLink(context.Context, string) (*models.AffiliateLink, error) {
 	return nil, nil
 }
 func (*recordingSellerAffiliateService) GetLinkByToken(context.Context, string) (*models.AffiliateLink, error) {
+	return nil, nil
+}
+func (*recordingSellerAffiliateService) ListLinks(context.Context) ([]models.AffiliateLink, error) {
+	return nil, nil
+}
+func (*recordingSellerAffiliateService) RevokeLink(context.Context, string) (*models.AffiliateLink, error) {
 	return nil, nil
 }
 func (*recordingSellerAffiliateService) CreateReferralSession(context.Context, string, time.Time) (*models.AffiliateReferralSession, error) {
@@ -307,6 +313,32 @@ func TestReconcileSellerAffiliateCommissionStatus_UnallocatedRefundReversesWhole
 	require.NoError(t, service.reconcileSellerAffiliateCommissionStatus(context.Background(), order))
 	assert.Empty(t, affiliate.lineIDs)
 	assert.Equal(t, models.AffiliateCommissionStatusReversed, affiliate.status)
+}
+
+func TestReconcileSellerAffiliateCommissionStatus_ReversesSellerLostDispute(t *testing.T) {
+	affiliate := new(recordingSellerAffiliateService)
+	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
+	order := &models.Order{ID: models.OrderID("affiliate-dispute-lost")}
+	require.NoError(t, order.PutMessage(testutil.MustWrapOrderMessage(&pb.DisputeClose{
+		ReleaseInfo: &pb.DisputeClose_ModeratedEscrowRelease{BuyerAmount: "100", VendorAmount: "0"},
+	})))
+
+	require.NoError(t, service.reconcileSellerAffiliateCommissionStatus(context.Background(), order))
+	assert.Equal(t, models.AffiliateCommissionStatusReversed, affiliate.status)
+	assert.Equal(t, models.AffiliateReversalDisputeLost, affiliate.reason)
+}
+
+func TestReconcileSellerAffiliateCommissionStatus_PreservesSellerAwardedDispute(t *testing.T) {
+	affiliate := new(recordingSellerAffiliateService)
+	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
+	order := &models.Order{ID: models.OrderID("affiliate-dispute-won")}
+	require.NoError(t, order.PutMessage(testutil.MustWrapOrderMessage(&pb.DisputeClose{
+		ReleaseInfo: &pb.DisputeClose_ModeratedEscrowRelease{BuyerAmount: "0", VendorAmount: "100"},
+	})))
+
+	require.NoError(t, service.reconcileSellerAffiliateCommissionStatus(context.Background(), order))
+	assert.Empty(t, affiliate.status)
+	assert.Empty(t, affiliate.reason)
 }
 
 func orderAffiliateTestPeerID(t *testing.T) string {

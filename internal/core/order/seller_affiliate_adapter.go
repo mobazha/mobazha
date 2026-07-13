@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 	"strings"
 	"time"
@@ -280,6 +281,24 @@ func (s *OrderAppService) reconcileSellerAffiliateCommissionStatus(ctx context.C
 	if order.State == models.OrderState_CANCELED || order.State == models.OrderState_DECLINED {
 		_, err := s.sellerAffiliate.TransitionCommission(ctx, order.ID.String(), models.AffiliateCommissionStatusReversed, models.AffiliateReversalOrderInvalid, time.Now().UTC())
 		return err
+	}
+	if len(order.SerializedDisputeClosed) > 0 {
+		disputeClose, err := order.DisputeClosedMessage()
+		if err != nil {
+			return fmt.Errorf("read seller affiliate dispute close facts: %w", err)
+		}
+		release := disputeClose.GetReleaseInfo()
+		if release == nil {
+			return fmt.Errorf("read seller affiliate dispute close facts: release info is missing")
+		}
+		vendorAmount, ok := new(big.Int).SetString(strings.TrimSpace(release.GetVendorAmount()), 10)
+		if !ok || vendorAmount.Sign() < 0 {
+			return fmt.Errorf("read seller affiliate dispute close facts: invalid vendor amount")
+		}
+		if vendorAmount.Sign() == 0 {
+			_, err := s.sellerAffiliate.TransitionCommission(ctx, order.ID.String(), models.AffiliateCommissionStatusReversed, models.AffiliateReversalDisputeLost, time.Now().UTC())
+			return err
+		}
 	}
 	fiatEvidence, err := order.FiatDisputeEvidence()
 	if err != nil {

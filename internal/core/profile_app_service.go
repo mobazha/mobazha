@@ -133,6 +133,10 @@ func (s *ProfileAppService) reserveAffiliateDestinations() models.PayoutDestinat
 		iwallet.ChainBitcoinCash,
 		iwallet.ChainLitecoin,
 		iwallet.ChainEthereum,
+		iwallet.ChainBSC,
+		iwallet.ChainPolygon,
+		iwallet.ChainBase,
+		iwallet.ChainSolana,
 	}
 	destinations := make([]models.PayoutDestination, 0, len(chains))
 	for _, chain := range chains {

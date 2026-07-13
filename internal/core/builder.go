@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path"
 
 	"strings"
@@ -36,6 +37,7 @@ import (
 	"github.com/mobazha/mobazha/internal/payment/embeddedwallet"
 	fiat "github.com/mobazha/mobazha/internal/payment/fiat"
 	"github.com/mobazha/mobazha/internal/payment/onramp"
+	onrampmock "github.com/mobazha/mobazha/internal/payment/onramp/mock"
 	"github.com/mobazha/mobazha/internal/repo"
 	nodeVersion "github.com/mobazha/mobazha/internal/version"
 	webhookinternal "github.com/mobazha/mobazha/internal/webhook"
@@ -1487,7 +1489,33 @@ func initBuyerFundingSubsystem(obNode *MobazhaNode) {
 	obNode.embeddedWalletRegistry = embeddedwallet.NewRegistry()
 	obNode.onrampRegistry = onramp.NewRegistry()
 	obNode.onrampFundingService = corePmt.NewOnrampFundingAppService(obNode.db, obNode.onrampRegistry)
+	registerDevMockOnrampProvider(obNode)
 	logger.LogInfoWithID(log, obNode.nodeID, "Buyer funding subsystem initialized (embedded wallet + onramp registries, fail-closed)")
+}
+
+// registerDevMockOnrampProvider registers the in-process mock onramp provider
+// for local end-to-end demos, gated entirely on the MOBAZHA_DEV_MOCK_ONRAMP_RAILS
+// env var (comma-separated rail ids, e.g. "crypto:eip155:1:native"). When the
+// var is unset the onramp registry stays empty and fail-closed, so this is a
+// no-op in any real deployment and cannot ship enabled by accident.
+func registerDevMockOnrampProvider(obNode *MobazhaNode) {
+	raw := strings.TrimSpace(os.Getenv("MOBAZHA_DEV_MOCK_ONRAMP_RAILS"))
+	if raw == "" {
+		return
+	}
+	opts := make([]onrampmock.Option, 0)
+	for _, rail := range strings.Split(raw, ",") {
+		rail = strings.TrimSpace(rail)
+		if rail != "" {
+			opts = append(opts, onrampmock.WithRailCapabilities(onrampmock.OpenRail(rail, "USD")))
+		}
+	}
+	if len(opts) == 0 {
+		return
+	}
+	obNode.onrampRegistry.Register(onrampmock.New(opts...))
+	logger.LogWarningWithIDf(log, obNode.nodeID,
+		"BuyerFunding: DEV mock onramp provider registered for rails [%s] — NOT for production", raw)
 }
 
 // finalizeFiatSubsystem runs after NodeOptions have been applied so hosted

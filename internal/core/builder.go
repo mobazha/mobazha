@@ -33,7 +33,9 @@ import (
 	"github.com/mobazha/mobazha/internal/orderextensions"
 	"github.com/mobazha/mobazha/internal/orders"
 	"github.com/mobazha/mobazha/internal/orders/utils"
+	"github.com/mobazha/mobazha/internal/payment/embeddedwallet"
 	fiat "github.com/mobazha/mobazha/internal/payment/fiat"
+	"github.com/mobazha/mobazha/internal/payment/onramp"
 	"github.com/mobazha/mobazha/internal/repo"
 	nodeVersion "github.com/mobazha/mobazha/internal/version"
 	webhookinternal "github.com/mobazha/mobazha/internal/webhook"
@@ -366,6 +368,7 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 		initStorePolicySubsystem(obNode)
 		initSellerAffiliateSubsystem(obNode)
 		initFiatSubsystem(obNode)
+		initBuyerFundingSubsystem(obNode)
 		initSupplyChainSubsystem(obNode)
 		initShippingSubsystem(obNode)
 		obNode.applyOptions(append([]NodeOption{
@@ -634,6 +637,7 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 	initStorePolicySubsystem(obNode)
 	initSellerAffiliateSubsystem(obNode)
 	initFiatSubsystem(obNode)
+	initBuyerFundingSubsystem(obNode)
 	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
 
@@ -1278,6 +1282,7 @@ func newLightweightNode(
 	initStorePolicySubsystem(obNode)
 	initSellerAffiliateSubsystem(obNode)
 	initFiatSubsystem(obNode)
+	initBuyerFundingSubsystem(obNode)
 	initSupplyChainSubsystem(obNode)
 	initShippingSubsystem(obNode)
 	initEventDispatcher(obNode, notifyWsFn, notifyWsForTenant)
@@ -1466,6 +1471,23 @@ func initFiatSubsystem(obNode *MobazhaNode) {
 	// applyOptions → initOrderService.
 
 	logger.LogInfoWithID(log, obNode.nodeID, "Fiat payment subsystem initialized")
+}
+
+// initBuyerFundingSubsystem initializes the embedded-wallet and onramp
+// provider registries and the onramp funding orchestration (RFC-0012 /
+// ADR-019). Both registries start empty: every capability surface is
+// fail-closed until a reviewed provider module is registered by hosting
+// (SaaS) or node configuration, so wiring the subsystem unconditionally
+// changes no buyer-visible behavior on its own.
+func initBuyerFundingSubsystem(obNode *MobazhaNode) {
+	if err := dbgorm.MigrateBuyerFundingModels(obNode.db); err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "BuyerFunding: failed to migrate models: %v", err)
+		return
+	}
+	obNode.embeddedWalletRegistry = embeddedwallet.NewRegistry()
+	obNode.onrampRegistry = onramp.NewRegistry()
+	obNode.onrampFundingService = corePmt.NewOnrampFundingAppService(obNode.db, obNode.onrampRegistry)
+	logger.LogInfoWithID(log, obNode.nodeID, "Buyer funding subsystem initialized (embedded wallet + onramp registries, fail-closed)")
 }
 
 // finalizeFiatSubsystem runs after NodeOptions have been applied so hosted

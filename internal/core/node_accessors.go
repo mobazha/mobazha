@@ -7,6 +7,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	internalcollateral "github.com/mobazha/mobazha/internal/collateral"
+	"github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/internal/wallet"
 	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	pkgconfig "github.com/mobazha/mobazha/pkg/config"
@@ -175,6 +176,23 @@ func (n *MobazhaNode) Fiat() contracts.FiatService {
 // FiatRegistry returns the fiat provider registry for external provider registration.
 // Hosting (SaaS) uses this to register platform-level providers after node creation.
 func (n *MobazhaNode) FiatRegistry() contracts.FiatProviderRegistry { return n.fiatRegistry }
+
+// EmbeddedWalletRegistry returns the embedded-wallet provider registry
+// (RFC-0012). Hosting (SaaS) or node configuration registers reviewed
+// provider modules here after node creation; it starts empty (fail-closed).
+func (n *MobazhaNode) EmbeddedWalletRegistry() contracts.EmbeddedWalletProviderRegistry {
+	return n.embeddedWalletRegistry
+}
+
+// OnrampRegistry returns the onramp provider registry (RFC-0012 Proposal 5).
+// Like the embedded-wallet registry, it starts empty and fail-closed.
+func (n *MobazhaNode) OnrampRegistry() contracts.OnrampProviderRegistry { return n.onrampRegistry }
+
+// OnrampFunding returns the onramp funding orchestration (ADR-019), or nil
+// when the buyer-funding subsystem failed to initialize.
+func (n *MobazhaNode) OnrampFunding() *payment.OnrampFundingAppService {
+	return n.onrampFundingService
+}
 
 // ActivePaymentChains returns the payment strategies that are currently
 // registered and eligible for runtime capability projection. Wallet presence

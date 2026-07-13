@@ -89,6 +89,9 @@ type appServices struct {
 	sellerAffiliateService     *SellerAffiliateAppService
 	fiatRegistry               contracts.FiatProviderRegistry
 	fiatPaymentService         *FiatPaymentAppService
+	embeddedWalletRegistry     contracts.EmbeddedWalletProviderRegistry
+	onrampRegistry             contracts.OnrampProviderRegistry
+	onrampFundingService       *payment.OnrampFundingAppService
 	supplyChainRegistry        contracts.FulfillmentProviderRegistry
 	supplyChainService         *SupplyChainAppService
 	supplyAvailabilityService  contracts.SupplyAvailabilityService

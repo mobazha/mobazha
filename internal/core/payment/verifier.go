@@ -3,7 +3,6 @@ package payment
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -833,6 +832,18 @@ func frozenStandardOrderAggregatedPaymentIntent(
 	case strings.HasPrefix(target.AssetID, "crypto:solana:"):
 		intent.settlementSpec = paymentmetrics.NewSolanaEscrowSpec(terms.ModeratorPeerID != "")
 		intent.contractAddress = target.Address
+		// Solana Anchor envelopes must carry the frozen setup binding: the
+		// counterparty validates the escrow seed in PaymentSent.Script and
+		// expects ContractAddress to name the program, not the funding PDA.
+		// Both mirrors persist the same snapshot, so the envelope stays
+		// byte-identical.
+		if snapshot, err := order.GetPendingEscrowPaymentInfo(); err == nil && snapshot != nil &&
+			strings.TrimSpace(snapshot.EscrowSeed) != "" {
+			if script, err := snapshot.EncodeHexScript(); err == nil {
+				intent.script = script
+				intent.contractAddress = snapshot.ContractAddress
+			}
+		}
 	default:
 		coinInfo, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(target.AssetID))
 		if err != nil || !coinInfo.IsNative || !coinInfo.Chain.IsUTXOChain() {
@@ -987,8 +998,8 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 		// from PaymentSent.Script, and both tenant mirrors persist identical
 		// snapshots so the envelope stays byte-identical.
 		if strings.TrimSpace(escrowInfo.EscrowSeed) != "" {
-			if data, err := json.Marshal(escrowInfo); err == nil {
-				intent.script = hex.EncodeToString(data)
+			if script, err := escrowInfo.EncodeHexScript(); err == nil {
+				intent.script = script
 			}
 		}
 		return intent

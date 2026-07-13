@@ -221,9 +221,11 @@ func (s *OrderAppService) preProcessPaymentSent(ctx context.Context, orderMsg *n
 		expectedPaymentCoin = string(lockedCoin)
 		expectedPaymentAmount = order.ExpectedPaymentAmountString()
 	}
+	// A decode error means the local snapshot exists but is corrupt; silently
+	// dropping it would disable the forged-binding cross-check, so fail closed.
 	localEscrowIntent, err := order.GetPendingEscrowPaymentInfo()
 	if err != nil {
-		localEscrowIntent = nil
+		return nil, fmt.Errorf("payment validation failed for order %s: decode local escrow setup facts: %w", orderMsg.OrderID, err)
 	}
 	if err := s.paymentVerifier.ValidateMessage(coinType, payment.PaymentMessageParams{
 		OrderOpen:             orderOpen,

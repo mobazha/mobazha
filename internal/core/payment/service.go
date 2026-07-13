@@ -3,7 +3,6 @@ package payment
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -519,15 +518,15 @@ func (s *PaymentAppService) BuildInitEscrowInstructions(ctx context.Context, par
 	return nil, iwallet.Address{}, nil, fmt.Errorf("%s does not support legacy escrow setup", coinInfo.Chain)
 }
 
-func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
-	if pd == nil {
-		return "", nil
-	}
+// pendingEscrowInfoFromPaymentData projects the frozen setup facts into the
+// snapshot persisted on every order mirror and serialized into the signed
+// payment binding.
+func pendingEscrowInfoFromPaymentData(pd *models.PaymentData) (*models.PendingEscrowPaymentInfo, error) {
 	platformFeeAmount, err := paymentDataPlatformFeeAmount(pd)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	data, err := json.Marshal(&models.PendingEscrowPaymentInfo{
+	return &models.PendingEscrowPaymentInfo{
 		Type:                   "escrow",
 		Coin:                   string(pd.Coin),
 		Amount:                 pd.Amount,
@@ -546,11 +545,18 @@ func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
 		FundingDeadline:        pd.FundingDeadline,
 		PlatformFeeAmount:      platformFeeAmount,
 		SettlementSpec:         pd.SettlementSpec,
-	})
+	}, nil
+}
+
+func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
+	if pd == nil {
+		return "", nil
+	}
+	info, err := pendingEscrowInfoFromPaymentData(pd)
 	if err != nil {
 		return "", err
 	}
-	return hex.EncodeToString(data), nil
+	return info.EncodeHexScript()
 }
 
 // CommitManagedSolanaSetup persists the private module's validated PDA result
@@ -571,38 +577,31 @@ func (s *PaymentAppService) persistEscrowPaymentInfo(orderID string, pd *models.
 	if pd == nil {
 		return nil
 	}
-	platformFeeAmount, err := paymentDataPlatformFeeAmount(pd)
+	info, err := pendingEscrowInfoFromPaymentData(pd)
 	if err != nil {
 		return err
 	}
+	// Every tenant mirror of the order must carry the same frozen snapshot:
+	// the counterparty cross-checks the signed binding against its own copy
+	// and both mirrors must build byte-identical aggregated envelopes.
 	return s.db.Update(func(tx database.Tx) error {
-		var order models.Order
-		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
-			return fmt.Errorf("load order: %w", err)
+		var orders []models.Order
+		if err := tx.Read().Where("id = ?", orderID).Find(&orders).Error; err != nil {
+			return fmt.Errorf("load orders: %w", err)
 		}
-		order.PaymentAddress = pd.ToAddress
-		if err := order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
-			Coin:                   string(pd.Coin),
-			Amount:                 pd.Amount,
-			ContractAddress:        pd.ContractAddress,
-			EscrowAddress:          pd.ToAddress,
-			EscrowSeed:             pd.EscrowSeed,
-			Moderator:              pd.Moderator,
-			ModeratorAddress:       pd.ModeratorAddress,
-			ModeratorPayoutAddress: pd.ModeratorPayoutAddress,
-			ModeratorPayoutAmount:  pd.ModeratorPayoutAmount,
-			AffiliatePayoutAddress: pd.AffiliatePayoutAddress,
-			AffiliatePayoutAmount:  pd.AffiliatePayoutAmount,
-			PlatformFeeAddress:     pd.PlatformFeeAddress,
-			RentCollector:          pd.RentCollector,
-			UnlockTime:             pd.UnlockTime,
-			FundingDeadline:        pd.FundingDeadline,
-			PlatformFeeAmount:      platformFeeAmount,
-			SettlementSpec:         pd.SettlementSpec,
-		}); err != nil {
-			return err
+		if len(orders) == 0 {
+			return fmt.Errorf("load orders: order %s not found", orderID)
 		}
-		return tx.Save(&order)
+		for i := range orders {
+			orders[i].PaymentAddress = pd.ToAddress
+			if err := orders[i].SetPendingEscrowPaymentInfo(info); err != nil {
+				return err
+			}
+			if err := tx.Save(&orders[i]); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 

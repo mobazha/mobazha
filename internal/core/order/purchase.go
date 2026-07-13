@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
@@ -933,19 +932,14 @@ func hydratePaymentDataFromPendingInfo(order *models.Order, paymentData *models.
 	if paymentData.SettlementSpec == nil && pending.SettlementSpec != nil {
 		paymentData.SettlementSpec = pending.SettlementSpec
 	}
-	// The Solana Anchor PDA is created before PaymentSent exists and its seed is
+	// A managed escrow PDA is created before PaymentSent exists and its seed is
 	// an immutable setup fact (frozen into the pending escrow snapshot at commit
 	// time). The signed payment message must serialize that frozen fact; it must
 	// never be re-derived from a local order projection, whose chaincode is not
-	// the seed the on-chain escrow was created with.
-	isSolanaAnchor := false
-	if coinInfo, err := paymentpkg.SettlementCoinInfoForCoin(paymentData.Coin); err == nil && coinInfo.Chain == iwallet.ChainSolana {
-		isSolanaAnchor = true
-	}
-	if paymentData.Script == "" || (isSolanaAnchor && pending.EscrowSeed != "") {
-		data, err := json.Marshal(pending)
-		if err == nil {
-			paymentData.Script = hex.EncodeToString(data)
+	// necessarily the seed the on-chain escrow was created with.
+	if paymentData.Script == "" || pending.EscrowSeed != "" {
+		if script, err := pending.EncodeHexScript(); err == nil {
+			paymentData.Script = script
 		}
 	}
 }

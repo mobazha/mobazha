@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 )
@@ -27,6 +28,22 @@ type PendingEscrowPaymentInfo struct {
 	AffiliatePayoutAddress string                 `json:"affiliatePayoutAddress,omitempty"`
 	AffiliatePayoutAmount  uint64                 `json:"affiliatePayoutAmount,omitempty"`
 	SettlementSpec         *PendingSettlementSpec `json:"settlementSpec,omitempty"`
+}
+
+// EncodeHexScript serializes the snapshot into the canonical hex-encoded JSON
+// form carried by PaymentSent.Script and the persisted setup metadata. Every
+// producer must use this single marshal site: the binding is validated by the
+// counterparty and must stay byte-identical across order mirrors.
+func (info *PendingEscrowPaymentInfo) EncodeHexScript() (string, error) {
+	if info == nil {
+		return "", fmt.Errorf("pending escrow payment info is nil")
+	}
+	info.Type = "escrow"
+	data, err := json.Marshal(info)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(data), nil
 }
 
 // SetPendingEscrowPaymentInfo stores escrow payment intent in PendingPaymentInfo.

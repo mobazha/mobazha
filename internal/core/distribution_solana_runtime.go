@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	gosolana "github.com/gagliardetto/solana-go"
 	corepayment "github.com/mobazha/mobazha/internal/core/payment"
@@ -13,6 +14,8 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/distribution"
 	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"github.com/mobazha/mobazha/pkg/payment"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 )
 
@@ -45,6 +48,91 @@ func (s distributionManagedSolanaOrderSource) LoadManagedSolanaOrder(ctx context
 		return nil, fmt.Errorf("distribution Solana order source: load order %s: %w", orderID, err)
 	}
 	return &order, nil
+}
+
+// PrepareManagedSolanaSetup builds the escrow intent for orders provisioned
+// outside settlement authorization (e.g. non-zero cancel fee). Its PDA seed is
+// the order projection's chaincode prefix; the exact seed is frozen into
+// PaymentData.EscrowSeed so the signed payment binding matches the derived
+// escrow regardless of which projection later assembles the message.
+func (s distributionManagedSolanaSetupService) PrepareManagedSolanaSetup(
+	ctx context.Context,
+	params payment.PaymentSetupParams,
+	config distribution.ManagedSolanaSetupConfig,
+) (*distribution.ManagedSolanaSetupIntent, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if s.service == nil {
+		return nil, fmt.Errorf("distribution Solana setup: payment service unavailable")
+	}
+	coinInfo, err := payment.SettlementCoinInfoForCoin(params.CoinType)
+	if err != nil {
+		return nil, fmt.Errorf("distribution Solana setup: %w", err)
+	}
+	if coinInfo.Chain != iwallet.ChainSolana {
+		return nil, fmt.Errorf("distribution Solana setup: coin %s is not on Solana", params.CoinType)
+	}
+	program, err := gosolana.PublicKeyFromBase58(strings.TrimSpace(config.ProgramAddress))
+	if err != nil || program.IsZero() {
+		return nil, fmt.Errorf("distribution Solana setup: valid program address is required")
+	}
+	payer, err := gosolana.PublicKeyFromBase58(strings.TrimSpace(params.PayerAddress))
+	if err != nil || payer.IsZero() {
+		return nil, fmt.Errorf("distribution Solana setup: valid payer address is required")
+	}
+	orderInfo, err := s.service.GetOrderInfo(models.OrderID(params.OrderID), params.CoinType)
+	if err != nil {
+		return nil, fmt.Errorf("distribution Solana setup: order projection: %w", err)
+	}
+	method, moderatorAddress, requiredSignatures, err := s.service.GetModeratorEscrowInfo(ctx, params.Moderator, params.CoinType)
+	if err != nil {
+		return nil, fmt.Errorf("distribution Solana setup: moderator projection: %w", err)
+	}
+	refundAddress := strings.TrimSpace(params.RefundAddress)
+	if refundAddress == "" {
+		refundAddress = orderInfo.BuyerAddress
+	}
+	now := time.Now().UTC()
+	unlockTime := now.Add(time.Duration(orderInfo.UnlockHours) * time.Hour).Unix()
+	platformAuthority := strings.TrimSpace(config.PlatformAuthority)
+	if platformAuthority == "" {
+		platformAuthority = params.PayerAddress
+	}
+	feeCollector := strings.TrimSpace(config.PlatformFeeAddress)
+	if feeCollector == "" {
+		feeCollector = platformAuthority
+	}
+	rentCollector := strings.TrimSpace(config.RentCollector)
+	if rentCollector == "" {
+		rentCollector = platformAuthority
+	}
+	escrowInfo := iwallet.EscrowInfo{
+		ContractAddress: program.String(), PayerAddress: params.PayerAddress,
+		PlatformAuthority: platformAuthority, BuyerAddress: orderInfo.BuyerAddress,
+		RefundAddress: refundAddress, SellerAddress: orderInfo.VendorAddress,
+		ModeratorAddress: moderatorAddress, PlatformFeeAddress: feeCollector,
+		RentCollector: rentCollector, UniqueId: orderInfo.UniqueId,
+		RequiredSignatures: uint8(requiredSignatures), UnlockHours: uint64(orderInfo.UnlockHours),
+		UnlockTime: unlockTime, FundingDeadline: unlockTime,
+		CoinType: params.CoinType, Amount: params.Amount, Testnet: config.Testnet,
+	}
+	paymentTokenAddress := "0x0000000000000000000000000000000000000000"
+	if !coinInfo.IsNative {
+		paymentTokenAddress = coinInfo.ContractAddress(config.Testnet)
+	}
+	paymentData := &models.PaymentData{
+		OrderID: params.OrderID, Coin: params.CoinType, Method: method,
+		SettlementSpec:  payment.NewSolanaEscrowSpec(method == pb.PaymentSent_MODERATED).ToPending(),
+		ContractAddress: program.String(), PayerAddress: params.PayerAddress,
+		Moderator: params.Moderator, ModeratorAddress: moderatorAddress,
+		Amount: params.Amount, FromID: padManagedSolanaID(payer.Bytes()),
+		UnlockHours: uint32(orderInfo.UnlockHours), UnlockTime: unlockTime, FundingDeadline: unlockTime,
+		PlatformFeeAddress: feeCollector, RentCollector: rentCollector,
+		RefundAddress: refundAddress, PaymentTokenAddress: paymentTokenAddress,
+		EscrowSeed: hex.EncodeToString(orderInfo.UniqueId[:]),
+	}
+	return &distribution.ManagedSolanaSetupIntent{EscrowInfo: escrowInfo, PaymentData: paymentData}, nil
 }
 
 func (s distributionManagedSolanaSetupService) CommitManagedSolanaSetup(

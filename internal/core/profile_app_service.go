@@ -141,7 +141,12 @@ func (s *ProfileAppService) reserveAffiliateDestinations() models.PayoutDestinat
 			log.Warningf("affiliate payout destination: no canonical rail for %s", chain)
 			continue
 		}
-		reserved, err := s.walletAccounts.ReserveAddress(context.Background(), string(railID), contracts.AccountAffiliate, "default")
+		// Reservations intentionally have a tenant-wide unique reference. The
+		// Affiliate payout set owns one deterministic address per rail, so the
+		// reference must include that rail instead of making the first successful
+		// reservation block every subsequent payout destination.
+		referenceID := "affiliate:" + string(railID)
+		reserved, err := s.walletAccounts.ReserveAddress(context.Background(), string(railID), contracts.AccountAffiliate, referenceID)
 		if err != nil {
 			log.Warningf("affiliate payout destination: reserve %s address failed (will retry on next profile save): %v", railID, err)
 			continue

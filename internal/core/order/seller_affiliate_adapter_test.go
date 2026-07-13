@@ -24,6 +24,7 @@ type recordingSellerAffiliateService struct {
 	payout       *models.AffiliateSettlementPayout
 	termsPresent bool
 	facts        []models.AffiliateOrderFacts
+	recorded     bool
 	status       models.AffiliateCommissionStatus
 	reason       models.AffiliateCommissionReversalReason
 }
@@ -50,6 +51,26 @@ func (s *recordingSellerAffiliateService) AttributeOrder(_ context.Context, fact
 		SellerPeerID: facts.SellerPeerID, BuyerPeerID: facts.BuyerPeerID,
 	}
 	return &models.AffiliateOrderResult{Attribution: *s.attribution}, nil
+}
+func (s *recordingSellerAffiliateService) PrepareOrderAttribution(_ context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error) {
+	s.facts = append(s.facts, facts)
+	return &models.AffiliateOrderResult{
+		Attribution: models.AffiliateAttribution{
+			ID: "attribution-prepared", OrderID: facts.OrderID, ReferralSessionID: facts.ReferralSessionID,
+			SellerPeerID: facts.SellerPeerID, BuyerPeerID: facts.BuyerPeerID,
+		},
+		Lines: []models.AffiliateCommissionLine{{
+			AttributionID: "attribution-prepared", OrderID: facts.OrderID, OrderLineID: facts.Lines[0].OrderLineID,
+		}},
+	}, nil
+}
+func (s *recordingSellerAffiliateService) RecordPreparedOrderTx(_ database.Tx, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error) {
+	s.recorded = true
+	s.attribution = &result.Attribution
+	return result, nil
+}
+func (*recordingSellerAffiliateService) TransitionCommissionTx(database.Tx, string, models.AffiliateCommissionStatus, models.AffiliateCommissionReversalReason, time.Time) ([]models.AffiliateCommissionLine, error) {
+	return nil, nil
 }
 func (s *recordingSellerAffiliateService) TransitionCommission(_ context.Context, _ string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, _ time.Time) ([]models.AffiliateCommissionLine, error) {
 	s.status = status
@@ -92,6 +113,65 @@ func (s *recordingSellerAffiliateService) SettlementPayout(context.Context, stri
 }
 func (s *recordingSellerAffiliateService) HasSettlementTerms(context.Context, string) (bool, error) {
 	return s.termsPresent, nil
+}
+
+func TestIncomingOrderOpen_RecordsAffiliateSnapshotWithSellerOrderTransaction(t *testing.T) {
+	affiliate := new(recordingSellerAffiliateService)
+	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
+	sellerPeerID := orderAffiliateTestPeerID(t)
+	buyerPeerID := orderAffiliateTestPeerID(t)
+	listing := &pb.SignedListing{Listing: &pb.Listing{
+		VendorID: &pb.ID{PeerID: sellerPeerID},
+		Metadata: &pb.Listing_Metadata{
+			ContractType: pb.Listing_Metadata_DIGITAL_GOOD, Format: pb.Listing_Metadata_FIXED_PRICE,
+			PricingCurrency: &pb.Currency{Code: "BTC", Divisibility: 8},
+		},
+		Item: &pb.Listing_Item{Price: "100000"},
+	}}
+	listingHash, err := orderutils.HashListing(listing)
+	require.NoError(t, err)
+	orderOpen := &pb.OrderOpen{
+		BuyerID: &pb.ID{PeerID: buyerPeerID}, Listings: []*pb.SignedListing{listing},
+		Items:       []*pb.OrderOpen_Item{{ListingHash: listingHash.B58String(), Quantity: "1"}},
+		PricingCoin: "BTC", AffiliateReferralSessionID: "referral-prepared",
+	}
+	orderMsg := testutil.MustWrapOrderMessage(orderOpen)
+	orderMsg.OrderID = "affiliate-order-prepared"
+
+	ppCtx, err := service.preProcessOrderOpen(t.Context(), orderMsg)
+	require.NoError(t, err)
+	require.NotNil(t, ppCtx)
+	require.True(t, ppCtx.AffiliateAttributionValidated)
+	require.NotNil(t, ppCtx.AffiliateOrderResult)
+	require.Len(t, affiliate.facts, 1)
+	assert.Equal(t, buyerPeerID, affiliate.facts[0].BuyerPeerID)
+
+	order := &models.Order{ID: models.OrderID(orderMsg.OrderID), MyRole: string(models.RoleVendor), Open: true}
+	require.NoError(t, order.PutMessage(orderMsg))
+	require.NoError(t, service.db.Update(func(tx database.Tx) error {
+		if err := tx.Save(order); err != nil {
+			return err
+		}
+		return service.postProcessOrderOpenInTx(tx, orderMsg, ppCtx)
+	}))
+	assert.True(t, affiliate.recorded)
+	require.NotNil(t, affiliate.attribution)
+	assert.Equal(t, orderMsg.OrderID, affiliate.attribution.OrderID)
+
+	// Simulate an order accepted by an older binary: the invariant repair path
+	// recreates the missing snapshot without putting attribution logic in a rail
+	// finalizer.
+	affiliate.attribution = nil
+	affiliate.recorded = false
+	require.NoError(t, service.EnsureSellerAffiliateOrderSnapshot(t.Context(), order.ID))
+	assert.True(t, affiliate.recorded)
+	require.NotNil(t, affiliate.attribution)
+
+	order.SetFSMState(models.OrderState_CANCELED)
+	require.NoError(t, service.db.Update(func(tx database.Tx) error { return tx.Save(order) }))
+	require.NoError(t, service.ReconcileSellerAffiliateOrder(t.Context(), order.ID))
+	assert.Equal(t, models.AffiliateCommissionStatusReversed, affiliate.status)
+	assert.Equal(t, models.AffiliateReversalOrderInvalid, affiliate.reason)
 }
 
 func TestReconcileSellerAffiliateOrder_DerivesPendingCommissionFromSignedOrder(t *testing.T) {

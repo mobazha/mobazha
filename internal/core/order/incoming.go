@@ -44,6 +44,13 @@ type PreProcessContext struct {
 
 	// REFUND (buyer, MODERATED UTXO): escrow release committed
 	EscrowRefundCommitted bool
+
+	// ORDER_OPEN (seller): referral eligibility was validated before the order
+	// transaction. A non-nil result is committed atomically with the order;
+	// AffiliateAttributionValidated also covers an idempotent replay whose
+	// immutable attribution already exists.
+	AffiliateOrderResult          *models.AffiliateOrderResult
+	AffiliateAttributionValidated bool
 }
 
 // HandleIncomingOrderMessage is the main entry point for processing incoming
@@ -128,6 +135,8 @@ func (s *OrderAppService) recordPreProcessError(orderMsg *npb.OrderMessage, ppEr
 // Dispatches to message-type-specific handlers.
 func (s *OrderAppService) preProcess(ctx context.Context, orderMsg *npb.OrderMessage) (*PreProcessContext, error) {
 	switch orderMsg.MessageType {
+	case npb.OrderMessage_ORDER_OPEN:
+		return s.preProcessOrderOpen(ctx, orderMsg)
 	case npb.OrderMessage_PAYMENT_SENT:
 		return s.preProcessPaymentSent(ctx, orderMsg)
 	case npb.OrderMessage_ORDER_CONFIRMATION:
@@ -141,6 +150,28 @@ func (s *OrderAppService) preProcess(ctx context.Context, orderMsg *npb.OrderMes
 	default:
 		return nil, nil
 	}
+}
+
+func (s *OrderAppService) preProcessOrderOpen(ctx context.Context, orderMsg *npb.OrderMessage) (*PreProcessContext, error) {
+	if orderMsg == nil {
+		return nil, nil
+	}
+	orderOpen := new(pb.OrderOpen)
+	if err := orderMsg.Message.UnmarshalTo(orderOpen); err != nil {
+		return nil, err
+	}
+	referralSessionID := strings.TrimSpace(orderOpen.GetAffiliateReferralSessionID())
+	if referralSessionID == "" {
+		return nil, nil
+	}
+	result, err := s.prepareSellerAffiliateOrderSnapshot(ctx, orderMsg.OrderID, orderOpen)
+	if err != nil {
+		return nil, err
+	}
+	return &PreProcessContext{
+		AffiliateOrderResult:          result,
+		AffiliateAttributionValidated: true,
+	}, nil
 }
 
 // preProcessPaymentSent handles the pre-processing I/O for PAYMENT_SENT messages:
@@ -609,7 +640,7 @@ func (s *OrderAppService) postProcessOutgoingTxInTx(tx database.Tx, orderMsg *np
 func (s *OrderAppService) postProcessInTx(tx database.Tx, orderMsg *npb.OrderMessage, ppCtx *PreProcessContext, order *models.Order) error {
 	switch orderMsg.MessageType {
 	case npb.OrderMessage_ORDER_OPEN:
-		return s.postProcessOrderOpenInTx(tx, orderMsg)
+		return s.postProcessOrderOpenInTx(tx, orderMsg, ppCtx)
 	case npb.OrderMessage_ORDER_CONFIRMATION:
 		if err := s.commitStandardOrderSupplyInTx(tx, orderMsg.OrderID); err != nil {
 			return err
@@ -650,7 +681,7 @@ type orderTransactionalSupplyAvailabilityService interface {
 	ReleaseOrderTx(context.Context, database.Tx, string, string, string) error
 }
 
-func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb.OrderMessage) error {
+func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb.OrderMessage, ppCtx *PreProcessContext) error {
 	var stored models.Order
 	if err := tx.Read().Where("id = ?", orderMsg.OrderID).First(&stored).Error; err != nil {
 		return err
@@ -665,6 +696,20 @@ func (s *OrderAppService) postProcessOrderOpenInTx(tx database.Tx, orderMsg *npb
 	orderOpen := new(pb.OrderOpen)
 	if err := orderMsg.Message.UnmarshalTo(orderOpen); err != nil {
 		return err
+	}
+	if strings.TrimSpace(orderOpen.GetAffiliateReferralSessionID()) != "" {
+		if ppCtx == nil || !ppCtx.AffiliateAttributionValidated {
+			return models.ErrInvalidSellerAffiliate
+		}
+		if ppCtx.AffiliateOrderResult != nil {
+			attributionService, ok := s.sellerAffiliate.(contracts.SellerAffiliateAttributionService)
+			if !ok {
+				return fmt.Errorf("seller affiliate attribution does not support transactional order snapshots")
+			}
+			if _, err := attributionService.RecordPreparedOrderTx(tx, ppCtx.AffiliateOrderResult); err != nil {
+				return fmt.Errorf("record seller affiliate order snapshot: %w", err)
+			}
+		}
 	}
 	if err := s.persistOrderExtensions(context.Background(), tx, orderMsg.OrderID, orderOpen); err != nil {
 		return err

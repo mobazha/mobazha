@@ -185,14 +185,37 @@ func TestValidateFrozenStandardOrderDisputeRelease_BindsModeratorPayout(t *testi
 		BuyerAddress: "tb1buyer", BuyerAmount: "400", VendorAddress: "tb1vendor", VendorAmount: "490",
 		ModeratorAddress: "tb1moderator", ModeratorAmount: "100", TransactionFee: "10",
 	}
-	require.NoError(t, validateFrozenStandardOrderDisputeRelease(valid, terms, target))
+	require.NoError(t, validateFrozenStandardOrderDisputeRelease(valid, terms, target, nil))
 
 	redirected := *valid
 	redirected.ModeratorAddress = "tb1attacker"
-	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(&redirected, terms, target), models.ErrPaymentAttemptSettlementTermsConflict)
+	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(&redirected, terms, target, nil), models.ErrPaymentAttemptSettlementTermsConflict)
 	underpaid := *valid
 	underpaid.ModeratorAmount = "1"
-	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(&underpaid, terms, target), models.ErrPaymentAttemptSettlementTermsConflict)
+	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(&underpaid, terms, target, nil), models.ErrPaymentAttemptSettlementTermsConflict)
+}
+
+func TestValidateFrozenStandardOrderDisputeRelease_BindsScaledAffiliatePayout(t *testing.T) {
+	terms := models.PaymentAttemptSettlementTerms{
+		ModeratorPeerID: "moderator", FundingAmount: "1000", SellerGrossBasis: "1000",
+		ModeratorFee: &models.PaymentAttemptSettlementFee{Address: "tb1moderator", Amount: "100"},
+		Affiliate:    &models.PaymentAttemptAffiliateTerm{Address: "tb1affiliate", Amount: "100"},
+	}
+	target := models.PaymentAttemptFundingTarget{AmountAtomic: "1000"}
+	release := &pb.DisputeClose_ModeratedEscrowRelease{
+		Outpoints:    []*pb.Outpoint{{FromID: []byte{0x01}, Value: "1000"}},
+		BuyerAddress: "tb1buyer", BuyerAmount: "400", VendorAddress: "tb1vendor", VendorAmount: "490",
+		ModeratorAddress: "tb1moderator", ModeratorAmount: "100", TransactionFee: "10",
+	}
+	payout := &models.AffiliateSettlementPayout{Address: "tb1affiliate", Amount: "49"}
+	require.NoError(t, validateFrozenStandardOrderDisputeRelease(release, terms, target, payout))
+
+	redirected := *payout
+	redirected.Address = "tb1attacker"
+	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(release, terms, target, &redirected), models.ErrPaymentAttemptSettlementTermsConflict)
+	wrongAmount := *payout
+	wrongAmount.Amount = "50"
+	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(release, terms, target, &wrongAmount), models.ErrPaymentAttemptSettlementTermsConflict)
 }
 
 func (f *fakeRefunderStrategy) SellerDeclineRefund(_ context.Context, params payment.ActionParams) (*payment.ActionResult, error) {

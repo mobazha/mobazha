@@ -205,15 +205,6 @@ func (n *MobazhaNode) FinalizeStandardOrderSettlementAuthorization(
 	if cancelFee := strings.TrimSpace(order.CancelFeeAmount); cancelFee != "" && cancelFee != "0" {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("non-zero cancellation fees are outside the first settlement authorization scope")
 	}
-	if n.sellerAffiliateService != nil {
-		hasAffiliateTerms, err := n.sellerAffiliateService.HasSettlementTerms(ctx, orderID)
-		if err != nil {
-			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load seller affiliate settlement terms: %w", err)
-		}
-		if hasAffiliateTerms {
-			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("affiliate settlement terms are outside the first settlement authorization scope")
-		}
-	}
 	rawProvider, ok := n.db.(rawSettlementAuthorizationDB)
 	if !ok || rawProvider.RawDB() == nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("standard order settlement finalization raw database is unavailable")
@@ -221,8 +212,19 @@ func (n *MobazhaNode) FinalizeStandardOrderSettlementAuthorization(
 	var draft models.PaymentAttempt
 	if err := rawProvider.RawDB().Where(
 		"tenant_id = ? AND attempt_id = ?", strings.TrimSpace(order.TenantID), attemptID,
-	).Select("currency").First(&draft).Error; err != nil {
+	).Select("currency", "state").First(&draft).Error; err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load settlement authorization rail: %w", err)
+	}
+	var affiliateTerm *models.PaymentAttemptAffiliateTerm
+	if draft.State == models.PaymentAttemptAuthorizationDraft && n.sellerAffiliateService != nil {
+		if err := n.orderService.EnsureSellerAffiliateOrderSnapshot(ctx, order.ID); err != nil {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("ensure seller affiliate order snapshot: %w", err)
+		}
+		term, termErr := n.sellerAffiliateService.SettlementAttemptTerm(ctx, order.ID.String(), draft.Currency)
+		if termErr != nil {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("load seller affiliate settlement terms: %w", termErr)
+		}
+		affiliateTerm = term
 	}
 	targetProjector, err := n.standardOrderFundingTargetProjectorForRail(draft.Currency)
 	if err != nil {
@@ -230,7 +232,7 @@ func (n *MobazhaNode) FinalizeStandardOrderSettlementAuthorization(
 	}
 	finalization, err := finalizeSellerSettlementAuthorization(
 		ctx, rawProvider.RawDB(), &order, n.signer, n.walletAccountService,
-		targetProjector, attemptID,
+		targetProjector, attemptID, affiliateTerm,
 	)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
@@ -265,6 +267,7 @@ func finalizeSellerSettlementAuthorization(
 	walletAccounts contracts.WalletAccountService,
 	targetProjector standardOrderFundingTargetProjector,
 	attemptID string,
+	affiliateTerm *models.PaymentAttemptAffiliateTerm,
 ) (StandardOrderSettlementAuthorizationFinalization, error) {
 	if err := ctx.Err(); err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
@@ -303,6 +306,11 @@ func finalizeSellerSettlementAuthorization(
 	}
 	if identitySigner.PeerID().String() != sellerPeerID {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("local identity does not match signed order seller")
+	}
+	referralSessionID := strings.TrimSpace(orderOpen.GetAffiliateReferralSessionID())
+	if (referralSessionID == "") != (affiliateTerm == nil) ||
+		(affiliateTerm != nil && (affiliateTerm.ReferralSessionID != referralSessionID || affiliateTerm.BuyerPeerID != buyerPeerID)) {
+		return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	if !iwallet.CoinType(attempt.Currency).MatchesPricingCurrency(orderOpen.PricingCoin) ||
 		strings.TrimSpace(orderOpen.Amount) != attempt.AmountValue {
@@ -372,6 +380,7 @@ func finalizeSellerSettlementAuthorization(
 		SellerGrossBasis:     attempt.AmountValue,
 		PlatformReleaseFee:   models.PaymentAttemptSettlementFee{Amount: "0"},
 		BuyerCancellationFee: models.PaymentAttemptSettlementFee{Amount: "0"},
+		Affiliate:            affiliateTerm,
 		DisputePolicy:        models.DisputeScalingSellerAwardProRataFloor,
 	}
 	payload, err := terms.SellerSigningPayload()

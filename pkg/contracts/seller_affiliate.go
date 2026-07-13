@@ -66,13 +66,18 @@ type SellerAffiliateService interface {
 	ListPendingCommissionOrderIDs(ctx context.Context) ([]string, error)
 }
 
-// GuestSellerAffiliateService exposes only the affiliate operations that must
-// participate in the Guest order database transaction.
-type GuestSellerAffiliateService interface {
+// SellerAffiliateAttributionService exposes the two-phase attribution
+// operations used to validate mutable referral resources before an order
+// transaction and commit the resulting immutable snapshot with that order.
+type SellerAffiliateAttributionService interface {
 	PrepareOrderAttribution(ctx context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error)
 	RecordPreparedOrderTx(tx database.Tx, result *models.AffiliateOrderResult) (*models.AffiliateOrderResult, error)
 	TransitionCommissionTx(tx database.Tx, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
 }
+
+// GuestSellerAffiliateService is retained as the checkout-facing name for the
+// shared transactional attribution contract.
+type GuestSellerAffiliateService = SellerAffiliateAttributionService
 
 // SellerAffiliateProvider exposes the tenant-local affiliate subsystem.
 type SellerAffiliateProvider interface {

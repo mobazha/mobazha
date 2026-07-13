@@ -107,7 +107,7 @@ func TestPostProcessOrderOpen_UsesLocalVariantHashWhenEmbeddedSkuOnlyHasProductI
 		if err := tx.Save(order); err != nil {
 			return err
 		}
-		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-embedded-product-id-only", embedded, listingHash))
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-embedded-product-id-only", embedded, listingHash), nil)
 	}))
 
 	require.Len(t, recorder.reserveTxRequests, 1)
@@ -142,7 +142,7 @@ func TestPostProcessOrderOpen_ReservesWhenOrderListingOmitsSkuQuantity(t *testin
 		if err := tx.Save(order); err != nil {
 			return err
 		}
-		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-public-embed-no-qty", orderEmbed, listingHash))
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-public-embed-no-qty", orderEmbed, listingHash), nil)
 	}))
 
 	require.Len(t, recorder.reserveTxRequests, 1)
@@ -176,7 +176,7 @@ func TestPostProcessOrderOpen_ReservesUsingEmbeddedSkuWithLocalStockLimit(t *tes
 		if err := tx.Save(order); err != nil {
 			return err
 		}
-		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-embedded-local-stock", embedded, listingHash))
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-embedded-local-stock", embedded, listingHash), nil)
 	}))
 
 	require.Len(t, recorder.reserveTxRequests, 1)
@@ -207,7 +207,7 @@ func TestPostProcessOrderOpen_ReservesStandardOrderSupplyForVendorWithoutVariant
 		if err := tx.Save(order); err != nil {
 			return err
 		}
-		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-standard-no-variant", listing, listingHash))
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-standard-no-variant", listing, listingHash), nil)
 	}))
 
 	require.Len(t, recorder.reserveTxRequests, 1)
@@ -249,7 +249,7 @@ func TestPostProcessOrderOpen_ReservesWhenEmbeddedListingHasNoSkus(t *testing.T)
 		if err := tx.Save(order); err != nil {
 			return err
 		}
-		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-embedded-no-skus", embedded, listingHash))
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessageNoOptions(t, "order-embedded-no-skus", embedded, listingHash), nil)
 	}))
 
 	require.Len(t, recorder.reserveTxRequests, 1)
@@ -280,7 +280,7 @@ func TestPostProcessOrderOpen_ReservesStandardOrderSupplyForVendor(t *testing.T)
 		if err := tx.Save(order); err != nil {
 			return err
 		}
-		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessage(t, "order-standard-1", listing, listingHash))
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessage(t, "order-standard-1", listing, listingHash), nil)
 	}))
 
 	require.Len(t, recorder.reserveTxRequests, 1)
@@ -340,7 +340,7 @@ func TestPostProcessOrderOpen_LeavesExternalSupplyLineForManualAction(t *testing
 		require.Equal(t, "sync-123", lines[0].ProviderRef)
 		require.False(t, lines[0].StockTracked)
 		require.Empty(t, lines[0].VariantHash)
-		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessage(t, "order-standard-external", listing, listingHash))
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessage(t, "order-standard-external", listing, listingHash), nil)
 	}))
 
 	require.Empty(t, recorder.reserveTxRequests)
@@ -470,7 +470,7 @@ func TestPostProcessOrderOpen_SkipsClosedOrDeclinedStandardOrder(t *testing.T) {
 		if err := tx.Save(order); err != nil {
 			return err
 		}
-		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessage(t, "order-standard-declined", listing, listingHash))
+		return svc.postProcessOrderOpenInTx(tx, orderSupplyOrderOpenMessage(t, "order-standard-declined", listing, listingHash), nil)
 	}))
 
 	require.Empty(t, recorder.reserveTxRequests)

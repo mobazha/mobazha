@@ -183,7 +183,7 @@ func validatePaymentAttemptAffiliateTerm(term *PaymentAttemptAffiliateTerm, sell
 			return nil, nil, fmt.Errorf("invalid affiliate peer ID")
 		}
 	}
-	affiliate, err := settlementAtomicAmount(term.Amount, true)
+	affiliate, err := settlementAtomicAmount(term.Amount, false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid affiliate amount: %w", err)
 	}

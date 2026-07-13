@@ -231,7 +231,7 @@ func TestPostProcessOrderOpen_PersistsVendorCollectibleExtension(t *testing.T) {
 			OrderID:     orderID,
 			MessageType: npb.OrderMessage_ORDER_OPEN,
 			Message:     payload,
-		})
+		}, nil)
 	})
 	if err != nil {
 		t.Fatal(err)

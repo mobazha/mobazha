@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"sort"
 	"strings"
 	"time"
 
@@ -571,6 +572,76 @@ func (s *SellerAffiliateAppService) SettlementPayout(ctx context.Context, orderI
 		return nil, nil
 	}
 	return &models.AffiliateSettlementPayout{Address: address, Amount: amount.String()}, nil
+}
+
+// SettlementAttemptTerm returns the complete immutable affiliate allocation
+// that a seller must bind into one attempt-scoped settlement authorization.
+// Unlike SettlementPayout, an allocation that rounds to zero is retained so
+// the signed terms still prove that the referred order was not silently
+// stripped of its attribution.
+func (s *SellerAffiliateAppService) SettlementAttemptTerm(ctx context.Context, orderID, settlementCoin string) (*models.PaymentAttemptAffiliateTerm, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	orderID = strings.TrimSpace(orderID)
+	settlementCoin = strings.TrimSpace(settlementCoin)
+	if orderID == "" || settlementCoin == "" {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	attribution, err := s.store.GetAffiliateAttributionByOrder(ctx, orderID)
+	if errors.Is(err, models.ErrSellerAffiliateNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if attribution == nil || attribution.Validate() != nil ||
+		(attribution.BuyerKind != "" && attribution.BuyerKind != models.AffiliateBuyerKindPeer) {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	address, err := affiliatePayoutAddressForSettlementCoin(attribution, settlementCoin)
+	if err != nil {
+		return nil, err
+	}
+	lines, err := s.store.ListAffiliateCommissionLinesByOrder(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if len(lines) == 0 {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	termLines := make([]models.PaymentAttemptAffiliateLineTerm, 0, len(lines))
+	netTotal := new(big.Int)
+	commissionTotal := new(big.Int)
+	for i := range lines {
+		line := &lines[i]
+		if line.Validate() != nil || line.Status != models.AffiliateCommissionStatusPending ||
+			line.OrderID != orderID || line.AttributionID != attribution.ID ||
+			line.CommissionRateBPSSnapshot != attribution.CommissionRateBPSSnapshot ||
+			!sameAffiliateSettlementCoin(line.Currency, settlementCoin) {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		netAmount, netOK := new(big.Int).SetString(strings.TrimSpace(line.NetMerchandiseAtomic), 10)
+		commission, commissionOK := new(big.Int).SetString(strings.TrimSpace(line.CommissionAtomic), 10)
+		if !netOK || !commissionOK || netAmount.Sign() <= 0 || commission.Sign() < 0 ||
+			netAmount.String() != line.NetMerchandiseAtomic || commission.String() != line.CommissionAtomic {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+		netTotal.Add(netTotal, netAmount)
+		commissionTotal.Add(commissionTotal, commission)
+		termLines = append(termLines, models.PaymentAttemptAffiliateLineTerm{
+			OrderLineID: line.OrderLineID, NetMerchandiseAtomic: line.NetMerchandiseAtomic,
+			CommissionAtomic: line.CommissionAtomic,
+		})
+	}
+	sort.Slice(termLines, func(i, j int) bool { return termLines[i].OrderLineID < termLines[j].OrderLineID })
+	return &models.PaymentAttemptAffiliateTerm{
+		ReferralSessionID: attribution.ReferralSessionID,
+		ProgramID:         attribution.ProgramID, PromoterPeerID: attribution.PromoterPeerID,
+		BuyerPeerID: attribution.BuyerPeerID, CommissionRateBPS: attribution.CommissionRateBPSSnapshot,
+		Address: address, Amount: commissionTotal.String(), SellerGrossBasis: netTotal.String(),
+		Lines: termLines,
+	}, nil
 }
 
 // HasSettlementTerms reports whether immutable affiliate attribution exists

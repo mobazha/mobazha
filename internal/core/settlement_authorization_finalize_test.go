@@ -108,6 +108,10 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 	require.NoError(t, err)
 	sellerPeerID, err := identity.PeerIDFromPublicKey(sellerKeys.PubKey)
 	require.NoError(t, err)
+	promoterKeys, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	promoterPeerID, err := identity.PeerIDFromPublicKey(promoterKeys.PubKey)
+	require.NoError(t, err)
 	buyerSettlementKey, _ := btcec.PrivKeyFromBytes([]byte("buyer-finalization-settlement-key"))
 	sellerSettlementKey, _ := btcec.PrivKeyFromBytes([]byte("seller-finalization-settlement-key"))
 	keyRef := contracts.SettlementKeyRef{
@@ -134,7 +138,8 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 	))
 	openBytes, err := protojson.Marshal(&pb.OrderOpen{
 		Amount: attempt.AmountValue, PricingCoin: "BTC", BuyerID: &pb.ID{PeerID: buyerPeerID.String()},
-		Listings: []*pb.SignedListing{{Listing: &pb.Listing{VendorID: &pb.ID{PeerID: sellerPeerID.String()}}}},
+		AffiliateReferralSessionID: "referral-finalize-utxo",
+		Listings:                   []*pb.SignedListing{{Listing: &pb.Listing{VendorID: &pb.ID{PeerID: sellerPeerID.String()}}}},
 	})
 	require.NoError(t, err)
 	order := &models.Order{
@@ -147,13 +152,22 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 	}}
 	projector := standardOrderUTXOFundingTargetProjector{wallets: testMultiwallet(t, testMasterKey(t))}
 	identitySigner := contracts.NewKeyPairSigner(sellerKeys, sellerPeerID)
+	affiliateTerm := &models.PaymentAttemptAffiliateTerm{
+		ReferralSessionID: "referral-finalize-utxo", ProgramID: "program-finalize-utxo",
+		PromoterPeerID: promoterPeerID.String(), BuyerPeerID: buyerPeerID.String(),
+		CommissionRateBPS: 1000, Address: "bc1qaffiliatepayout0000000000000000000000000",
+		Amount: "100", SellerGrossBasis: "1000",
+		Lines: []models.PaymentAttemptAffiliateLineTerm{{
+			OrderLineID: "order-finalize-utxo:0", NetMerchandiseAtomic: "1000", CommissionAtomic: "100",
+		}},
+	}
 
 	first, err := finalizeSellerSettlementAuthorization(
-		t.Context(), db, order, identitySigner, walletAccounts, projector, attempt.AttemptID,
+		t.Context(), db, order, identitySigner, walletAccounts, projector, attempt.AttemptID, affiliateTerm,
 	)
 	require.NoError(t, err)
 	retry, err := finalizeSellerSettlementAuthorization(
-		t.Context(), db, order, identitySigner, walletAccounts, projector, attempt.AttemptID,
+		t.Context(), db, order, identitySigner, walletAccounts, projector, attempt.AttemptID, affiliateTerm,
 	)
 	require.NoError(t, err)
 
@@ -165,6 +179,7 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 	require.Equal(t, attempt.AmountValue, first.Terms.SellerGrossBasis)
 	require.Equal(t, "0", first.Terms.PlatformReleaseFee.Amount)
 	require.Equal(t, "0", first.Terms.BuyerCancellationFee.Amount)
+	require.Equal(t, affiliateTerm, first.Terms.Affiliate)
 	require.Equal(t, []models.SettlementParticipantRole{
 		models.SettlementParticipantBuyer, models.SettlementParticipantSeller,
 	}, first.Authorization.RequiredRoles)

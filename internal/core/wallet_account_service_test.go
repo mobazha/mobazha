@@ -182,6 +182,22 @@ func TestWalletAccountService_ReserveAddress_IsIdempotentAndRoleSeparated(t *tes
 	assert.Len(t, reservations, 3)
 }
 
+func TestWalletAccountService_ReserveAddress_Ethereum(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	migrateWalletAccountModels(t, db)
+
+	service := newWalletAccountServiceForTest(t, db)
+	rail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainEthereum)
+	require.True(t, ok)
+
+	destination, err := service.ReserveAddress(t.Context(), string(rail), contracts.AccountAffiliate, "default")
+	require.NoError(t, err)
+	assert.Equal(t, string(rail), destination.RailID)
+	assert.Regexp(t, `^0x[0-9a-fA-F]{40}$`, destination.Address)
+}
+
 func TestWalletAccountService_Capabilities_GuestFailsClosedUntilTransferExists(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)

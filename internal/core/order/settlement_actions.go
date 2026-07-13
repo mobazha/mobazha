@@ -186,15 +186,24 @@ func (s *OrderAppService) signFrozenStandardOrderUTXOAction(
 		appendOutput(release.AffiliateAddress, release.AffiliateAmount)
 	case *pb.DisputeClose_ModeratedEscrowRelease:
 		if action != payment.SettlementActionDisputeRelease ||
-			validateFrozenStandardOrderDisputeRelease(release, *terms, *target) != nil {
+			validateFrozenStandardOrderDisputeRelease(release, *terms, *target, params.AffiliatePayout) != nil {
 			return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
 		}
 		for _, outpoint := range release.Outpoints {
 			txn.From = append(txn.From, iwallet.SpendInfo{ID: outpoint.FromID, Amount: iwallet.NewAmount(outpoint.Value)})
 		}
 		appendOutput(release.BuyerAddress, release.BuyerAmount)
-		appendOutput(release.VendorAddress, release.VendorAmount)
+		vendorAmount := new(big.Int)
+		vendorAmount.SetString(release.VendorAmount, 10)
+		if params.AffiliatePayout != nil {
+			affiliateAmount, _ := new(big.Int).SetString(params.AffiliatePayout.Amount, 10)
+			vendorAmount.Sub(vendorAmount, affiliateAmount)
+		}
+		appendOutput(release.VendorAddress, vendorAmount.String())
 		appendOutput(release.ModeratorAddress, release.ModeratorAmount)
+		if params.AffiliatePayout != nil {
+			appendOutput(params.AffiliatePayout.Address, params.AffiliatePayout.Amount)
+		}
 	default:
 		return nil, false, nil
 	}
@@ -250,7 +259,8 @@ func validateFrozenStandardOrderCompleteRelease(
 	} else {
 		affiliateAmount, err = canonicalSettlementActionAmount(release.AffiliateAmount, false)
 		if err != nil || affiliateAmount.String() != terms.Affiliate.Amount ||
-			!sameSettlementActionAddress(release.AffiliateAddress, terms.Affiliate.Address, affiliateAmount) {
+			(affiliateAmount.Sign() == 0 && strings.TrimSpace(release.AffiliateAddress) != "") ||
+			(affiliateAmount.Sign() > 0 && !sameSettlementActionAddress(release.AffiliateAddress, terms.Affiliate.Address, affiliateAmount)) {
 			return models.ErrPaymentAttemptSettlementTermsConflict
 		}
 	}
@@ -272,8 +282,9 @@ func validateFrozenStandardOrderDisputeRelease(
 	release *pb.DisputeClose_ModeratedEscrowRelease,
 	terms models.PaymentAttemptSettlementTerms,
 	target models.PaymentAttemptFundingTarget,
+	affiliatePayout *models.AffiliateSettlementPayout,
 ) error {
-	if release == nil || terms.ModeratorPeerID == "" || terms.ModeratorFee == nil || terms.Affiliate != nil ||
+	if release == nil || terms.ModeratorPeerID == "" || terms.ModeratorFee == nil ||
 		target.AmountAtomic != terms.FundingAmount {
 		return models.ErrPaymentAttemptSettlementTermsConflict
 	}
@@ -303,6 +314,44 @@ func validateFrozenStandardOrderDisputeRelease(
 	expectedParticipantTotal.Sub(expectedParticipantTotal, moderatorAmount)
 	actualParticipantTotal := new(big.Int).Add(buyerAmount, vendorAmount)
 	if expectedParticipantTotal.Sign() < 0 || actualParticipantTotal.Cmp(expectedParticipantTotal) != 0 {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	if err := validateFrozenDisputeAffiliatePayout(terms, vendorAmount, affiliatePayout, payment.SameUTXOAddress); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateFrozenDisputeAffiliatePayout(
+	terms models.PaymentAttemptSettlementTerms,
+	vendorGross *big.Int,
+	payout *models.AffiliateSettlementPayout,
+	sameAddress func(string, string) bool,
+) error {
+	if vendorGross == nil || sameAddress == nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	if terms.Affiliate == nil {
+		if payout != nil {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		return nil
+	}
+	fullAffiliate, ok := new(big.Int).SetString(strings.TrimSpace(terms.Affiliate.Amount), 10)
+	grossBasis, basisOK := new(big.Int).SetString(strings.TrimSpace(terms.SellerGrossBasis), 10)
+	if !ok || !basisOK || fullAffiliate.Sign() < 0 || grossBasis.Sign() <= 0 || vendorGross.Sign() < 0 || vendorGross.Cmp(grossBasis) > 0 {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	expected := new(big.Int).Mul(fullAffiliate, vendorGross)
+	expected.Div(expected, grossBasis)
+	if expected.Sign() == 0 {
+		if payout != nil {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		return nil
+	}
+	if payout == nil || strings.TrimSpace(payout.Amount) != expected.String() ||
+		!sameAddress(terms.Affiliate.Address, payout.Address) {
 		return models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	return nil

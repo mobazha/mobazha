@@ -24,6 +24,94 @@ import (
 // present but the verified-payment transaction has not committed yet.
 var ErrSellerAffiliateSettlementNotReady = errors.New("seller affiliate settlement facts are not ready")
 
+func (s *OrderAppService) prepareSellerAffiliateOrderSnapshot(
+	ctx context.Context,
+	orderID string,
+	orderOpen *pb.OrderOpen,
+) (*models.AffiliateOrderResult, error) {
+	if s == nil || s.sellerAffiliate == nil {
+		return nil, fmt.Errorf("seller affiliate attribution is not configured")
+	}
+	referralSessionID := strings.TrimSpace(orderOpen.GetAffiliateReferralSessionID())
+	if referralSessionID == "" {
+		return nil, nil
+	}
+	attributedAt := time.Now().UTC()
+	if timestamp := orderOpen.GetTimestamp(); timestamp != nil && !timestamp.AsTime().IsZero() {
+		attributedAt = timestamp.AsTime().UTC()
+	}
+	facts, err := orders.BuildAffiliateOrderFacts(orderID, orderOpen, referralSessionID, attributedAt, s.exchangeRates)
+	if err != nil {
+		return nil, err
+	}
+	existing, err := s.sellerAffiliate.GetAttributionByOrder(ctx, orderID)
+	if err == nil {
+		if existing == nil || existing.ReferralSessionID != referralSessionID ||
+			existing.SellerPeerID != facts.SellerPeerID || existing.BuyerPeerID != facts.BuyerPeerID {
+			return nil, models.ErrSellerAffiliateConflict
+		}
+		return nil, nil
+	}
+	if !errors.Is(err, models.ErrSellerAffiliateNotFound) {
+		return nil, err
+	}
+	attributionService, ok := s.sellerAffiliate.(contracts.SellerAffiliateAttributionService)
+	if !ok {
+		return nil, fmt.Errorf("seller affiliate attribution does not support transactional order snapshots")
+	}
+	result, err := attributionService.PrepareOrderAttribution(ctx, facts)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	return result, nil
+}
+
+// EnsureSellerAffiliateOrderSnapshot repairs the invariant for referred
+// seller orders accepted by an older binary before OrderOpen attribution was
+// made transactional. Normal orders already have the snapshot and take the
+// read-only idempotent path.
+func (s *OrderAppService) EnsureSellerAffiliateOrderSnapshot(ctx context.Context, orderID models.OrderID) error {
+	if s == nil || s.sellerAffiliate == nil {
+		return nil
+	}
+	if err := s.acquireOrderLock(orderID); err != nil {
+		return fmt.Errorf("acquire seller affiliate order lock: %w", err)
+	}
+	defer s.releaseOrderLock(orderID)
+
+	var order models.Order
+	if err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("id = ?", orderID.String()).First(&order).Error
+	}); err != nil {
+		return fmt.Errorf("load seller affiliate order snapshot: %w", err)
+	}
+	if order.Role() != models.RoleVendor {
+		return nil
+	}
+	orderOpen, err := order.OrderOpenMessage()
+	if err != nil {
+		return fmt.Errorf("read seller affiliate OrderOpen snapshot: %w", err)
+	}
+	if strings.TrimSpace(orderOpen.GetAffiliateReferralSessionID()) == "" {
+		return nil
+	}
+	result, err := s.prepareSellerAffiliateOrderSnapshot(ctx, orderID.String(), orderOpen)
+	if err != nil || result == nil {
+		return err
+	}
+	attributionService, ok := s.sellerAffiliate.(contracts.SellerAffiliateAttributionService)
+	if !ok {
+		return fmt.Errorf("seller affiliate attribution does not support transactional order snapshots")
+	}
+	return s.db.Update(func(tx database.Tx) error {
+		_, err := attributionService.RecordPreparedOrderTx(tx, result)
+		return err
+	})
+}
+
 // ReconcileSellerAffiliateOrder projects verified seller-order facts into the
 // minimal affiliate ledger. It is safe to call after every order message.
 func (s *OrderAppService) ReconcileSellerAffiliateOrder(ctx context.Context, orderID models.OrderID) error {
@@ -44,12 +132,15 @@ func (s *OrderAppService) ReconcileSellerAffiliateOrder(ctx context.Context, ord
 		return fmt.Errorf("read seller affiliate OrderOpen: %w", err)
 	}
 	referralSessionID := strings.TrimSpace(orderOpen.GetAffiliateReferralSessionID())
-	if referralSessionID == "" || !orderRecord.IsPaymentVerified() {
+	if referralSessionID == "" {
 		return nil
 	}
 
 	attribution, err := s.sellerAffiliate.GetAttributionByOrder(ctx, orderID.String())
 	if errors.Is(err, models.ErrSellerAffiliateNotFound) {
+		if !orderRecord.IsPaymentVerified() {
+			return nil
+		}
 		facts, factsErr := s.sellerAffiliateOrderFacts(orderID, orderOpen, referralSessionID)
 		if factsErr != nil {
 			return factsErr
@@ -142,6 +233,10 @@ func (s *OrderAppService) reconcileSellerAffiliateCommissionStatus(ctx context.C
 			}
 		}
 		_, err := s.sellerAffiliate.TransitionCommission(ctx, order.ID.String(), models.AffiliateCommissionStatusReversed, models.AffiliateReversalRefund, time.Now().UTC())
+		return err
+	}
+	if order.State == models.OrderState_CANCELED || order.State == models.OrderState_DECLINED {
+		_, err := s.sellerAffiliate.TransitionCommission(ctx, order.ID.String(), models.AffiliateCommissionStatusReversed, models.AffiliateReversalOrderInvalid, time.Now().UTC())
 		return err
 	}
 	fiatEvidence, err := order.FiatDisputeEvidence()

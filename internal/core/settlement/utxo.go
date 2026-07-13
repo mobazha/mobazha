@@ -236,15 +236,33 @@ func (s *SettlementService) frozenStandardOrderUTXOReleaseAuthorization(
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	if matched.Currency != strings.TrimSpace(params.CoinCode) || target.RedeemScriptHex == "" ||
-		(strings.TrimSpace(params.ScriptHex) != "" && !strings.EqualFold(params.ScriptHex, target.RedeemScriptHex)) ||
-		params.AffiliatePayout != nil {
+		(strings.TrimSpace(params.ScriptHex) != "" && !strings.EqualFold(params.ScriptHex, target.RedeemScriptHex)) {
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
 	}
 	terms, err := matched.GetSettlementTerms()
-	if err != nil || terms == nil || terms.ModeratorPeerID != "" || terms.Affiliate != nil ||
+	if err != nil || terms == nil || terms.ModeratorPeerID != "" ||
 		terms.PlatformReleaseFee.Amount != "0" || terms.BuyerCancellationFee.Amount != "0" ||
 		terms.SellerGrossBasis != terms.FundingAmount {
 		return nil, models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	if terms.Affiliate == nil {
+		if params.AffiliatePayout != nil {
+			return nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+	} else {
+		affiliateAmount, ok := new(big.Int).SetString(strings.TrimSpace(terms.Affiliate.Amount), 10)
+		if !ok || affiliateAmount.Sign() < 0 {
+			return nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		if affiliateAmount.Sign() == 0 {
+			if params.AffiliatePayout != nil {
+				return nil, models.ErrPaymentAttemptSettlementTermsConflict
+			}
+		} else if params.AffiliatePayout == nil ||
+			!payment.SameUTXOAddress(terms.Affiliate.Address, params.AffiliatePayout.Address) ||
+			strings.TrimSpace(terms.Affiliate.Amount) != strings.TrimSpace(params.AffiliatePayout.Amount) {
+			return nil, models.ErrPaymentAttemptSettlementTermsConflict
+		}
 	}
 	bundle, err := matched.GetAuthorizationBundle()
 	if err != nil || bundle == nil {

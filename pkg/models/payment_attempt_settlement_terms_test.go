@@ -57,6 +57,16 @@ func TestPaymentAttemptSettlementTerms_CanonicalHashIsStable(t *testing.T) {
 	require.Len(t, firstHash, 64)
 }
 
+func TestPaymentAttemptSettlementTerms_PreservesZeroAffiliateAllocation(t *testing.T) {
+	terms := validPaymentAttemptSettlementTerms()
+	terms.Affiliate.Amount = "0"
+	terms.Affiliate.SellerGrossBasis = "1"
+	terms.Affiliate.Lines = []PaymentAttemptAffiliateLineTerm{{
+		OrderLineID: "order-1:0", NetMerchandiseAtomic: "1", CommissionAtomic: "0",
+	}}
+	require.NoError(t, terms.Validate())
+}
+
 func TestPaymentAttempt_SetSettlementTermsIsImmutable(t *testing.T) {
 	attempt := PaymentAttempt{AttemptID: "attempt-1", OrderID: "order-1"}
 	terms := validPaymentAttemptSettlementTerms()

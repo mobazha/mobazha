@@ -243,7 +243,12 @@ func TestProfileAppService_SetProfile_PublishesWalletManagedAffiliateDestination
 		contracts.AccountAffiliate, contracts.AccountAffiliate,
 		contracts.AccountAffiliate, contracts.AccountAffiliate,
 	}, accounts.roles)
-	assert.Equal(t, []string{"default", "default", "default", "default"}, accounts.references)
+	assert.Equal(t, []string{
+		"affiliate:crypto:bip122:000000000019d6689c085ae165831e93:native",
+		"affiliate:crypto:bitcoincash:mainnet:native",
+		"affiliate:crypto:bip122:12a765e31ffd4059bada1e25190f6e98:native",
+		"affiliate:crypto:eip155:1:native",
+	}, accounts.references)
 }
 
 func TestProfileAppService_SetProfile_ToleratesOneUnavailableAffiliateRail(t *testing.T) {

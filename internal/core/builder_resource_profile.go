@@ -226,6 +226,13 @@ func loadResourceProfileIdentityAndKeys(db database.Database) (peer.ID, pkgcontr
 //	initFeatureResolver         → covered (initSovereignFeatureResolver)
 //	initGuestOrderService       → covered (OP-1.3)
 func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
+	// The profile service reserves the node-owned Affiliate payout addresses
+	// whenever a profile is saved. Initialise the wallet adapter first so the
+	// first profile publication (including a freshly provisioned hosted tenant)
+	// cannot publish an empty destination set.
+	if n.walletAccountService == nil && n.bip44Key != nil {
+		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet, n.keyProvider)
+	}
 	n.preferencesService = NewPreferencesAppService(PreferencesAppServiceConfig{
 		DB:         n.db,
 		BanChecker: noOpBanChecker{},
@@ -238,11 +245,12 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 		EventBus:     n.eventBus,
 	})
 	n.profileService = NewProfileAppService(ProfileAppServiceConfig{
-		DB:       n.db,
-		Publish:  n.Publish,
-		EventBus: n.eventBus,
-		NodeID:   n.nodeID,
-		PeerID:   n.peerID,
+		DB:             n.db,
+		Publish:        n.Publish,
+		EventBus:       n.eventBus,
+		NodeID:         n.nodeID,
+		PeerID:         n.peerID,
+		WalletAccounts: n.walletAccountService,
 	})
 	initDiscountSubsystem(n)
 	initCollectionSubsystem(n)
@@ -286,8 +294,7 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 	})
 	n.initReceivingAccountService()
 
-	if n.bip44Key != nil {
-		n.walletAccountService = NewWalletAccountService(n.db, n.bip44Key, n.multiwallet, n.keyProvider)
+	if n.walletAccountService != nil {
 		n.directPaymentService = guest.NewDirectPaymentService(n.db)
 		n.directPaymentService.SetWalletAccountService(n.walletAccountService)
 	}

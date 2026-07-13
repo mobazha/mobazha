@@ -57,7 +57,9 @@ func TestCollateralOpenAPIOperationsRequireHumanAdministratorAuth(t *testing.T) 
 	require.NoError(t, json.Unmarshal(BuildOpenAPISpec(), &spec))
 
 	want := map[string]bool{
+		"collateral-capabilities-get":       false,
 		"collateral-accounts-open":          false,
+		"collateral-accounts-list":          false,
 		"collateral-accounts-get":           false,
 		"collateral-funding-target-prepare": false,
 		"collateral-funding-reconcile":      false,

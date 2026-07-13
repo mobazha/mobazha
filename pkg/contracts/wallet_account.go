@@ -55,6 +55,13 @@ type WalletCapabilities struct {
 	Affiliate    bool
 }
 
+// WalletCapabilityProvider is an optional node-side read port for callers that
+// need to advertise wallet-backed flows without exposing reservation or spend
+// operations. Its zero value is intentionally unavailable/fail-closed.
+type WalletCapabilityProvider interface {
+	WalletCapabilities(ctx context.Context, railID string) (WalletCapabilities, error)
+}
+
 // WalletTransferRequest asks the wallet domain to move funds from one durable
 // reservation. Amount is expressed in the rail's smallest native unit. When
 // SweepAll is true Amount must be zero and the entire spendable balance is

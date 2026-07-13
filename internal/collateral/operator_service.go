@@ -49,6 +49,15 @@ func NewOperatorService(
 	return service, nil
 }
 
+func (s *operatorService) Capabilities(ctx context.Context) (pkgcollateral.RailDescriptor, bool) {
+	if err := ctx.Err(); err != nil || s == nil || s.executor == nil {
+		return pkgcollateral.RailDescriptor{}, false
+	}
+	descriptor := s.executor.descriptor
+	descriptor.Assets = append([]string(nil), descriptor.Assets...)
+	return descriptor, true
+}
+
 func (s *operatorService) Open(ctx context.Context, input pkgcollateral.OperatorOpenRequest) (pkgcollateral.Account, error) {
 	if err := ctx.Err(); err != nil {
 		return pkgcollateral.Account{}, err
@@ -73,6 +82,36 @@ func (s *operatorService) Open(ctx context.Context, input pkgcollateral.Operator
 		return pkgcollateral.Account{}, operatorMutationError(err)
 	}
 	return account, nil
+}
+
+func (s *operatorService) ListAccounts(ctx context.Context, providerID, resourceID string) ([]pkgcollateral.Account, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	providerID = strings.TrimSpace(providerID)
+	resourceID = strings.TrimSpace(resourceID)
+	if providerID == "" || resourceID == "" {
+		return nil, fmt.Errorf("%w: provider and resource are required", pkgcollateral.ErrOperatorInvalid)
+	}
+	records := make([]models.CollateralAccountRecord, 0)
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().WithContext(ctx).
+			Where("tenant_id = ? AND principal_id = ? AND provider_id = ? AND resource_id = ?", s.tenantID, s.principalID, providerID, resourceID).
+			Order("created_at DESC, collateral_id ASC").
+			Find(&records).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	accounts := make([]pkgcollateral.Account, 0, len(records))
+	for _, record := range records {
+		account, accountErr := accountFromRecord(record)
+		if accountErr != nil {
+			return nil, accountErr
+		}
+		accounts = append(accounts, account)
+	}
+	return accounts, nil
 }
 
 func (s *operatorService) Status(ctx context.Context, collateralID string) (pkgcollateral.OperatorAccountStatus, error) {

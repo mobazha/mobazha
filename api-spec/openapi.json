@@ -1032,6 +1032,39 @@
         ],
         "type": "object"
       },
+      "CollateralAccountsView": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CollateralAccountView"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "CollateralCapabilitiesView": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "rail": {
+            "$ref": "#/components/schemas/RailDescriptor"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "type": "object"
+      },
       "Digital-asset-create-license-keyRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1628,6 +1661,60 @@
           "attempts",
           "expiresAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "RailDescriptor": {
+        "additionalProperties": false,
+        "properties": {
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "custodyModel": {
+            "type": "string"
+          },
+          "hasReceiptVerification": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "supportsClaimSlash": {
+            "type": "boolean"
+          },
+          "supportsFundingObserve": {
+            "type": "boolean"
+          },
+          "supportsFundingTargets": {
+            "type": "boolean"
+          },
+          "supportsPrincipalRelease": {
+            "type": "boolean"
+          },
+          "supportsReconciliation": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "custodyModel",
+          "assets",
+          "supportsFundingTargets",
+          "supportsFundingObserve",
+          "supportsPrincipalRelease",
+          "supportsClaimSlash",
+          "supportsReconciliation",
+          "hasReceiptVerification"
         ],
         "type": "object"
       },
@@ -6904,6 +6991,69 @@
       }
     },
     "/v1/collateral/accounts": {
+      "get": {
+        "description": "Returns only accounts bound to the selected tenant, local principal, provider, and resource.",
+        "operationId": "collateral-accounts-list",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "providerID",
+            "schema": {
+              "maxLength": 160,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "resourceID",
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollateralAccountsView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "List collateral accounts for a resource",
+        "tags": [
+          "collateral"
+        ]
+      },
       "post": {
         "description": "Creates or retrieves one tenant- and local-principal-bound collateral requirement. This does not prove funding.",
         "operationId": "collateral-accounts-open",
@@ -7126,6 +7276,49 @@
           }
         ],
         "summary": "Reconcile collateral funding",
+        "tags": [
+          "collateral"
+        ]
+      }
+    },
+    "/v1/collateral/capabilities": {
+      "get": {
+        "description": "Returns the effective reviewed collateral rail for this node. Source presence does not make a rail available.",
+        "operationId": "collateral-capabilities-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollateralCapabilitiesView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Get collateral operator capabilities",
         "tags": [
           "collateral"
         ]

@@ -96,7 +96,9 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 
 	expectedOps := []string{
 		"node-huma-ping",
+		"collateral-capabilities-get",
 		"collateral-accounts-open",
+		"collateral-accounts-list",
 		"collateral-accounts-get",
 		"collateral-funding-target-prepare",
 		"collateral-funding-reconcile",

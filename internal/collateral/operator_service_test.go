@@ -34,6 +34,11 @@ func TestOperatorServiceBindsTenantPrincipalAndFailsClosedWithoutRail(t *testing
 	require.Equal(t, database.StandaloneTenantID, account.TenantID)
 	require.Equal(t, "seller-peer", account.PrincipalID)
 	require.Equal(t, pkgcollateral.StatePendingFunding, account.State)
+	_, available := service.Capabilities(context.Background())
+	require.False(t, available)
+	accounts, err := service.ListAccounts(context.Background(), account.ProviderID, account.ResourceID)
+	require.NoError(t, err)
+	require.Equal(t, []pkgcollateral.Account{account}, accounts)
 
 	replayed, err := service.Open(context.Background(), pkgcollateral.OperatorOpenRequest{
 		ProviderID: "io.mobazha.collectibles", ResourceID: "source-operator-1",
@@ -51,6 +56,9 @@ func TestOperatorServiceBindsTenantPrincipalAndFailsClosedWithoutRail(t *testing
 
 	otherPrincipalAPI, err := NewOperatorService(db, database.StandaloneTenantID, "other-seller", nil)
 	require.NoError(t, err)
+	accounts, err = otherPrincipalAPI.ListAccounts(context.Background(), account.ProviderID, account.ResourceID)
+	require.NoError(t, err)
+	require.Empty(t, accounts)
 	_, err = otherPrincipalAPI.Status(context.Background(), account.CollateralID)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
@@ -64,6 +72,9 @@ func TestOperatorServicePreparesAndReconcilesReceiptVerifiedFunding(t *testing.T
 	service := serviceAPI.(*operatorService)
 	service.now = func() time.Time { return now }
 	service.executor.now = func() time.Time { return now }
+	descriptor, available := service.Capabilities(context.Background())
+	require.True(t, available)
+	require.Equal(t, rail.descriptor, descriptor)
 
 	account, err := service.Open(context.Background(), pkgcollateral.OperatorOpenRequest{
 		ProviderID: "io.mobazha.collectibles", ResourceID: "source-operator-2",

@@ -60,6 +60,15 @@ func (n *MobazhaNode) Multiwallet() contracts.WalletOperator {
 	return n.multiwallet
 }
 
+// WalletCapabilities exposes the node's effective wallet-domain readiness
+// without leaking the mutable wallet account service to platform callers.
+func (n *MobazhaNode) WalletCapabilities(ctx context.Context, railID string) (contracts.WalletCapabilities, error) {
+	if n == nil || n.walletAccountService == nil {
+		return contracts.WalletCapabilities{}, fmt.Errorf("wallet account service is unavailable")
+	}
+	return n.walletAccountService.Capabilities(ctx, railID)
+}
+
 // ExchangeRates returns the node's exchange rate provider.
 func (n *MobazhaNode) ExchangeRates() *wallet.ExchangeRateProvider {
 	return n.exchangeRates

@@ -70,7 +70,9 @@ type OperatorAccountStatus struct {
 // OperatorService is the narrow onboarding surface. Financial release, claim,
 // slash, evidence, and credential authority are intentionally absent.
 type OperatorService interface {
+	Capabilities(context.Context) (RailDescriptor, bool)
 	Open(context.Context, OperatorOpenRequest) (Account, error)
+	ListAccounts(context.Context, string, string) ([]Account, error)
 	Status(context.Context, string) (OperatorAccountStatus, error)
 	PrepareFunding(context.Context, OperatorPrepareFundingRequest) (FundingTarget, error)
 	ReconcileFunding(context.Context, string) (OperatorAccountStatus, error)

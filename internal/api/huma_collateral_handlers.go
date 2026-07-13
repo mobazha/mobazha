@@ -39,7 +39,42 @@ type collateralFundingTargetOutput struct {
 	Body pkgcollateral.FundingTarget
 }
 
+type collateralCapabilitiesView struct {
+	Available bool                          `json:"available"`
+	Rail      *pkgcollateral.RailDescriptor `json:"rail,omitempty"`
+}
+
+type collateralCapabilitiesOutput struct {
+	Body collateralCapabilitiesView
+}
+
+type collateralAccountsView struct {
+	Items []collateralAccountView `json:"items"`
+}
+
+type collateralAccountsOutput struct {
+	Body collateralAccountsView
+}
+
 func (g *Gateway) registerNodeHumaCollateralOperations(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "collateral-capabilities-get",
+		Method:      http.MethodGet, Path: "/v1/collateral/capabilities",
+		Summary:     "Get collateral operator capabilities",
+		Description: "Returns the effective reviewed collateral rail for this node. Source presence does not make a rail available.",
+		Tags:        []string{"collateral"}, Security: adminOnlyAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*collateralCapabilitiesOutput, error) {
+		service, err := collateralOperatorService(ctx)
+		if err != nil {
+			return &collateralCapabilitiesOutput{Body: collateralCapabilitiesView{Available: false}}, nil
+		}
+		descriptor, available := service.Capabilities(ctx)
+		if !available {
+			return &collateralCapabilitiesOutput{Body: collateralCapabilitiesView{Available: false}}, nil
+		}
+		return &collateralCapabilitiesOutput{Body: collateralCapabilitiesView{Available: true, Rail: &descriptor}}, nil
+	})
+
 	type openInput struct {
 		Body struct {
 			ProviderID     string    `json:"providerID" minLength:"1" maxLength:"160"`
@@ -73,6 +108,32 @@ func (g *Gateway) registerNodeHumaCollateralOperations(api huma.API) {
 			return nil, collateralOperationError(err)
 		}
 		return &collateralAccountOutput{Body: collateralAccountProjection(account, nil)}, nil
+	})
+
+	type listInput struct {
+		ProviderID string `query:"providerID" minLength:"1" maxLength:"160"`
+		ResourceID string `query:"resourceID" minLength:"1" maxLength:"256"`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "collateral-accounts-list",
+		Method:      http.MethodGet, Path: "/v1/collateral/accounts",
+		Summary:     "List collateral accounts for a resource",
+		Description: "Returns only accounts bound to the selected tenant, local principal, provider, and resource.",
+		Tags:        []string{"collateral"}, Security: adminOnlyAuthSecurity,
+	}, func(ctx context.Context, input *listInput) (*collateralAccountsOutput, error) {
+		service, err := collateralOperatorService(ctx)
+		if err != nil {
+			return nil, collateralOperationError(err)
+		}
+		accounts, err := service.ListAccounts(ctx, input.ProviderID, input.ResourceID)
+		if err != nil {
+			return nil, collateralOperationError(err)
+		}
+		items := make([]collateralAccountView, 0, len(accounts))
+		for _, account := range accounts {
+			items = append(items, collateralAccountProjection(account, nil))
+		}
+		return &collateralAccountsOutput{Body: collateralAccountsView{Items: items}}, nil
 	})
 
 	type accountInput struct {

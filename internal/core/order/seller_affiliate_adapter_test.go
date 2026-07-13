@@ -20,14 +20,15 @@ import (
 )
 
 type recordingSellerAffiliateService struct {
-	attribution  *models.AffiliateAttribution
-	payout       *models.AffiliateSettlementPayout
-	termsPresent bool
-	facts        []models.AffiliateOrderFacts
-	recorded     bool
-	status       models.AffiliateCommissionStatus
-	reason       models.AffiliateCommissionReversalReason
-	lineIDs      []string
+	attribution     *models.AffiliateAttribution
+	payout          *models.AffiliateSettlementPayout
+	termsPresent    bool
+	facts           []models.AffiliateOrderFacts
+	recorded        bool
+	status          models.AffiliateCommissionStatus
+	reason          models.AffiliateCommissionReversalReason
+	lineIDs         []string
+	commissionLines []models.AffiliateCommissionLine
 }
 
 func (*recordingSellerAffiliateService) PutProgram(context.Context, *models.AffiliateProgram) (*models.AffiliateProgram, error) {
@@ -97,7 +98,7 @@ func (s *recordingSellerAffiliateService) GetAttributionByOrder(context.Context,
 	return s.attribution, nil
 }
 func (s *recordingSellerAffiliateService) ListCommissionLinesByOrder(context.Context, string) ([]models.AffiliateCommissionLine, error) {
-	return nil, nil
+	return append([]models.AffiliateCommissionLine(nil), s.commissionLines...), nil
 }
 
 func TestSellerAffiliateSettlementPayout_UsesFrozenSettlementAssetAndAddress(t *testing.T) {
@@ -239,7 +240,10 @@ func TestReconcileSellerAffiliateOrder_DerivesPendingCommissionFromSignedOrder(t
 }
 
 func TestReconcileSellerAffiliateCommissionStatus_ReversesOnlyRefundedItemIndexes(t *testing.T) {
-	affiliate := new(recordingSellerAffiliateService)
+	affiliate := &recordingSellerAffiliateService{commissionLines: []models.AffiliateCommissionLine{
+		{OrderLineID: "affiliate-partial-refund:0"},
+		{OrderLineID: "affiliate-partial-refund:2"},
+	}}
 	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
 	order := &models.Order{ID: models.OrderID("affiliate-partial-refund")}
 	require.NoError(t, order.PutMessage(testutil.MustWrapOrderMessage(&pb.Refund{
@@ -252,6 +256,43 @@ func TestReconcileSellerAffiliateCommissionStatus_ReversesOnlyRefundedItemIndexe
 	assert.Equal(t, []string{"affiliate-partial-refund:0", "affiliate-partial-refund:2"}, affiliate.lineIDs)
 	assert.Equal(t, models.AffiliateCommissionStatusReversed, affiliate.status)
 	assert.Equal(t, models.AffiliateReversalRefund, affiliate.reason)
+}
+
+func TestReconcileSellerAffiliateCommissionStatus_IgnoresRefundedItemsWithoutCommissionLines(t *testing.T) {
+	affiliate := &recordingSellerAffiliateService{commissionLines: []models.AffiliateCommissionLine{
+		{OrderLineID: "affiliate-zero-net-refund:0"},
+		{OrderLineID: "affiliate-zero-net-refund:2"},
+	}}
+	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
+	order := &models.Order{ID: models.OrderID("affiliate-zero-net-refund")}
+	require.NoError(t, order.PutMessage(testutil.MustWrapOrderMessage(&pb.Refund{
+		RefundInfo:          &pb.Refund_TransactionID{TransactionID: "partial-refund-with-zero-net-item"},
+		Amount:              "100",
+		RefundedItemIndexes: []uint32{0, 1},
+	})))
+
+	require.NoError(t, service.reconcileSellerAffiliateCommissionStatus(context.Background(), order))
+	assert.Equal(t, []string{"affiliate-zero-net-refund:0"}, affiliate.lineIDs)
+	assert.Equal(t, models.AffiliateCommissionStatusReversed, affiliate.status)
+	assert.Equal(t, models.AffiliateReversalRefund, affiliate.reason)
+}
+
+func TestReconcileSellerAffiliateCommissionStatus_ZeroNetOnlyRefundNeedsNoTransition(t *testing.T) {
+	affiliate := &recordingSellerAffiliateService{commissionLines: []models.AffiliateCommissionLine{
+		{OrderLineID: "affiliate-zero-net-only:0"},
+	}}
+	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
+	order := &models.Order{ID: models.OrderID("affiliate-zero-net-only")}
+	require.NoError(t, order.PutMessage(testutil.MustWrapOrderMessage(&pb.Refund{
+		RefundInfo:          &pb.Refund_TransactionID{TransactionID: "zero-net-only-refund"},
+		Amount:              "1",
+		RefundedItemIndexes: []uint32{1},
+	})))
+
+	require.NoError(t, service.reconcileSellerAffiliateCommissionStatus(context.Background(), order))
+	assert.Empty(t, affiliate.lineIDs)
+	assert.Empty(t, affiliate.status)
+	assert.Empty(t, affiliate.reason)
 }
 
 func TestReconcileSellerAffiliateCommissionStatus_UnallocatedRefundReversesWholeOrder(t *testing.T) {

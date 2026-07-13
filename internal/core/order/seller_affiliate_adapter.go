@@ -246,19 +246,33 @@ func (s *OrderAppService) reconcileSellerAffiliateCommissionStatus(ctx context.C
 				}
 			}
 			if !allLines {
+				commissionLines, err := s.sellerAffiliate.ListCommissionLinesByOrder(ctx, order.ID.String())
+				if err != nil {
+					return fmt.Errorf("list seller affiliate commission lines: %w", err)
+				}
+				commissionLineIDs := make(map[string]struct{}, len(commissionLines))
+				for _, line := range commissionLines {
+					commissionLineIDs[line.OrderLineID] = struct{}{}
+				}
 				indexes := make([]int, 0, len(seen))
 				for itemIndex := range seen {
 					indexes = append(indexes, int(itemIndex))
 				}
 				sort.Ints(indexes)
 				for _, itemIndex := range indexes {
-					refundedLineIDs = append(refundedLineIDs, fmt.Sprintf("%s:%d", order.ID, itemIndex))
+					lineID := fmt.Sprintf("%s:%d", order.ID, itemIndex)
+					if _, ok := commissionLineIDs[lineID]; ok {
+						refundedLineIDs = append(refundedLineIDs, lineID)
+					}
 				}
 			}
 		}
 		if !allLines && len(refundedLineIDs) > 0 {
 			_, err := s.sellerAffiliate.TransitionCommissionLines(ctx, order.ID.String(), refundedLineIDs, models.AffiliateCommissionStatusReversed, models.AffiliateReversalRefund, time.Now().UTC())
 			return err
+		}
+		if !allLines {
+			return nil
 		}
 		_, err := s.sellerAffiliate.TransitionCommission(ctx, order.ID.String(), models.AffiliateCommissionStatusReversed, models.AffiliateReversalRefund, time.Now().UTC())
 		return err

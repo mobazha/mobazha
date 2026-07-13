@@ -81,6 +81,89 @@ explicit note that payment completes only on on-chain confirmation. Point a
 browser at the buyer checkout for the order above and record the card cycling
 as you advance the mock in step 4.
 
+## Driving it on the local E2E Docker stack (testuser1/2/3)
+
+The `tests/e2e/docker` stack (Casdoor `:18000`, hosting `:18080`, node instances,
+anvil, solana, postgres) serves the seeded accounts **testuser1** (Alice/seller),
+**testuser2** (Bob/buyer), **testuser3** (Carol), password `123`. A SaaS buyer's
+`/v1/*` traffic is served by the node **embedded in the hosting binary**, so the
+onramp endpoints must be deployed into `e2e-hosting`.
+
+Get a buyer token and probe:
+
+```bash
+cd <mobazha_hosting>
+TOK=$(E2E_TEST_USERNAME=testuser2 bash scripts/e2e-token.sh)   # Bob, the buyer
+curl -s -H "Authorization: Bearer $TOK" http://localhost:18080/v1/purchases   # 200 on the stock stack
+```
+
+### Prerequisite: deploy this branch into e2e-hosting
+
+The stock stack returns **404** for `/v1/orders/{id}/payment-session/onramp`
+(this branch isn't built into the running image). Two blockers gate the inject:
+
+1. **Build entanglement (must resolve first).** `make dev-hosting` /
+   `make dev-node` rebuild through `mobazha-commercial-node`, which references
+   the node models `PendingEscrowPaymentInfo.EscrowSeed`,
+   `PaymentMessageParams.LocalEscrowIntent`, and `PaymentData.EscrowSeed`. Those
+   live in **uncommitted** working-tree changes on the node `main` checkout, not
+   on this onramp branch, so a build sourced from this branch alone fails:
+
+   ```
+   commercial/internal/payment/solana/adapter.go: binding.EscrowSeed undefined
+   commercial/internal/payment/solana/attempt_settlement.go: unknown field EscrowSeed
+   ```
+
+   Resolve by committing the EscrowSeed changes (then rebase/merge this branch on
+   them), or build from a transient tree that combines this branch with the
+   EscrowSeed diff. Once buildable, from `tests/e2e/docker`:
+
+   ```bash
+   make dev-hosting \
+     HOSTING_SRC=<hosting_worktree>/.claude/worktrees/onramp-endpoint \
+     MOBAZHA_SRC=<node_worktree>/.claude/worktrees/embedded-wallet
+   ```
+
+2. **Mock provider env (needs container recreate).** The dev mock registers only
+   when `MOBAZHA_DEV_MOCK_ONRAMP_RAILS` is in the hosting process env, which is
+   fixed at container create time — a binary `docker cp` + restart won't pick it
+   up. Add it via a compose override and recreate just hosting:
+
+   ```yaml
+   # tests/e2e/docker/docker-compose.override.yml
+   services:
+     hosting:
+       environment:
+         MOBAZHA_DEV_MOCK_ONRAMP_RAILS: "crypto:eip155:1:native"
+   ```
+   ```bash
+   docker compose up -d hosting      # recreate with the env, then make dev-hosting to inject the binary
+   ```
+
+### The buyer journey (once deployed)
+
+```bash
+TOK=$(E2E_TEST_USERNAME=testuser2 bash scripts/e2e-token.sh)
+H="Authorization: Bearer $TOK"; J="Content-Type: application/json"
+B=http://localhost:18080
+
+# 1. Buy testuser1's listing → get {orderID}
+curl -s -X POST "$B/v1/orders"      -H "$H" -H "$J" -d @order.json
+# 2. Provision the payment session (freezes the crypto funding target)
+curl -s -X POST "$B/v1/orders/$OID/payment-session" -H "$H" -H "$J" -d '{"paymentCoin":"<coin>"}'
+curl -s "$B/v1/orders/$OID/payment-session" -H "$H"     # status=awaiting_funds
+# 3. Initiate onramp funding (mock provider)
+curl -s -X POST "$B/v1/orders/$OID/payment-session/onramp" -H "$H" -H "$J" \
+  -d '{"providerID":"mock-onramp","fiatCurrency":"USD","deliverToBuyerWallet":true}'
+# 4. Advance the mock (Go harness: provider.SetStatus), then poll
+curl -s -X POST "$B/v1/orders/$OID/payment-session/onramp/refresh" -H "$H"
+curl -s "$B/v1/orders/$OID/payment-session" -H "$H"     # paymentProgress.fundingState refines
+```
+
+Watch `paymentProgress.fundingState` walk
+`onramp_awaiting_payment → onramp_processing → onramp_delivering →
+onramp_forwarding` while the top-level `status` stays `awaiting_funds`.
+
 ## Fastest fully-automated proof (no browser, CI-friendly)
 
 `go test ./internal/core/payment/ -run TestOnrampFundingReachesSessionProjection`

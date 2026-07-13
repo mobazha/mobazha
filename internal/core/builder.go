@@ -35,6 +35,7 @@ import (
 	"github.com/mobazha/mobazha/internal/orders"
 	"github.com/mobazha/mobazha/internal/orders/utils"
 	"github.com/mobazha/mobazha/internal/payment/embeddedwallet"
+	privy "github.com/mobazha/mobazha/internal/payment/embeddedwallet/privy"
 	fiat "github.com/mobazha/mobazha/internal/payment/fiat"
 	"github.com/mobazha/mobazha/internal/payment/onramp"
 	onrampmock "github.com/mobazha/mobazha/internal/payment/onramp/mock"
@@ -1490,7 +1491,39 @@ func initBuyerFundingSubsystem(obNode *MobazhaNode) {
 	obNode.onrampRegistry = onramp.NewRegistry()
 	obNode.onrampFundingService = corePmt.NewOnrampFundingAppService(obNode.db, obNode.onrampRegistry)
 	registerDevMockOnrampProvider(obNode)
+	registerDevPrivyProvider(obNode)
 	logger.LogInfoWithID(log, obNode.nodeID, "Buyer funding subsystem initialized (embedded wallet + onramp registries, fail-closed)")
+}
+
+// registerDevPrivyProvider registers the real Privy embedded-wallet provider for
+// local dev against a Privy dev app, gated on PRIVY_APP_ID + PRIVY_APP_SECRET.
+// When PRIVY_JWKS_URL is also set, the Casdoor->Privy identity link is wired and
+// the production buyer-authorized paths are enabled; otherwise those paths stay
+// fail-closed (ErrProductionAuthNotWired). It advertises no proven rail
+// capabilities (RFC-0012 Proposal 6 gate stays closed) — registration only makes
+// the provider resolvable, not buyer-visible. Unset env ⇒ no-op.
+func registerDevPrivyProvider(obNode *MobazhaNode) {
+	appID := strings.TrimSpace(os.Getenv("PRIVY_APP_ID"))
+	appSecret := strings.TrimSpace(os.Getenv("PRIVY_APP_SECRET"))
+	if appID == "" || appSecret == "" {
+		return
+	}
+	provider, err := privy.New(privy.Config{
+		AppID:     appID,
+		AppSecret: appSecret,
+		JWKSURL:   strings.TrimSpace(os.Getenv("PRIVY_JWKS_URL")),
+	})
+	if err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "BuyerFunding: DEV Privy provider not registered: %v", err)
+		return
+	}
+	obNode.embeddedWalletRegistry.Register(provider)
+	linked := "identity link OFF (set PRIVY_JWKS_URL to enable production paths)"
+	if os.Getenv("PRIVY_JWKS_URL") != "" {
+		linked = "identity link ON (Casdoor->Privy via JWKS)"
+	}
+	logger.LogWarningWithIDf(log, obNode.nodeID,
+		"BuyerFunding: DEV Privy embedded-wallet provider registered — %s — NOT for production", linked)
 }
 
 // registerDevMockOnrampProvider registers the in-process mock onramp provider

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -51,6 +52,26 @@ type Config struct {
 	// reproduction path. Leave false in any real deployment.
 	AllowServerWalletFixture bool
 
+	// JWKSURL is the app's Privy access-token JWKS endpoint (e.g.
+	// https://auth.privy.io/api/v1/apps/{app_id}/jwks.json). Setting it wires the
+	// Casdoor->Privy identity link and enables the production buyer-authorized
+	// paths, tolerating key rotation. This is the preferred production wiring.
+	JWKSURL string
+
+	// VerificationKeyPEM is an offline alternative to JWKSURL: the app's Privy
+	// access-token verification key (PEM-encoded ECDSA public key, from the Privy
+	// dashboard). Use it only when a JWKS fetch is undesirable; it does not
+	// tolerate key rotation. JWKSURL takes precedence when both are set.
+	VerificationKeyPEM string
+
+	// HTTPClient overrides the client used for JWKS fetches (tests inject a fake).
+	HTTPClient *http.Client
+
+	// Verifier overrides the identity verifier (tests inject a fake user
+	// directory). When nil and VerificationKeyPEM is set, a REST-backed verifier
+	// is constructed.
+	Verifier *IdentityVerifier
+
 	// Capabilities is the fail-closed capability surface keyed by rail id. It is
 	// empty by default: the RFC-0012 Proposal 6 capability gate has not closed
 	// for Privy, so the adapter advertises nothing until an operator asserts a
@@ -62,6 +83,7 @@ type Config struct {
 type Provider struct {
 	client        *Client
 	allowFixture  bool
+	verifier      *IdentityVerifier
 	caps          map[string]contracts.EmbeddedWalletCapabilities
 	mu            sync.Mutex
 	fixtureWallet map[string]contracts.EmbeddedWallet // key: rail|subject
@@ -81,9 +103,34 @@ func New(cfg Config) (*Provider, error) {
 	for rail, c := range cfg.Capabilities {
 		caps[rail] = c
 	}
+
+	verifier := cfg.Verifier
+	if verifier == nil {
+		appID := cfg.AppID
+		if appID == "" {
+			appID = client.appID
+		}
+		dir := restUserDirectory{client: client}
+		switch {
+		case strings.TrimSpace(cfg.JWKSURL) != "":
+			v, err := newIdentityVerifierJWKS(appID, cfg.JWKSURL, cfg.HTTPClient, dir)
+			if err != nil {
+				return nil, err
+			}
+			verifier = v
+		case strings.TrimSpace(cfg.VerificationKeyPEM) != "":
+			v, err := newIdentityVerifier(appID, cfg.VerificationKeyPEM, dir)
+			if err != nil {
+				return nil, err
+			}
+			verifier = v
+		}
+	}
+
 	return &Provider{
 		client:        client,
 		allowFixture:  cfg.AllowServerWalletFixture,
+		verifier:      verifier,
 		caps:          caps,
 		fixtureWallet: make(map[string]contracts.EmbeddedWallet),
 	}, nil
@@ -108,6 +155,26 @@ func (p *Provider) EnsureWallet(ctx context.Context, req contracts.EnsureWalletR
 	if err := req.Validate(); err != nil {
 		return contracts.EmbeddedWallet{}, err
 	}
+
+	// Production: resolve the buyer's own embedded wallet through the
+	// Casdoor->Privy identity link. Signs/creates nothing here — the wallet is
+	// provisioned by the buyer's client at custom-auth login; we resolve which
+	// address is theirs to admit as an escrow co-owner.
+	if p.verifier != nil {
+		family := chainFamilyForRail(req.RailID)
+		w, err := p.verifier.ResolveBuyerWallet(ctx, req.Buyer.Subject, family)
+		if err != nil {
+			return contracts.EmbeddedWallet{}, err
+		}
+		return contracts.EmbeddedWallet{
+			ProviderID:  ProviderID,
+			WalletID:    w.ID,
+			Address:     w.Address,
+			RailID:      req.RailID,
+			ChainFamily: family,
+		}, nil
+	}
+
 	if !p.allowFixture {
 		return contracts.EmbeddedWallet{}, ErrProductionAuthNotWired
 	}
@@ -147,7 +214,24 @@ func (p *Provider) SignTypedData(ctx context.Context, req contracts.EmbeddedWall
 
 	switch req.Authorization.Scheme {
 	case SchemeUserJWT:
-		return contracts.EmbeddedWalletSignature{}, ErrProductionAuthNotWired
+		if p.verifier == nil {
+			return contracts.EmbeddedWalletSignature{}, ErrProductionAuthNotWired
+		}
+		// Prove the buyer's access token authorizes this wallet before signing.
+		// RFC-0012 Proposal 2: no signature is produced on platform authority
+		// alone; the buyer's token is what carries consent.
+		if _, err := p.verifier.AuthorizeSigner(ctx, req.Authorization.Token, "", req.Wallet.Address); err != nil {
+			return contracts.EmbeddedWalletSignature{}, err
+		}
+		sigHex, err := p.client.SignTypedDataV4WithUserWallet(ctx, req.Wallet.WalletID, req.Authorization.Token, req.Payload.Document)
+		if err != nil {
+			return contracts.EmbeddedWalletSignature{}, err
+		}
+		raw, err := decodeHexSignature(sigHex)
+		if err != nil {
+			return contracts.EmbeddedWalletSignature{}, err
+		}
+		return contracts.EmbeddedWalletSignature{Signer: req.Wallet.Address, Signature: raw}, nil
 	case SchemeServerWalletFixture:
 		if !p.allowFixture {
 			return contracts.EmbeddedWalletSignature{}, ErrServerWalletFixtureDisabled
@@ -164,6 +248,17 @@ func (p *Provider) SignTypedData(ctx context.Context, req contracts.EmbeddedWall
 	default:
 		return contracts.EmbeddedWalletSignature{}, fmt.Errorf("%w: unknown authorization scheme %q", contracts.ErrEmbeddedWalletNoBuyerAuthorization, req.Authorization.Scheme)
 	}
+}
+
+// chainFamilyForRail maps a rail id to its structured-signing chain family.
+// Rails are network-qualified (e.g. "crypto:eip155:1:native",
+// "crypto:solana:mainnet:..."); anything Solana-qualified is the Solana family,
+// otherwise EVM.
+func chainFamilyForRail(railID string) contracts.ChainFamily {
+	if strings.Contains(strings.ToLower(railID), "solana") {
+		return contracts.ChainFamilySolana
+	}
+	return contracts.ChainFamilyEVM
 }
 
 func decodeHexSignature(s string) ([]byte, error) {

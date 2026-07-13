@@ -51,7 +51,7 @@ distribution-profile composition (ADR-016 / ADR-018):
 Provider modules live in `internal/payment/embeddedwallet/{mock,privy,cdp}` and
 `internal/payment/onramp/{mock}`. Privy's app-authority "server wallet" path is
 gated off by default as a non-production Phase 0 reproduction; the production
-buyer-JWT path is stubbed pending the Casdoor→Privy identity link.
+buyer-JWT path is now gated on the Casdoor→Privy identity link (§5).
 
 ### 2. Onramp is a funding source, not a settlement mode
 
@@ -84,6 +84,55 @@ observation always does.
 `OnrampProvider.InitiatePurchase` is idempotent on `(AttemptID,
 IdempotencyKey)`: a buyer who closes the page and returns re-reads the existing
 source and does not create a second onramp order.
+
+### 5. Casdoor→Privy identity link is verified server-side, fail-closed
+
+The buyer's embedded wallet may only be admitted into an escrow attempt as their
+co-signer if it genuinely belongs to the Core-authenticated buyer. Privy is
+configured (dashboard) to trust Casdoor JWTs as a **custom auth provider**
+— JWKS URL + a user-id claim — so a buyer's Privy user carries a linked
+`custom_auth` account whose `custom_user_id` is the Casdoor `sub`. The node
+re-proves that chain server-side and never trusts the client's claim:
+
+```
+Casdoor `sub` (Core-authenticated) ─ custom-auth link ─▶ Privy user (DID) ─ owns ─▶ embedded wallet
+```
+
+`internal/payment/embeddedwallet/privy/identity.go` implements the gate:
+
+- **Access-token authenticity** — the buyer's Privy access token is verified
+  ES256 against the app's signing key, issuer `privy.io`, audience = app id, and
+  a required, unexpired `exp`. Keys come from the app **JWKS endpoint**
+  (`https://auth.privy.io/api/v1/apps/{app_id}/jwks.json`), cached and selected
+  by the token `kid` so key rotation is tolerated (the live dev app publishes
+  two keys). A static PEM verification key is an offline alternative.
+- **Subject binding** — the token's Privy user (looked up in a `userDirectory`
+  seam; REST-backed in `client.go`) must carry a linked `custom_auth` subject
+  equal to the Core-authenticated Casdoor `sub`. A mismatch is refused
+  (`ErrBuyerBindingMismatch`) — this is what stops a buyer admitting someone
+  else's wallet.
+- **Wallet ownership** — at sign time the token's user must own the wallet being
+  signed with (`ErrWalletNotOwnedByBuyer`); the produced signature is thereby
+  attributable to the admitted buyer.
+
+The provider stays **fail-closed**: with no verifier configured, `EnsureWallet`
+and the `privy-user-jwt` sign path return `ErrProductionAuthNotWired`. The pure
+security logic (token verification, binding, ownership) is proven offline against
+a fake directory; the JWKS fetch is validated against the live dev app
+(`TestLivePrivyJWKSFetch`, gated on `PRIVY_JWKS_URL`). The full buyer-login chain
+(a real buyer access token → sign) still requires a client-side custom-auth login
+and is exercised by the env-gated live tests, not asserted in CI.
+
+**CDP equivalence.** Coinbase CDP offers the same third-party JWT/JWKS custom
+auth, so the `EmbeddedWalletProvider` contract and this identity gate transfer
+without change: a CDP adapter would supply its own `userDirectory` and JWKS, and
+the fail-closed capability/verifier posture is identical.
+
+**Dev wiring.** `registerDevPrivyProvider` (builder) registers the real provider
+when `PRIVY_APP_ID` + `PRIVY_APP_SECRET` are set, enabling the identity link when
+`PRIVY_JWKS_URL` is also present. Unset ⇒ no registration. It advertises no
+proven rail capabilities, so registration alone changes no buyer-visible
+behavior.
 
 ## Status of implementation (2026-07-13)
 

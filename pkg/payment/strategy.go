@@ -418,6 +418,12 @@ type PaymentMessageParams struct {
 
 	// EscrowTimeoutHours is the configured escrow timeout.
 	EscrowTimeoutHours uint32
+
+	// LocalEscrowIntent carries the receiver's own frozen escrow setup facts
+	// (persisted at managed setup time) so escrow rails can cross-check the
+	// sender-declared binding against local truth instead of re-deriving it
+	// from an order projection. Nil when the local projection has none.
+	LocalEscrowIntent *models.PendingEscrowPaymentInfo
 }
 
 // ── Pre-Release Verification Params ─────────────────────────────

@@ -14,6 +14,7 @@ type PendingEscrowPaymentInfo struct {
 	Amount                 uint64                 `json:"amount,omitempty"`
 	ContractAddress        string                 `json:"contractAddress,omitempty"`
 	EscrowAddress          string                 `json:"escrowAddress,omitempty"`
+	EscrowSeed             string                 `json:"escrowSeed,omitempty"`
 	Moderator              string                 `json:"moderator,omitempty"`
 	ModeratorAddress       string                 `json:"moderatorAddress,omitempty"`
 	ModeratorPayoutAddress string                 `json:"moderatorPayoutAddress,omitempty"`

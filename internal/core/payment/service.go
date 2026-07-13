@@ -15,7 +15,6 @@ import (
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha/internal/config"
 	"github.com/mobazha/mobazha/internal/core/paymentintent"
-	"github.com/mobazha/mobazha/internal/logger"
 	wallet "github.com/mobazha/mobazha/internal/wallet"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
@@ -344,17 +343,6 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 			return nil, fmt.Errorf("persist managed EVM payment intent for order %s: %w", params.OrderID, persistErr)
 		}
 	}
-	if coinErr == nil &&
-		strategy.Model() == payment.PaymentModelMonitored &&
-		coinInfo.Chain == iwallet.ChainSolana &&
-		result.PaymentData != nil &&
-		result.PaymentData.ToAddress != "" {
-
-		if persistErr := s.persistEscrowPaymentInfo(params.OrderID, result.PaymentData); persistErr != nil {
-			logger.LogWarningWithIDf(log, s.nodeID, "GeneratePaymentInstructions: failed to persist managed Solana escrow for order %s: %v", params.OrderID, persistErr)
-		}
-	}
-
 	return setupResult, nil
 }
 
@@ -545,6 +533,7 @@ func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
 		Amount:                 pd.Amount,
 		ContractAddress:        pd.ContractAddress,
 		EscrowAddress:          pd.ToAddress,
+		EscrowSeed:             pd.EscrowSeed,
 		Moderator:              pd.Moderator,
 		ModeratorAddress:       pd.ModeratorAddress,
 		ModeratorPayoutAddress: pd.ModeratorPayoutAddress,
@@ -597,6 +586,7 @@ func (s *PaymentAppService) persistEscrowPaymentInfo(orderID string, pd *models.
 			Amount:                 pd.Amount,
 			ContractAddress:        pd.ContractAddress,
 			EscrowAddress:          pd.ToAddress,
+			EscrowSeed:             pd.EscrowSeed,
 			Moderator:              pd.Moderator,
 			ModeratorAddress:       pd.ModeratorAddress,
 			ModeratorPayoutAddress: pd.ModeratorPayoutAddress,

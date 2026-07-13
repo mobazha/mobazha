@@ -221,12 +221,17 @@ func (s *OrderAppService) preProcessPaymentSent(ctx context.Context, orderMsg *n
 		expectedPaymentCoin = string(lockedCoin)
 		expectedPaymentAmount = order.ExpectedPaymentAmountString()
 	}
+	localEscrowIntent, err := order.GetPendingEscrowPaymentInfo()
+	if err != nil {
+		localEscrowIntent = nil
+	}
 	if err := s.paymentVerifier.ValidateMessage(coinType, payment.PaymentMessageParams{
 		OrderOpen:             orderOpen,
 		PaymentSent:           paymentSent,
 		ExpectedPaymentAmount: expectedPaymentAmount,
 		ExpectedPaymentCoin:   expectedPaymentCoin,
 		EscrowTimeoutHours:    paymentSent.EscrowTimeoutHours,
+		LocalEscrowIntent:     localEscrowIntent,
 	}); err != nil {
 		return nil, fmt.Errorf("payment validation failed for order %s: %w", orderMsg.OrderID, err)
 	}

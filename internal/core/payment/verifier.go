@@ -3,6 +3,7 @@ package payment
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -980,6 +981,15 @@ func resolveAggregatedPaymentIntent(order *models.Order, rows []models.PaymentOb
 		}
 		if strings.TrimSpace(escrowInfo.ModeratorAddress) != "" {
 			intent.moderatorAddress = escrowInfo.ModeratorAddress
+		}
+		// Seed-bearing escrow snapshots (Solana Anchor) must travel inside the
+		// aggregated envelope: the counterparty validates the frozen setup seed
+		// from PaymentSent.Script, and both tenant mirrors persist identical
+		// snapshots so the envelope stays byte-identical.
+		if strings.TrimSpace(escrowInfo.EscrowSeed) != "" {
+			if data, err := json.Marshal(escrowInfo); err == nil {
+				intent.script = hex.EncodeToString(data)
+			}
 		}
 		return intent
 	}

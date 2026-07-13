@@ -103,16 +103,6 @@ type ManagedSolanaSigner interface {
 	SignManagedSolanaMessage(ctx context.Context, request ManagedSolanaSignRequest) (string, []byte, error)
 }
 
-// ManagedSolanaSetupConfig contains public deployment addresses selected by
-// the private composition. It contains no credential or RPC authority.
-type ManagedSolanaSetupConfig struct {
-	ProgramAddress     string
-	PlatformAuthority  string
-	PlatformFeeAddress string
-	RentCollector      string
-	Testnet            bool
-}
-
 // ManagedSolanaSetupIntent is Core's immutable order-policy projection. The
 // private module uses EscrowInfo to derive the PDA and build Anchor
 // instructions, then returns only the build result for persistence.
@@ -129,9 +119,10 @@ type ManagedSolanaSetupBuildResult struct {
 }
 
 // ManagedSolanaSetupService retains order policy and persistence inside Core,
-// while private code owns PDA derivation and instruction construction.
+// while private code owns PDA derivation and instruction construction. Setup
+// intents are built exclusively from participant-signed attempt facts; the
+// legacy order-projection (chaincode-seeded) prepare step is retired.
 type ManagedSolanaSetupService interface {
-	PrepareManagedSolanaSetup(ctx context.Context, params payment.PaymentSetupParams, config ManagedSolanaSetupConfig) (*ManagedSolanaSetupIntent, error)
 	CommitManagedSolanaSetup(ctx context.Context, intent ManagedSolanaSetupIntent, result ManagedSolanaSetupBuildResult) (*models.PaymentData, error)
 }
 

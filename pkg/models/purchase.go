@@ -164,6 +164,10 @@ type PaymentData struct {
 	PlatformFeeAddress string    `json:"platformFeeAddress"`
 	CancelFeeAmount    string    `json:"cancelFeeAmount,omitempty"`
 	RentCollector      string    `json:"rentCollector,omitempty"`
+	// EscrowSeed binds a managed escrow address to the exact seed selected during
+	// setup. It is serialized into the payment message for rails whose setup
+	// precedes PaymentSent construction (currently Solana Anchor).
+	EscrowSeed         string    `json:"escrowSeed,omitempty"`
 	PlatformRewardAddr string    `json:"platformRewardAddr"`
 	RefundAddress      string    `json:"refundAddress"`
 	Timestamp          time.Time `json:"timestamp"`

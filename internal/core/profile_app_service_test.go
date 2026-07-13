@@ -7,6 +7,7 @@ import (
 
 	"github.com/mobazha/mobazha/internal/repo"
 	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/assert"
@@ -284,4 +285,26 @@ func TestProfileAppService_SetProfile_UsesPublishedSolanaKeyWhenPrivateKeyAdapte
 	require.True(t, found)
 	assert.Equal(t, publicKey, destination.Address)
 	assert.Equal(t, uint32(1), destination.Version)
+}
+
+func TestProfileAppService_SetProfile_UsesActiveReceivingAccountWhenWalletReservationUnavailable(t *testing.T) {
+	solanaRail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainSolana)
+	require.True(t, ok)
+	accounts := &profileWalletAccountStub{failRailIDs: map[string]bool{string(solanaRail): true}}
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{WalletAccounts: accounts})
+	const address = "4Nd1mYjLrS1gN33Zf3Yc6wNwVozN5K6oNUwG3XhYhXyd"
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		return tx.Create(&models.ReceivingAccount{
+			ID: 1, Name: "Solana payout", ChainType: iwallet.ChainSolana,
+			Address: address, IsActive: true,
+		})
+	}))
+
+	require.NoError(t, svc.SetProfile(&models.Profile{Name: "Test"}, nil))
+
+	got, err := svc.GetMyProfile()
+	require.NoError(t, err)
+	destination, found := got.PayoutDestinationSet.DestinationForRail(string(solanaRail))
+	require.True(t, found)
+	assert.Equal(t, address, destination.Address)
 }

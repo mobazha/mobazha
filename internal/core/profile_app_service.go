@@ -154,19 +154,13 @@ func (s *ProfileAppService) reserveAffiliateDestinations() models.PayoutDestinat
 		referenceID := "affiliate:" + string(railID)
 		reserved, err := s.walletAccounts.ReserveAddress(context.Background(), string(railID), contracts.AccountAffiliate, referenceID)
 		if err != nil {
-			// Hosted Solana runtimes may deliberately expose only the tenant's
-			// public payout key to Core. Solana reservations currently resolve to
-			// that same tenant key for every account role, so freezing the already
-			// signed profile key is equivalent and avoids requiring private-key
-			// access merely to publish a payout destination.
-			if chain == iwallet.ChainSolana {
-				key, keyErr := solana.PublicKeyFromBase58(strings.TrimSpace(s.solanaPubKeyStr))
-				if keyErr == nil && !key.IsZero() {
-					destinations = append(destinations, models.PayoutDestination{
-						RailID: string(railID), Address: key.String(), Version: 1,
-					})
-					continue
-				}
+			// Hosted runtimes may deliberately keep payout keys outside Core.
+			// Freeze the tenant's signed public key or explicitly configured active
+			// receiving account instead of requiring private-key access merely to
+			// publish a commission destination.
+			if fallback, ok := s.configuredAffiliateDestination(chain, string(railID)); ok {
+				destinations = append(destinations, fallback)
+				continue
 			}
 			log.Warningf("affiliate payout destination: reserve %s address failed (will retry on next profile save): %v", railID, err)
 			continue
@@ -176,6 +170,27 @@ func (s *ProfileAppService) reserveAffiliateDestinations() models.PayoutDestinat
 		})
 	}
 	return models.PayoutDestinationSet{Destinations: destinations}
+}
+
+func (s *ProfileAppService) configuredAffiliateDestination(chain iwallet.ChainType, railID string) (models.PayoutDestination, bool) {
+	if chain == iwallet.ChainSolana {
+		key, err := solana.PublicKeyFromBase58(strings.TrimSpace(s.solanaPubKeyStr))
+		if err == nil && !key.IsZero() {
+			return models.PayoutDestination{RailID: railID, Address: key.String(), Version: 1}, true
+		}
+	}
+	if s == nil || s.db == nil {
+		return models.PayoutDestination{}, false
+	}
+	var account models.ReceivingAccount
+	err := s.db.View(func(tx database.Tx) error {
+		return tx.Read().Where("chain_type = ? AND is_active = ?", chain, true).
+			Order("updated_at DESC").First(&account).Error
+	})
+	if err != nil || strings.TrimSpace(account.Address) == "" {
+		return models.PayoutDestination{}, false
+	}
+	return models.PayoutDestination{RailID: railID, Address: strings.TrimSpace(account.Address), Version: 1}, true
 }
 
 func (s *ProfileAppService) GetMyProfile() (*models.Profile, error) {

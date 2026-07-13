@@ -255,6 +255,52 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	require.ErrorIs(t, err, models.ErrSellerAffiliateConflict)
 }
 
+func TestSellerAffiliateAppService_RejectsCryptoOrderOutsideFrozenPayoutRails(t *testing.T) {
+	base, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	defer base.Close()
+	require.NoError(t, coredatabase.MigrateSellerAffiliateModels(base))
+
+	service := NewSellerAffiliateAppService(coredatabase.NewGormSellerAffiliateStore(base))
+	ctx := context.Background()
+	sellerPeerID, promoterPeerID, buyerPeerID := affiliateTestPeerID(t), affiliateTestPeerID(t), affiliateTestPeerID(t)
+	_, err = service.PutProgram(ctx, &models.AffiliateProgram{
+		SellerPeerID: sellerPeerID, Status: models.AffiliateProgramStatusActive,
+		CommissionRateBPS: 1000, AttributionWindowSeconds: 3600,
+	})
+	require.NoError(t, err)
+	ethereumRail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainEthereum)
+	require.True(t, ok)
+	link, err := service.CreateLink(ctx, promoterPeerID, "affiliate-token-eth-only", models.PayoutDestinationSet{
+		Destinations: []models.PayoutDestination{{
+			RailID: ethereumRail.String(), Address: "0x1111111111111111111111111111111111111111", Version: 1,
+		}},
+	})
+	require.NoError(t, err)
+	issuedAt := time.Now().UTC().Add(-time.Minute)
+	session, err := service.CreateReferralSession(ctx, link.PublicToken, issuedAt)
+	require.NoError(t, err)
+
+	_, err = service.PrepareOrderAttribution(ctx, models.AffiliateOrderFacts{
+		OrderID: "order-sol-with-eth-referral", SellerPeerID: sellerPeerID, BuyerPeerID: buyerPeerID,
+		ReferralSessionID: session.ID, AttributedAt: issuedAt.Add(time.Second),
+		Lines: []models.AffiliateOrderLineFact{{
+			OrderLineID: "order-sol-with-eth-referral:0", NetMerchandiseAtomic: "1000", Currency: "SOL",
+		}},
+	})
+	require.ErrorIs(t, err, models.ErrInvalidSellerAffiliate)
+
+	result, err := service.PrepareOrderAttribution(ctx, models.AffiliateOrderFacts{
+		OrderID: "order-eth-with-eth-referral", SellerPeerID: sellerPeerID, BuyerPeerID: buyerPeerID,
+		ReferralSessionID: session.ID, AttributedAt: issuedAt.Add(2 * time.Second),
+		Lines: []models.AffiliateOrderLineFact{{
+			OrderLineID: "order-eth-with-eth-referral:0", NetMerchandiseAtomic: "1000", Currency: "ETH",
+		}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+}
+
 func TestSellerAffiliateAppService_ReissueLinkRotatesFutureSessionsOnly(t *testing.T) {
 	base, err := dbstore.NewMemoryDB(t.TempDir())
 	require.NoError(t, err)

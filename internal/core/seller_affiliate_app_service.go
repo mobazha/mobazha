@@ -313,6 +313,22 @@ func (s *SellerAffiliateAppService) PrepareOrderAttribution(ctx context.Context,
 	if err := result.Attribution.Validate(); err != nil {
 		return nil, err
 	}
+	// A referral may intentionally publish only the rails the promoter can
+	// receive. Bind that subset at order admission: a crypto-priced order must
+	// have a destination for its settlement rail before the buyer can create an
+	// authorization draft. Deferring this check to seller finalization would
+	// leave an unsupported attempt permanently awaiting the seller receipt.
+	for _, fact := range facts.Lines {
+		settlementCoin, cryptoRail := affiliateOrderSettlementRail(fact.Currency)
+		if !cryptoRail {
+			// Fiat affiliate orders are governed by the provider-session policy;
+			// there is no on-chain payout rail to bind here.
+			continue
+		}
+		if _, err := affiliatePayoutAddressForSettlementCoin(&result.Attribution, settlementCoin.String()); err != nil {
+			return nil, models.ErrInvalidSellerAffiliate
+		}
+	}
 	seenLines := make(map[string]struct{}, len(facts.Lines))
 	for _, fact := range facts.Lines {
 		fact.OrderLineID = strings.TrimSpace(fact.OrderLineID)
@@ -342,6 +358,16 @@ func (s *SellerAffiliateAppService) PrepareOrderAttribution(ctx context.Context,
 		result.Lines = append(result.Lines, line)
 	}
 	return result, nil
+}
+
+func affiliateOrderSettlementRail(currency string) (iwallet.CoinType, bool) {
+	currency = strings.TrimSpace(currency)
+	if info, err := iwallet.CoinInfoFromCoinType(iwallet.CoinType(currency)); err == nil && info.Chain != iwallet.ChainFiat {
+		return iwallet.CoinType(currency), true
+	}
+	// Legacy OrderOpen facts use native currency symbols (BTC, ETH, SOL, …)
+	// while payout snapshots use canonical rail IDs.
+	return iwallet.CanonicalNativeCoinType(iwallet.ChainType(strings.ToUpper(currency)))
 }
 
 // RecordPreparedOrderTx persists a prepared attribution in the caller's

@@ -167,9 +167,10 @@ func TestValidateFrozenStandardOrderCompleteRelease_BindsFrozenOutputs(t *testin
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			candidate := *valid
-			test.mutate(&candidate)
-			require.ErrorIs(t, validateFrozenStandardOrderCompleteRelease(&candidate, terms, target), models.ErrPaymentAttemptSettlementTermsConflict)
+			candidate := ordersettlement.CloneEscrowRelease(valid)
+			require.NotNil(t, candidate)
+			test.mutate(candidate)
+			require.ErrorIs(t, validateFrozenStandardOrderCompleteRelease(candidate, terms, target), models.ErrPaymentAttemptSettlementTermsConflict)
 		})
 	}
 }
@@ -187,12 +188,14 @@ func TestValidateFrozenStandardOrderDisputeRelease_BindsModeratorPayout(t *testi
 	}
 	require.NoError(t, validateFrozenStandardOrderDisputeRelease(valid, terms, target, nil))
 
-	redirected := *valid
+	redirected := ordersettlement.CloneDisputeRelease(valid)
+	require.NotNil(t, redirected)
 	redirected.ModeratorAddress = "tb1attacker"
-	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(&redirected, terms, target, nil), models.ErrPaymentAttemptSettlementTermsConflict)
-	underpaid := *valid
+	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(redirected, terms, target, nil), models.ErrPaymentAttemptSettlementTermsConflict)
+	underpaid := ordersettlement.CloneDisputeRelease(valid)
+	require.NotNil(t, underpaid)
 	underpaid.ModeratorAmount = "1"
-	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(&underpaid, terms, target, nil), models.ErrPaymentAttemptSettlementTermsConflict)
+	require.ErrorIs(t, validateFrozenStandardOrderDisputeRelease(underpaid, terms, target, nil), models.ErrPaymentAttemptSettlementTermsConflict)
 }
 
 func TestValidateFrozenStandardOrderDisputeRelease_BindsScaledAffiliatePayout(t *testing.T) {

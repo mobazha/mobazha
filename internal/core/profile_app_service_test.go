@@ -265,3 +265,23 @@ func TestProfileAppService_SetProfile_ToleratesOneUnavailableAffiliateRail(t *te
 	_, hasFailingRail := got.PayoutDestinationSet.DestinationForRail(string(failingRail))
 	assert.False(t, hasFailingRail)
 }
+
+func TestProfileAppService_SetProfile_UsesPublishedSolanaKeyWhenPrivateKeyAdapterUnavailable(t *testing.T) {
+	solanaRail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainSolana)
+	require.True(t, ok)
+	accounts := &profileWalletAccountStub{failRailIDs: map[string]bool{string(solanaRail): true}}
+	const publicKey = "4Nd1mYjLrS1gN33Zf3Yc6wNwVozN5K6oNUwG3XhYhXyd"
+	svc := newTestProfileAppService(t, ProfileAppServiceConfig{
+		WalletAccounts:  accounts,
+		SolanaPubKeyStr: publicKey,
+	})
+
+	require.NoError(t, svc.SetProfile(&models.Profile{Name: "Test"}, nil))
+
+	got, err := svc.GetMyProfile()
+	require.NoError(t, err)
+	destination, found := got.PayoutDestinationSet.DestinationForRail(string(solanaRail))
+	require.True(t, found)
+	assert.Equal(t, publicKey, destination.Address)
+	assert.Equal(t, uint32(1), destination.Version)
+}

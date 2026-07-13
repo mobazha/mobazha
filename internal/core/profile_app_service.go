@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	solana "github.com/gagliardetto/solana-go"
 	"github.com/ipfs/go-cid"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -89,8 +91,8 @@ func (s *ProfileAppService) SetProfile(profile *models.Profile, done chan<- stru
 		// must not block unrelated profile edits such as name or bio.
 		// reserveAffiliateDestinations publishes whatever rails currently
 		// succeed; a rail that fails is simply absent from the set until a
-		// later save succeeds. Hosting will keep new Affiliate links unavailable
-		// while any required destination is absent, without blocking profile edits.
+		// later save succeeds. Affiliate checkout remains fail-closed for a rail
+		// whose destination is absent, without blocking unrelated profile edits.
 		profile.PayoutDestinationSet = s.reserveAffiliateDestinations()
 	}
 
@@ -152,6 +154,20 @@ func (s *ProfileAppService) reserveAffiliateDestinations() models.PayoutDestinat
 		referenceID := "affiliate:" + string(railID)
 		reserved, err := s.walletAccounts.ReserveAddress(context.Background(), string(railID), contracts.AccountAffiliate, referenceID)
 		if err != nil {
+			// Hosted Solana runtimes may deliberately expose only the tenant's
+			// public payout key to Core. Solana reservations currently resolve to
+			// that same tenant key for every account role, so freezing the already
+			// signed profile key is equivalent and avoids requiring private-key
+			// access merely to publish a payout destination.
+			if chain == iwallet.ChainSolana {
+				key, keyErr := solana.PublicKeyFromBase58(strings.TrimSpace(s.solanaPubKeyStr))
+				if keyErr == nil && !key.IsZero() {
+					destinations = append(destinations, models.PayoutDestination{
+						RailID: string(railID), Address: key.String(), Version: 1,
+					})
+					continue
+				}
+			}
 			log.Warningf("affiliate payout destination: reserve %s address failed (will retry on next profile save): %v", railID, err)
 			continue
 		}

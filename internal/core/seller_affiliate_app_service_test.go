@@ -249,6 +249,45 @@ func TestSellerAffiliateAppService_FreezesPayoutDestinationAndRateAtReferralIssu
 	require.ErrorIs(t, err, models.ErrSellerAffiliateConflict)
 }
 
+func TestSellerAffiliateAppService_ReissueLinkRotatesFutureSessionsOnly(t *testing.T) {
+	base, err := dbstore.NewMemoryDB(t.TempDir())
+	require.NoError(t, err)
+	defer base.Close()
+	require.NoError(t, coredatabase.MigrateSellerAffiliateModels(base))
+
+	service := NewSellerAffiliateAppService(coredatabase.NewGormSellerAffiliateStore(base))
+	ctx := context.Background()
+	_, err = service.PutProgram(ctx, &models.AffiliateProgram{
+		SellerPeerID: affiliateTestPeerID(t), Status: models.AffiliateProgramStatusActive,
+		CommissionRateBPS: 1250, AttributionWindowSeconds: 3600,
+	})
+	require.NoError(t, err)
+	oldEVM := "0x1111111111111111111111111111111111111111"
+	oldUTXO := affiliateTestUTXOPayoutAddresses()
+	link, err := service.CreateLink(ctx, affiliateTestPeerID(t), "affiliate-token-before-rotation", oldEVM, oldUTXO)
+	require.NoError(t, err)
+	oldSession, err := service.CreateReferralSession(ctx, link.PublicToken, time.Now().UTC())
+	require.NoError(t, err)
+
+	newEVM := "0x2222222222222222222222222222222222222222"
+	newUTXO := oldUTXO.Clone()
+	newUTXO[models.AffiliatePayoutRailBitcoin] = "bc1qrotatedaffiliatepayoutdestination000000000"
+	reissued, err := service.ReissueLink(ctx, link.ID, "affiliate-token-after-rotation", newEVM, newUTXO)
+	require.NoError(t, err)
+	assert.Equal(t, link.ID, reissued.ID)
+	assert.Equal(t, newEVM, reissued.PromoterPayoutAddress)
+	assert.Equal(t, newUTXO, reissued.PromoterUTXOPayoutAddresses)
+
+	_, err = service.GetLinkByToken(ctx, "affiliate-token-before-rotation")
+	require.Error(t, err)
+	newSession, err := service.CreateReferralSession(ctx, reissued.PublicToken, time.Now().UTC())
+	require.NoError(t, err)
+	assert.Equal(t, oldEVM, oldSession.PromoterPayoutAddress)
+	assert.Equal(t, oldUTXO, oldSession.PromoterUTXOPayoutAddresses)
+	assert.Equal(t, newEVM, newSession.PromoterPayoutAddress)
+	assert.Equal(t, newUTXO, newSession.PromoterUTXOPayoutAddresses)
+}
+
 func TestGormSellerAffiliateStore_IsTenantScoped(t *testing.T) {
 	base, err := dbstore.NewMemoryDB(t.TempDir())
 	require.NoError(t, err)

@@ -16,6 +16,7 @@ type SellerAffiliateStore interface {
 	PutAffiliateProgram(ctx context.Context, program *models.AffiliateProgram) error
 	GetAffiliateProgram(ctx context.Context) (*models.AffiliateProgram, error)
 	CreateAffiliateLink(ctx context.Context, link *models.AffiliateLink) error
+	UpdateAffiliateLink(ctx context.Context, link *models.AffiliateLink) error
 	GetAffiliateLink(ctx context.Context, id string) (*models.AffiliateLink, error)
 	GetAffiliateLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error)
 	GetAffiliateLinkByPromoter(ctx context.Context, programID, promoterPeerID string) (*models.AffiliateLink, error)
@@ -28,6 +29,7 @@ type SellerAffiliateStore interface {
 	ListAffiliateStatementLines(ctx context.Context, promoterPeerID string) ([]models.AffiliateStatementLine, error)
 	ListPendingAffiliateCommissionOrderIDs(ctx context.Context) ([]string, error)
 	TransitionAffiliateCommission(ctx context.Context, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
+	TransitionAffiliateCommissionLines(ctx context.Context, orderID string, orderLineIDs []string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
 	TransitionAffiliateCommissionTx(tx database.Tx, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
 }
 
@@ -55,10 +57,13 @@ type SellerAffiliateService interface {
 	PutProgram(ctx context.Context, program *models.AffiliateProgram) (*models.AffiliateProgram, error)
 	GetProgram(ctx context.Context) (*models.AffiliateProgram, error)
 	CreateLink(ctx context.Context, promoterPeerID, publicToken, payoutAddress string, utxoPayoutAddresses models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error)
+	ReissueLink(ctx context.Context, linkID, publicToken, payoutAddress string, utxoPayoutAddresses models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error)
+	GetLink(ctx context.Context, linkID string) (*models.AffiliateLink, error)
 	GetLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error)
 	CreateReferralSession(ctx context.Context, publicToken string, issuedAt time.Time) (*models.AffiliateReferralSession, error)
 	AttributeOrder(ctx context.Context, facts models.AffiliateOrderFacts) (*models.AffiliateOrderResult, error)
 	TransitionCommission(ctx context.Context, orderID string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
+	TransitionCommissionLines(ctx context.Context, orderID string, orderLineIDs []string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error)
 	GetAttributionByOrder(ctx context.Context, orderID string) (*models.AffiliateAttribution, error)
 	ListCommissionLinesByOrder(ctx context.Context, orderID string) ([]models.AffiliateCommissionLine, error)
 	ListSellerStatement(ctx context.Context) ([]models.AffiliateStatementLine, error)

@@ -94,6 +94,27 @@ func (s *GormSellerAffiliateStore) CreateAffiliateLink(_ context.Context, link *
 	return s.db.Update(func(tx pkgdb.Tx) error { return tx.Create(link) })
 }
 
+// UpdateAffiliateLink rotates only future-session link material. Existing
+// sessions and order attributions already contain immutable snapshots.
+func (s *GormSellerAffiliateStore) UpdateAffiliateLink(_ context.Context, link *models.AffiliateLink) error {
+	if link == nil {
+		return models.ErrInvalidSellerAffiliate
+	}
+	if err := link.Validate(); err != nil {
+		return err
+	}
+	return s.db.Update(func(tx pkgdb.Tx) error {
+		var existing models.AffiliateLink
+		if err := tx.Read().Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", link.ID).First(&existing).Error; err != nil {
+			return err
+		}
+		if existing.ProgramID != link.ProgramID || existing.PromoterPeerID != link.PromoterPeerID || !existing.CreatedAt.Equal(link.CreatedAt) {
+			return ErrSellerAffiliateConflict
+		}
+		return tx.Save(link)
+	})
+}
+
 // GetAffiliateLink returns one tenant-local promoter link.
 func (s *GormSellerAffiliateStore) GetAffiliateLink(_ context.Context, id string) (*models.AffiliateLink, error) {
 	var link models.AffiliateLink
@@ -296,6 +317,50 @@ func (s *GormSellerAffiliateStore) TransitionAffiliateCommission(_ context.Conte
 		var err error
 		lines, err = s.TransitionAffiliateCommissionTx(tx, orderID, status, reason, at)
 		return err
+	})
+	return lines, err
+}
+
+// TransitionAffiliateCommissionLines advances a deterministic subset of order lines.
+func (s *GormSellerAffiliateStore) TransitionAffiliateCommissionLines(_ context.Context, orderID string, orderLineIDs []string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error) {
+	if len(orderLineIDs) == 0 {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	var lines []models.AffiliateCommissionLine
+	err := s.db.Update(func(tx pkgdb.Tx) error {
+		query := tx.Read().Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("order_id = ? AND order_line_id IN ?", orderID, orderLineIDs).
+			Order("order_line_id ASC")
+		if err := query.Find(&lines).Error; err != nil {
+			return err
+		}
+		if len(lines) != len(orderLineIDs) {
+			return ErrSellerAffiliateConflict
+		}
+		for index := range lines {
+			line := &lines[index]
+			if line.Status == status {
+				if line.ReversalReason != reason {
+					return ErrSellerAffiliateConflict
+				}
+				continue
+			}
+			if status != models.AffiliateCommissionStatusReversed || line.Status != models.AffiliateCommissionStatusPending {
+				return ErrSellerAffiliateConflict
+			}
+			line.Status = status
+			line.ReversalReason = reason
+			reversedAt := at
+			line.ReversedAt = &reversedAt
+			line.UpdatedAt = at
+			if err := line.Validate(); err != nil {
+				return err
+			}
+			if err := tx.Save(line); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	return lines, err
 }

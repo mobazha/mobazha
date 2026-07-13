@@ -234,6 +234,10 @@ message Refund {
     }
     string amount                       = 3;
     google.protobuf.Timestamp timestamp = 4;
+    // Zero-based OrderOpen item indexes covered by this refund. Empty means
+    // the refund cannot be allocated safely and Affiliate falls back to a
+    // whole-order reversal.
+    repeated uint32 refundedItemIndexes = 5;
 }
 
 message PaymentSent {

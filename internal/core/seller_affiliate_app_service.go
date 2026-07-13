@@ -125,6 +125,39 @@ func (s *SellerAffiliateAppService) CreateLink(ctx context.Context, promoterPeer
 	return link, nil
 }
 
+// ReissueLink rotates the public token and destination snapshot used by new
+// referral sessions. Previously issued sessions and accepted orders are not rewritten.
+func (s *SellerAffiliateAppService) ReissueLink(ctx context.Context, linkID, publicToken, payoutAddress string, utxoPayoutAddresses models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	payoutAddress, err := normalizeAffiliateEVMPayoutAddress(payoutAddress)
+	if err != nil || !utxoPayoutAddresses.Valid() || strings.TrimSpace(publicToken) == "" {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	link, err := s.store.GetAffiliateLink(ctx, strings.TrimSpace(linkID))
+	if err != nil {
+		return nil, err
+	}
+	link.PromoterPayoutAddress = payoutAddress
+	link.PromoterUTXOPayoutAddresses = utxoPayoutAddresses.Clone()
+	link.PublicToken = strings.TrimSpace(publicToken)
+	link.Status = models.AffiliateLinkStatusActive
+	link.UpdatedAt = time.Now().UTC()
+	if err := s.store.UpdateAffiliateLink(ctx, link); err != nil {
+		return nil, err
+	}
+	return link, nil
+}
+
+// GetLink returns a direct promoter link inside the current tenant.
+func (s *SellerAffiliateAppService) GetLink(ctx context.Context, linkID string) (*models.AffiliateLink, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	return s.store.GetAffiliateLink(ctx, strings.TrimSpace(linkID))
+}
+
 // GetLinkByToken resolves a direct promoter link inside the current tenant.
 func (s *SellerAffiliateAppService) GetLinkByToken(ctx context.Context, token string) (*models.AffiliateLink, error) {
 	if s == nil || s.store == nil {
@@ -305,6 +338,17 @@ func (s *SellerAffiliateAppService) TransitionCommission(ctx context.Context, or
 		return nil, models.ErrInvalidSellerAffiliate
 	}
 	return s.store.TransitionAffiliateCommission(ctx, strings.TrimSpace(orderID), status, reason, at.UTC())
+}
+
+// TransitionCommissionLines advances only deterministically identified order lines.
+func (s *SellerAffiliateAppService) TransitionCommissionLines(ctx context.Context, orderID string, orderLineIDs []string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, at time.Time) ([]models.AffiliateCommissionLine, error) {
+	if s == nil || s.store == nil {
+		return nil, errors.New("seller affiliate store not configured")
+	}
+	if at.IsZero() || status != models.AffiliateCommissionStatusReversed || !reason.Valid() || len(orderLineIDs) == 0 {
+		return nil, models.ErrInvalidSellerAffiliate
+	}
+	return s.store.TransitionAffiliateCommissionLines(ctx, strings.TrimSpace(orderID), orderLineIDs, status, reason, at.UTC())
 }
 
 // TransitionCommissionTx applies an objective lifecycle fact in the caller's

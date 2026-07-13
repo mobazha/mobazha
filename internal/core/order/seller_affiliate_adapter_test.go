@@ -27,6 +27,7 @@ type recordingSellerAffiliateService struct {
 	recorded     bool
 	status       models.AffiliateCommissionStatus
 	reason       models.AffiliateCommissionReversalReason
+	lineIDs      []string
 }
 
 func (*recordingSellerAffiliateService) PutProgram(context.Context, *models.AffiliateProgram) (*models.AffiliateProgram, error) {
@@ -36,6 +37,12 @@ func (*recordingSellerAffiliateService) GetProgram(context.Context) (*models.Aff
 	return nil, nil
 }
 func (*recordingSellerAffiliateService) CreateLink(context.Context, string, string, string, models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error) {
+	return nil, nil
+}
+func (*recordingSellerAffiliateService) ReissueLink(context.Context, string, string, string, models.AffiliateUTXOPayoutAddresses) (*models.AffiliateLink, error) {
+	return nil, nil
+}
+func (*recordingSellerAffiliateService) GetLink(context.Context, string) (*models.AffiliateLink, error) {
 	return nil, nil
 }
 func (*recordingSellerAffiliateService) GetLinkByToken(context.Context, string) (*models.AffiliateLink, error) {
@@ -73,6 +80,12 @@ func (*recordingSellerAffiliateService) TransitionCommissionTx(database.Tx, stri
 	return nil, nil
 }
 func (s *recordingSellerAffiliateService) TransitionCommission(_ context.Context, _ string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, _ time.Time) ([]models.AffiliateCommissionLine, error) {
+	s.status = status
+	s.reason = reason
+	return nil, nil
+}
+func (s *recordingSellerAffiliateService) TransitionCommissionLines(_ context.Context, _ string, lineIDs []string, status models.AffiliateCommissionStatus, reason models.AffiliateCommissionReversalReason, _ time.Time) ([]models.AffiliateCommissionLine, error) {
+	s.lineIDs = append([]string(nil), lineIDs...)
 	s.status = status
 	s.reason = reason
 	return nil, nil
@@ -223,6 +236,36 @@ func TestReconcileSellerAffiliateOrder_DerivesPendingCommissionFromSignedOrder(t
 	require.NoError(t, service.ReconcileSellerAffiliateOrder(context.Background(), orderID))
 	assert.Equal(t, models.AffiliateCommissionStatusReversed, affiliate.status)
 	assert.Equal(t, models.AffiliateReversalRefund, affiliate.reason)
+}
+
+func TestReconcileSellerAffiliateCommissionStatus_ReversesOnlyRefundedItemIndexes(t *testing.T) {
+	affiliate := new(recordingSellerAffiliateService)
+	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
+	order := &models.Order{ID: models.OrderID("affiliate-partial-refund")}
+	require.NoError(t, order.PutMessage(testutil.MustWrapOrderMessage(&pb.Refund{
+		RefundInfo:          &pb.Refund_TransactionID{TransactionID: "partial-refund-tx"},
+		Amount:              "100",
+		RefundedItemIndexes: []uint32{2, 0, 2},
+	})))
+
+	require.NoError(t, service.reconcileSellerAffiliateCommissionStatus(context.Background(), order))
+	assert.Equal(t, []string{"affiliate-partial-refund:0", "affiliate-partial-refund:2"}, affiliate.lineIDs)
+	assert.Equal(t, models.AffiliateCommissionStatusReversed, affiliate.status)
+	assert.Equal(t, models.AffiliateReversalRefund, affiliate.reason)
+}
+
+func TestReconcileSellerAffiliateCommissionStatus_UnallocatedRefundReversesWholeOrder(t *testing.T) {
+	affiliate := new(recordingSellerAffiliateService)
+	service := newTestOrderAppService(t, OrderAppServiceConfig{SellerAffiliate: affiliate})
+	order := &models.Order{ID: models.OrderID("affiliate-unallocated-refund")}
+	require.NoError(t, order.PutMessage(testutil.MustWrapOrderMessage(&pb.Refund{
+		RefundInfo: &pb.Refund_TransactionID{TransactionID: "unallocated-refund-tx"},
+		Amount:     "100",
+	})))
+
+	require.NoError(t, service.reconcileSellerAffiliateCommissionStatus(context.Background(), order))
+	assert.Empty(t, affiliate.lineIDs)
+	assert.Equal(t, models.AffiliateCommissionStatusReversed, affiliate.status)
 }
 
 func orderAffiliateTestPeerID(t *testing.T) string {

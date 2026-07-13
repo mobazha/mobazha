@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -227,10 +228,37 @@ func (s *OrderAppService) sellerAffiliateOrderFacts(orderID models.OrderID, orde
 
 func (s *OrderAppService) reconcileSellerAffiliateCommissionStatus(ctx context.Context, order *models.Order) error {
 	if len(order.SerializedRefunds) > 0 || order.State == models.OrderState_REFUNDED {
+		var refundedLineIDs []string
+		allLines := order.State == models.OrderState_REFUNDED
 		if len(order.SerializedRefunds) > 0 {
-			if _, err := order.Refunds(); err != nil {
+			refunds, err := order.Refunds()
+			if err != nil {
 				return fmt.Errorf("read seller affiliate refund facts: %w", err)
 			}
+			seen := make(map[uint32]struct{})
+			for _, refund := range refunds {
+				if refund == nil || len(refund.GetRefundedItemIndexes()) == 0 {
+					allLines = true
+					break
+				}
+				for _, itemIndex := range refund.GetRefundedItemIndexes() {
+					seen[itemIndex] = struct{}{}
+				}
+			}
+			if !allLines {
+				indexes := make([]int, 0, len(seen))
+				for itemIndex := range seen {
+					indexes = append(indexes, int(itemIndex))
+				}
+				sort.Ints(indexes)
+				for _, itemIndex := range indexes {
+					refundedLineIDs = append(refundedLineIDs, fmt.Sprintf("%s:%d", order.ID, itemIndex))
+				}
+			}
+		}
+		if !allLines && len(refundedLineIDs) > 0 {
+			_, err := s.sellerAffiliate.TransitionCommissionLines(ctx, order.ID.String(), refundedLineIDs, models.AffiliateCommissionStatusReversed, models.AffiliateReversalRefund, time.Now().UTC())
+			return err
 		}
 		_, err := s.sellerAffiliate.TransitionCommission(ctx, order.ID.String(), models.AffiliateCommissionStatusReversed, models.AffiliateReversalRefund, time.Now().UTC())
 		return err

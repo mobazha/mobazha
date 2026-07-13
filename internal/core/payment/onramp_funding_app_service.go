@@ -227,6 +227,78 @@ func (s *OnrampFundingAppService) refreshRecord(ctx context.Context, row *models
 	return &view
 }
 
+// InitiateOrResumeForOrder implements contracts.OnrampFundingService: it
+// resolves the order's tenant and current payable attempt, then delegates to
+// InitiateOrResume.
+func (s *OnrampFundingAppService) InitiateOrResumeForOrder(ctx context.Context, orderID string, req contracts.OnrampFundingInitiation) (*payment.OnrampFundingSourceView, error) {
+	tenantID, attemptID, err := s.resolveOrderAttempt(orderID)
+	if err != nil {
+		return nil, err
+	}
+	return s.InitiateOrResume(ctx, InitiateOnrampFundingRequest{
+		TenantID:             tenantID,
+		OrderID:              orderID,
+		AttemptID:            attemptID,
+		Buyer:                req.Buyer,
+		ProviderID:           req.ProviderID,
+		FiatCurrency:         req.FiatCurrency,
+		IdempotencyKey:       req.IdempotencyKey,
+		DeliverToBuyerWallet: req.DeliverToBuyerWallet,
+		BuyerWalletAddress:   req.BuyerWalletAddress,
+	})
+}
+
+// RefreshForOrder implements contracts.OnrampFundingService.
+func (s *OnrampFundingAppService) RefreshForOrder(ctx context.Context, orderID string) (*payment.OnrampFundingSourceView, error) {
+	tenantID, attemptID, err := s.resolveOrderAttempt(orderID)
+	if err != nil {
+		return nil, err
+	}
+	return s.RefreshStatus(ctx, tenantID, attemptID)
+}
+
+// resolveOrderAttempt resolves an order to its tenant and its current payable
+// (funding_target_ready) attempt — the newest one when several exist.
+func (s *OnrampFundingAppService) resolveOrderAttempt(orderID string) (tenantID, attemptID string, err error) {
+	if strings.TrimSpace(orderID) == "" {
+		return "", "", ErrOnrampAttemptNotFound
+	}
+	var order models.Order
+	orderFound := false
+	var attempt models.PaymentAttempt
+	attemptFound := false
+	dbErr := s.db.View(func(tx database.Tx) error {
+		res := tx.Read().Where("id = ?", orderID).Limit(1).Find(&order)
+		if res.Error != nil {
+			return res.Error
+		}
+		orderFound = res.RowsAffected > 0
+		if !orderFound || !tx.Read().Migrator().HasTable(&models.PaymentAttempt{}) {
+			return nil
+		}
+		res = tx.Read().
+			Where("tenant_id = ? AND order_id = ? AND state = ?", order.TenantID, orderID, models.PaymentAttemptFundingTargetReady).
+			Order("updated_at DESC").Limit(1).Find(&attempt)
+		if res.Error != nil {
+			return res.Error
+		}
+		attemptFound = res.RowsAffected > 0
+		return nil
+	})
+	if dbErr != nil {
+		return "", "", dbErr
+	}
+	if !orderFound {
+		return "", "", ErrOnrampAttemptNotFound
+	}
+	if !attemptFound {
+		return "", "", ErrOnrampAttemptNotReady
+	}
+	return order.TenantID, attempt.AttemptID, nil
+}
+
+var _ contracts.OnrampFundingService = (*OnrampFundingAppService)(nil)
+
 // loadFrozenAttempt loads the attempt and enforces the frozen-target gate.
 func (s *OnrampFundingAppService) loadFrozenAttempt(tenantID, orderID, attemptID string) (*models.PaymentAttempt, *models.PaymentAttemptFundingTarget, error) {
 	var attempt models.PaymentAttempt

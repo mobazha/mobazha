@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/mobazha/mobazha/pkg/payment"
 )
 
 // OnrampProvider (RFC-0012 Proposal 5) funds a payment attempt by letting the
@@ -202,4 +204,30 @@ type OnrampProviderRegistry interface {
 	Unregister(id string)
 	ForProvider(id string) (OnrampProvider, error)
 	Registered() []string
+}
+
+// OnrampFundingInitiation is the client-facing request to fund an order's
+// current payable attempt through an onramp purchase. The buyer subject comes
+// from the authenticated request context, never from the client body.
+type OnrampFundingInitiation struct {
+	Buyer        BuyerRef
+	ProviderID   string
+	FiatCurrency string
+	// IdempotencyKey defaults to "primary": leave-and-resume returns the same
+	// purchase; a retry after a terminal failure supplies a new key.
+	IdempotencyKey string
+	// DeliverToBuyerWallet routes delivery to the buyer's embedded wallet for a
+	// later forwarding step instead of directly to the frozen funding target.
+	DeliverToBuyerWallet bool
+	BuyerWalletAddress   string
+}
+
+// OnrampFundingService is the node-facing orchestration surface for
+// onramp-funded attempts (ADR-019). Both methods are order-oriented: the
+// implementation resolves the order's current payable attempt and enforces the
+// frozen-terms gate. Returns are the same projection view the payment session
+// exposes as onrampFunding; a nil view from Refresh means nothing is in flight.
+type OnrampFundingService interface {
+	InitiateOrResumeForOrder(ctx context.Context, orderID string, req OnrampFundingInitiation) (*payment.OnrampFundingSourceView, error)
+	RefreshForOrder(ctx context.Context, orderID string) (*payment.OnrampFundingSourceView, error)
 }

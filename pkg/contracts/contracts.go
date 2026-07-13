@@ -462,6 +462,9 @@ type NodeService interface {
 	// PaymentSession returns the unified payment session service (Phase PS / B1).
 	// Returns nil when the selected profile does not compose the subsystem.
 	PaymentSession() PaymentSessionService
+	// OnrampFunding returns the onramp funding orchestration (ADR-019).
+	// Returns nil when the buyer-funding subsystem is not initialized.
+	OnrampFunding() OnrampFundingService
 
 	// Cross-cutting methods (kept directly on NodeService)
 

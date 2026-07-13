@@ -7,7 +7,6 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	internalcollateral "github.com/mobazha/mobazha/internal/collateral"
-	"github.com/mobazha/mobazha/internal/core/payment"
 	"github.com/mobazha/mobazha/internal/wallet"
 	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	pkgconfig "github.com/mobazha/mobazha/pkg/config"
@@ -189,8 +188,12 @@ func (n *MobazhaNode) EmbeddedWalletRegistry() contracts.EmbeddedWalletProviderR
 func (n *MobazhaNode) OnrampRegistry() contracts.OnrampProviderRegistry { return n.onrampRegistry }
 
 // OnrampFunding returns the onramp funding orchestration (ADR-019), or nil
-// when the buyer-funding subsystem failed to initialize.
-func (n *MobazhaNode) OnrampFunding() *payment.OnrampFundingAppService {
+// when the buyer-funding subsystem failed to initialize. The explicit nil
+// return avoids handing callers a typed-nil interface.
+func (n *MobazhaNode) OnrampFunding() contracts.OnrampFundingService {
+	if n.onrampFundingService == nil {
+		return nil
+	}
 	return n.onrampFundingService
 }
 

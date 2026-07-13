@@ -52,6 +52,7 @@ func onrampSourceView(s *models.PaymentAttemptOnrampFundingSource) payment.Onram
 		Status:               s.Status,
 		DeliverToBuyerWallet: s.DeliverToBuyerWallet,
 		BuyerWalletAddress:   s.BuyerWalletAddress,
+		BuyerActionURL:       s.BuyerActionURL,
 		Disclosure:           s.Disclosure,
 		UpdatedAt:            &updatedAt,
 	}

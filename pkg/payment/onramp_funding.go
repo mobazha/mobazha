@@ -58,8 +58,11 @@ type OnrampFundingSourceView struct {
 	Status               string     `json:"status"` // mirrors contracts.OnrampStatus
 	DeliverToBuyerWallet bool       `json:"deliverToBuyerWallet"`
 	BuyerWalletAddress   string     `json:"buyerWalletAddress,omitempty"`
-	Disclosure           string     `json:"disclosure,omitempty"`
-	UpdatedAt            *time.Time `json:"updatedAt,omitempty"`
+	// BuyerActionURL is where the buyer completes the fiat payment step while
+	// the purchase awaits payment (provider-hosted checkout).
+	BuyerActionURL string     `json:"buyerActionURL,omitempty"`
+	Disclosure     string     `json:"disclosure,omitempty"`
+	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
 }
 
 // Active reports whether the onramp source is still progressing toward

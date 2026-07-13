@@ -48,6 +48,54 @@ type idempotentCaptureProvider struct {
 	afterEffect func()
 }
 
+type idempotentDisburseProvider struct {
+	*mockFiatProvider
+	mu          sync.Mutex
+	results     map[string]*contracts.DisbursePaymentResult
+	calls       []contracts.DisbursePaymentParams
+	effects     int
+	afterEffect func()
+}
+
+func newIdempotentDisburseProvider(providerID string) *idempotentDisburseProvider {
+	return &idempotentDisburseProvider{
+		mockFiatProvider: &mockFiatProvider{
+			id: providerID,
+			capabilities: contracts.FiatProviderCapabilities{
+				ModeratedMode: contracts.FiatModeratedModeDelayedDisbursement,
+			},
+		},
+		results: make(map[string]*contracts.DisbursePaymentResult),
+	}
+}
+
+func (p *idempotentDisburseProvider) DisbursePayment(
+	_ context.Context,
+	params contracts.DisbursePaymentParams,
+) (*contracts.DisbursePaymentResult, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.calls = append(p.calls, params)
+	if result, ok := p.results[params.IdempotencyKey]; ok {
+		copy := *result
+		return &copy, nil
+	}
+	result := &contracts.DisbursePaymentResult{DisbursementID: "payout-" + params.PaymentID, Status: "success"}
+	p.results[params.IdempotencyKey] = result
+	p.effects++
+	if p.afterEffect != nil {
+		p.afterEffect()
+	}
+	copy := *result
+	return &copy, nil
+}
+
+func (p *idempotentDisburseProvider) snapshot() (calls []contracts.DisbursePaymentParams, effects int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]contracts.DisbursePaymentParams(nil), p.calls...), p.effects
+}
+
 func newIdempotentCaptureProvider(providerID string) *idempotentCaptureProvider {
 	return &idempotentCaptureProvider{
 		mockFiatProvider: &mockFiatProvider{id: providerID},
@@ -225,4 +273,70 @@ func TestFiatProviderAction_PostgresCrashAfterProviderSuccess_ReconcilesWithoutD
 	assert.Empty(t, completed.LeaseOwner)
 	assert.Nil(t, completed.LeaseExpiresAt)
 	require.NotNil(t, completed.CompletedAt)
+}
+
+func TestFiatProviderAction_PostgresDisburseCrash_ReconcilesWithoutDuplicateEffect(t *testing.T) {
+	dbOne, dbTwo := openProviderActionPostgresDatabases(t, "provider-disburse-crash-recovery")
+	failingDB := &failNextUpdateDatabase{Database: dbOne}
+	provider := newIdempotentDisburseProvider("paypal")
+	provider.afterEffect = func() { failingDB.failNext.Store(true) }
+	registry := newMockFiatRegistry()
+	registry.Register(provider)
+	crashingWorker := newProviderActionIntegrationService(registry, failingDB, "postgres-disburse-crashing-worker")
+	recoveryWorker := newProviderActionIntegrationService(registry, dbTwo, "postgres-disburse-recovery-worker")
+	seedProviderActionAttempt(t, crashingWorker, failingDB, "paypal", "order_disburse_crash", "CAPTURE-DISBURSE")
+	params := contracts.DisbursePaymentParams{
+		PaymentID: "CAPTURE-DISBURSE", OrderID: "order_disburse_crash", IdempotencyKey: "order-complete-disburse",
+	}
+
+	_, err := crashingWorker.DisbursePayment(context.Background(), "paypal", params)
+	require.ErrorIs(t, err, errSimulatedProviderActionCrash)
+	calls, effects := provider.snapshot()
+	require.Len(t, calls, 1)
+	assert.Equal(t, 1, effects)
+	assert.Equal(t, "acct_action_paypal", calls[0].SellerAccountID)
+	assert.NotEmpty(t, calls[0].IdempotencyKey)
+
+	_, err = recoveryWorker.DisbursePayment(context.Background(), "paypal", params)
+	require.ErrorIs(t, err, contracts.ErrActionInProgress)
+	calls, effects = provider.snapshot()
+	require.Len(t, calls, 1, "a live lease must prevent immediate disbursement replay")
+	assert.Equal(t, 1, effects)
+
+	var action models.PaymentProviderAction
+	require.NoError(t, dbTwo.View(func(tx database.Tx) error {
+		return tx.Read().Where(
+			"action_kind = ? AND external_reference = ?",
+			models.PaymentProviderActionDisburse, params.PaymentID,
+		).First(&action).Error
+	}))
+	expiredAt := time.Now().UTC().Add(-time.Second)
+	require.NoError(t, dbOne.Update(func(tx database.Tx) error {
+		updated, updateErr := tx.UpdateColumns(
+			map[string]interface{}{"lease_expires_at": expiredAt},
+			map[string]interface{}{"action_id = ?": action.ActionID},
+			&models.PaymentProviderAction{},
+		)
+		if updateErr != nil {
+			return updateErr
+		}
+		if updated != 1 {
+			return errors.New("provider disbursement lease was not expired")
+		}
+		return nil
+	}))
+	recoveryWorker.reconcileProviderActions(context.Background())
+
+	calls, effects = provider.snapshot()
+	require.Len(t, calls, 2, "reconciliation must replay the ambiguous disbursement request")
+	assert.Equal(t, calls[0].IdempotencyKey, calls[1].IdempotencyKey)
+	assert.Equal(t, 1, effects, "provider idempotency must collapse replay into one payout effect")
+	require.NoError(t, dbTwo.View(func(tx database.Tx) error {
+		return tx.Read().Where("action_id = ?", action.ActionID).First(&action).Error
+	}))
+	assert.Equal(t, models.PaymentProviderActionCompleted, action.State)
+	result, err := decodeProviderActionResult(action)
+	require.NoError(t, err)
+	require.NotNil(t, result.Disburse)
+	assert.Equal(t, "payout-CAPTURE-DISBURSE", result.Disburse.DisbursementID)
 }

@@ -522,16 +522,22 @@ func TestPaymentAppService_PersistEscrowPaymentInfo_PreservesModeratorAddress(t 
 	t.Cleanup(func() { _ = db.Close() })
 
 	paymentData := &models.PaymentData{
-		OrderID:          "order-solana-moderated",
-		Coin:             iwallet.CoinType("crypto:solana:mainnet:native"),
-		Amount:           1000,
-		ContractAddress:  "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX",
-		ToAddress:        "RT38nT6ABNLfotNxwseiNNKukCKAXpFkZctJGn4EbFe",
-		Moderator:        "moderator-peer-id",
-		ModeratorAddress: "Mod11111111111111111111111111111111111111111",
-		UnlockTime:       12345,
-		FundingDeadline:  12000,
-		SettlementSpec:   payment.NewSolanaEscrowSpec(true).ToPending(),
+		OrderID:                "order-solana-moderated",
+		Coin:                   iwallet.CoinType("crypto:solana:mainnet:native"),
+		Amount:                 1000,
+		ContractAddress:        "AnD79RcbbS1GsvNZZHcQTGRvozVL1J9mr4GJiwm587pX",
+		ToAddress:              "RT38nT6ABNLfotNxwseiNNKukCKAXpFkZctJGn4EbFe",
+		Moderator:              "moderator-peer-id",
+		ModeratorAddress:       "Mod11111111111111111111111111111111111111111",
+		ModeratorPayoutAddress: "ModPayout111111111111111111111111111111111",
+		ModeratorPayoutAmount:  25,
+		AffiliatePayoutAddress: "Affiliate1111111111111111111111111111111111",
+		AffiliatePayoutAmount:  75,
+		PlatformFeeAddress:     "Platform11111111111111111111111111111111111",
+		PlatformFeeAmount:      "10",
+		UnlockTime:             12345,
+		FundingDeadline:        12000,
+		SettlementSpec:         payment.NewSolanaEscrowSpec(true).ToPending(),
 	}
 	svc := newTestPaymentAppService(t, PaymentAppServiceConfig{DB: db})
 	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
@@ -547,6 +553,12 @@ func TestPaymentAppService_PersistEscrowPaymentInfo_PreservesModeratorAddress(t 
 	require.NoError(t, err)
 	require.NotNil(t, info)
 	require.Equal(t, paymentData.ModeratorAddress, info.ModeratorAddress)
+	require.Equal(t, paymentData.ModeratorPayoutAddress, info.ModeratorPayoutAddress)
+	require.Equal(t, paymentData.ModeratorPayoutAmount, info.ModeratorPayoutAmount)
+	require.Equal(t, paymentData.AffiliatePayoutAddress, info.AffiliatePayoutAddress)
+	require.Equal(t, paymentData.AffiliatePayoutAmount, info.AffiliatePayoutAmount)
+	require.Equal(t, paymentData.PlatformFeeAddress, info.PlatformFeeAddress)
+	require.EqualValues(t, 10, info.PlatformFeeAmount)
 
 	encoded, err := encodeSolanaAnchorPendingMetadata(paymentData)
 	require.NoError(t, err)
@@ -555,6 +567,12 @@ func TestPaymentAppService_PersistEscrowPaymentInfo_PreservesModeratorAddress(t 
 	var metadata models.PendingEscrowPaymentInfo
 	require.NoError(t, json.Unmarshal(rawMetadata, &metadata))
 	require.Equal(t, paymentData.ModeratorAddress, metadata.ModeratorAddress)
+	require.Equal(t, paymentData.ModeratorPayoutAddress, metadata.ModeratorPayoutAddress)
+	require.Equal(t, paymentData.ModeratorPayoutAmount, metadata.ModeratorPayoutAmount)
+	require.Equal(t, paymentData.AffiliatePayoutAddress, metadata.AffiliatePayoutAddress)
+	require.Equal(t, paymentData.AffiliatePayoutAmount, metadata.AffiliatePayoutAmount)
+	require.Equal(t, paymentData.PlatformFeeAddress, metadata.PlatformFeeAddress)
+	require.EqualValues(t, 10, metadata.PlatformFeeAmount)
 }
 
 func TestPaymentAppService_PersistSharedPaymentPolicySnapshot(t *testing.T) {
@@ -634,8 +652,8 @@ func TestPaymentAppService_GeneratePaymentInstructions_LocksManagedEscrowRelease
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result.PaymentData)
-	require.Equal(t, feeWei, result.PaymentData.PlatformAmount)
-	require.Equal(t, platformAddr, result.PaymentData.PlatformAddr)
+	require.Equal(t, feeWei, result.PaymentData.PlatformFeeAmount)
+	require.Equal(t, platformAddr, result.PaymentData.PlatformFeeAddress)
 	require.Equal(t, feeWei, result.PaymentData.CancelFeeAmount)
 
 	var order models.Order

@@ -9,19 +9,23 @@ import (
 // written. It carries settlement metadata for escrow rails such as Solana
 // Anchor and legacy contract escrow.
 type PendingEscrowPaymentInfo struct {
-	Type                 string                 `json:"type"` // always "escrow"
-	Coin                 string                 `json:"coin,omitempty"`
-	Amount               uint64                 `json:"amount,omitempty"`
-	ContractAddress      string                 `json:"contractAddress,omitempty"`
-	EscrowAddress        string                 `json:"escrowAddress,omitempty"`
-	Moderator            string                 `json:"moderator,omitempty"`
-	ModeratorAddress     string                 `json:"moderatorAddress,omitempty"`
-	PlatformFeeCollector string                 `json:"platformFeeCollector,omitempty"`
-	RentCollector        string                 `json:"rentCollector,omitempty"`
-	UnlockTime           int64                  `json:"unlockTime,omitempty"`
-	FundingDeadline      int64                  `json:"fundingDeadline,omitempty"`
-	EscrowServiceFee     uint64                 `json:"escrowServiceFee,omitempty"`
-	SettlementSpec       *PendingSettlementSpec `json:"settlementSpec,omitempty"`
+	Type                   string                 `json:"type"` // always "escrow"
+	Coin                   string                 `json:"coin,omitempty"`
+	Amount                 uint64                 `json:"amount,omitempty"`
+	ContractAddress        string                 `json:"contractAddress,omitempty"`
+	EscrowAddress          string                 `json:"escrowAddress,omitempty"`
+	Moderator              string                 `json:"moderator,omitempty"`
+	ModeratorAddress       string                 `json:"moderatorAddress,omitempty"`
+	ModeratorPayoutAddress string                 `json:"moderatorPayoutAddress,omitempty"`
+	ModeratorPayoutAmount  uint64                 `json:"moderatorPayoutAmount,omitempty"`
+	PlatformFeeAddress     string                 `json:"platformFeeAddress,omitempty"`
+	RentCollector          string                 `json:"rentCollector,omitempty"`
+	UnlockTime             int64                  `json:"unlockTime,omitempty"`
+	FundingDeadline        int64                  `json:"fundingDeadline,omitempty"`
+	PlatformFeeAmount      uint64                 `json:"platformFeeAmount,omitempty"`
+	AffiliatePayoutAddress string                 `json:"affiliatePayoutAddress,omitempty"`
+	AffiliatePayoutAmount  uint64                 `json:"affiliatePayoutAmount,omitempty"`
+	SettlementSpec         *PendingSettlementSpec `json:"settlementSpec,omitempty"`
 }
 
 // SetPendingEscrowPaymentInfo stores escrow payment intent in PendingPaymentInfo.

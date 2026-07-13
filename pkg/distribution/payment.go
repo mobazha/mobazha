@@ -106,11 +106,11 @@ type ManagedSolanaSigner interface {
 // ManagedSolanaSetupConfig contains public deployment addresses selected by
 // the private composition. It contains no credential or RPC authority.
 type ManagedSolanaSetupConfig struct {
-	ProgramAddress       string
-	PlatformAuthority    string
-	PlatformFeeCollector string
-	RentCollector        string
-	Testnet              bool
+	ProgramAddress     string
+	PlatformAuthority  string
+	PlatformFeeAddress string
+	RentCollector      string
+	Testnet            bool
 }
 
 // ManagedSolanaSetupIntent is Core's immutable order-policy projection. The

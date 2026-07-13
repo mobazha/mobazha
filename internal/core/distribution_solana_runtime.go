@@ -94,7 +94,7 @@ func (s distributionManagedSolanaSetupService) PrepareManagedSolanaSetup(
 	if platformAuthority == "" {
 		platformAuthority = params.PayerAddress
 	}
-	feeCollector := strings.TrimSpace(config.PlatformFeeCollector)
+	feeCollector := strings.TrimSpace(config.PlatformFeeAddress)
 	if feeCollector == "" {
 		feeCollector = platformAuthority
 	}
@@ -106,7 +106,7 @@ func (s distributionManagedSolanaSetupService) PrepareManagedSolanaSetup(
 		ContractAddress: program.String(), PayerAddress: params.PayerAddress,
 		PlatformAuthority: platformAuthority, BuyerAddress: orderInfo.BuyerAddress,
 		RefundAddress: refundAddress, SellerAddress: orderInfo.VendorAddress,
-		ModeratorAddress: moderatorAddress, PlatformFeeCollector: feeCollector,
+		ModeratorAddress: moderatorAddress, PlatformFeeAddress: feeCollector,
 		RentCollector: rentCollector, UniqueId: orderInfo.UniqueId,
 		RequiredSignatures: uint8(requiredSignatures), UnlockHours: uint64(orderInfo.UnlockHours),
 		UnlockTime: unlockTime, FundingDeadline: unlockTime,
@@ -123,7 +123,7 @@ func (s distributionManagedSolanaSetupService) PrepareManagedSolanaSetup(
 		Moderator: params.Moderator, ModeratorAddress: moderatorAddress,
 		Amount: params.Amount, FromID: padManagedSolanaID(payer.Bytes()),
 		UnlockHours: uint32(orderInfo.UnlockHours), UnlockTime: unlockTime, FundingDeadline: unlockTime,
-		PlatformAddr: feeCollector, RentCollector: rentCollector,
+		PlatformFeeAddress: feeCollector, RentCollector: rentCollector,
 		RefundAddress: refundAddress, PaymentTokenAddress: paymentTokenAddress,
 	}
 	return &distribution.ManagedSolanaSetupIntent{EscrowInfo: escrowInfo, PaymentData: paymentData}, nil

@@ -11,11 +11,15 @@ import (
 func TestPendingEscrowPaymentInfo_RoundTrip(t *testing.T) {
 	order := &Order{}
 	require.NoError(t, order.SetPendingEscrowPaymentInfo(&PendingEscrowPaymentInfo{
-		Coin:             "crypto:eip155:1:native",
-		Amount:           290000000,
-		EscrowAddress:    "0xescrow",
-		Moderator:        "moderator-peer-id",
-		ModeratorAddress: "moderator-chain-address",
+		Coin:                   "crypto:eip155:1:native",
+		Amount:                 290000000,
+		EscrowAddress:          "0xescrow",
+		Moderator:              "moderator-peer-id",
+		ModeratorAddress:       "moderator-chain-address",
+		ModeratorPayoutAddress: "moderator-payout-address",
+		ModeratorPayoutAmount:  123,
+		AffiliatePayoutAddress: "affiliate-payout-address",
+		AffiliatePayoutAmount:  45,
 		SettlementSpec: &PendingSettlementSpec{
 			Method:     "CANCELABLE",
 			PayMode:    "client_signed",
@@ -30,6 +34,10 @@ func TestPendingEscrowPaymentInfo_RoundTrip(t *testing.T) {
 	require.Equal(t, "0xescrow", got.EscrowAddress)
 	require.Equal(t, "moderator-peer-id", got.Moderator)
 	require.Equal(t, "moderator-chain-address", got.ModeratorAddress)
+	require.Equal(t, "moderator-payout-address", got.ModeratorPayoutAddress)
+	require.EqualValues(t, 123, got.ModeratorPayoutAmount)
+	require.Equal(t, "affiliate-payout-address", got.AffiliatePayoutAddress)
+	require.EqualValues(t, 45, got.AffiliatePayoutAmount)
 
 	// UTXO getter must not mis-read escrow JSON.
 	utxo, err := order.GetPendingPaymentInfo()

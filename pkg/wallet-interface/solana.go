@@ -15,16 +15,19 @@ type EscrowInfo struct {
 	RefundAddress          string
 	SellerAddress          string
 	SellerPayoutAddress    string
+	AffiliatePayoutAddress string
+	AffiliatePayoutAmount  uint64
 	ModeratorAddress       string
 	ModeratorPayoutAddress string
-	PlatformFeeCollector   string
+	ModeratorPayoutAmount  uint64
+	PlatformFeeAddress     string
 	RentCollector          string
 	UniqueId               [20]byte
 	RequiredSignatures     uint8
 	UnlockHours            uint64
 	UnlockTime             int64
 	FundingDeadline        int64
-	EscrowServiceFee       uint64
+	PlatformFeeAmount      uint64
 	CoinType               CoinType
 	Amount                 uint64
 	Testnet                bool // 是否使用测试网

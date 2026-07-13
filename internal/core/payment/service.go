@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -319,8 +320,8 @@ func (s *PaymentAppService) GeneratePaymentSetup(ctx context.Context, params pay
 		if quoteErr != nil {
 			return nil, quoteErr
 		}
-		result.PaymentData.PlatformAmount = feeQuote.ReleaseFeeAmount
-		result.PaymentData.PlatformAddr = feeQuote.PlatformAddr
+		result.PaymentData.PlatformFeeAmount = feeQuote.ReleaseFeeAmount
+		result.PaymentData.PlatformFeeAddress = feeQuote.PlatformAddr
 		result.PaymentData.CancelFeeAmount = feeQuote.CancelFeeAmount
 
 		setupResult.IsManagedEscrowOrder = true
@@ -534,20 +535,28 @@ func encodeSolanaAnchorPendingMetadata(pd *models.PaymentData) (string, error) {
 	if pd == nil {
 		return "", nil
 	}
+	platformFeeAmount, err := paymentDataPlatformFeeAmount(pd)
+	if err != nil {
+		return "", err
+	}
 	data, err := json.Marshal(&models.PendingEscrowPaymentInfo{
-		Type:                 "escrow",
-		Coin:                 string(pd.Coin),
-		Amount:               pd.Amount,
-		ContractAddress:      pd.ContractAddress,
-		EscrowAddress:        pd.ToAddress,
-		Moderator:            pd.Moderator,
-		ModeratorAddress:     pd.ModeratorAddress,
-		PlatformFeeCollector: pd.PlatformAddr,
-		RentCollector:        pd.RentCollector,
-		UnlockTime:           pd.UnlockTime,
-		FundingDeadline:      pd.FundingDeadline,
-		EscrowServiceFee:     pd.EscrowServiceFee,
-		SettlementSpec:       pd.SettlementSpec,
+		Type:                   "escrow",
+		Coin:                   string(pd.Coin),
+		Amount:                 pd.Amount,
+		ContractAddress:        pd.ContractAddress,
+		EscrowAddress:          pd.ToAddress,
+		Moderator:              pd.Moderator,
+		ModeratorAddress:       pd.ModeratorAddress,
+		ModeratorPayoutAddress: pd.ModeratorPayoutAddress,
+		ModeratorPayoutAmount:  pd.ModeratorPayoutAmount,
+		AffiliatePayoutAddress: pd.AffiliatePayoutAddress,
+		AffiliatePayoutAmount:  pd.AffiliatePayoutAmount,
+		PlatformFeeAddress:     pd.PlatformFeeAddress,
+		RentCollector:          pd.RentCollector,
+		UnlockTime:             pd.UnlockTime,
+		FundingDeadline:        pd.FundingDeadline,
+		PlatformFeeAmount:      platformFeeAmount,
+		SettlementSpec:         pd.SettlementSpec,
 	})
 	if err != nil {
 		return "", err
@@ -573,6 +582,10 @@ func (s *PaymentAppService) persistEscrowPaymentInfo(orderID string, pd *models.
 	if pd == nil {
 		return nil
 	}
+	platformFeeAmount, err := paymentDataPlatformFeeAmount(pd)
+	if err != nil {
+		return err
+	}
 	return s.db.Update(func(tx database.Tx) error {
 		var order models.Order
 		if err := tx.Read().Where("id = ?", orderID).First(&order).Error; err != nil {
@@ -580,23 +593,39 @@ func (s *PaymentAppService) persistEscrowPaymentInfo(orderID string, pd *models.
 		}
 		order.PaymentAddress = pd.ToAddress
 		if err := order.SetPendingEscrowPaymentInfo(&models.PendingEscrowPaymentInfo{
-			Coin:                 string(pd.Coin),
-			Amount:               pd.Amount,
-			ContractAddress:      pd.ContractAddress,
-			EscrowAddress:        pd.ToAddress,
-			Moderator:            pd.Moderator,
-			ModeratorAddress:     pd.ModeratorAddress,
-			PlatformFeeCollector: pd.PlatformAddr,
-			RentCollector:        pd.RentCollector,
-			UnlockTime:           pd.UnlockTime,
-			FundingDeadline:      pd.FundingDeadline,
-			EscrowServiceFee:     pd.EscrowServiceFee,
-			SettlementSpec:       pd.SettlementSpec,
+			Coin:                   string(pd.Coin),
+			Amount:                 pd.Amount,
+			ContractAddress:        pd.ContractAddress,
+			EscrowAddress:          pd.ToAddress,
+			Moderator:              pd.Moderator,
+			ModeratorAddress:       pd.ModeratorAddress,
+			ModeratorPayoutAddress: pd.ModeratorPayoutAddress,
+			ModeratorPayoutAmount:  pd.ModeratorPayoutAmount,
+			AffiliatePayoutAddress: pd.AffiliatePayoutAddress,
+			AffiliatePayoutAmount:  pd.AffiliatePayoutAmount,
+			PlatformFeeAddress:     pd.PlatformFeeAddress,
+			RentCollector:          pd.RentCollector,
+			UnlockTime:             pd.UnlockTime,
+			FundingDeadline:        pd.FundingDeadline,
+			PlatformFeeAmount:      platformFeeAmount,
+			SettlementSpec:         pd.SettlementSpec,
 		}); err != nil {
 			return err
 		}
 		return tx.Save(&order)
 	})
+}
+
+func paymentDataPlatformFeeAmount(pd *models.PaymentData) (uint64, error) {
+	if pd == nil || strings.TrimSpace(pd.PlatformFeeAmount) == "" {
+		return 0, nil
+	}
+	value := strings.TrimSpace(pd.PlatformFeeAmount)
+	amount, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || strconv.FormatUint(amount, 10) != value {
+		return 0, fmt.Errorf("invalid canonical platform fee amount %q", pd.PlatformFeeAmount)
+	}
+	return amount, nil
 }
 
 // GetOrderInfo retrieves order information needed for escrow setup.

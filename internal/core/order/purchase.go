@@ -751,8 +751,8 @@ func BuildPaymentSentProto(order *models.Order, pd *models.PaymentData) (*pb.Pay
 		Script:              pd.Script,
 		EscrowTimeoutHours:  pd.UnlockHours,
 		EscrowReleaseFee:    pd.EscrowReleaseFee,
-		PlatformAmount:      pd.PlatformAmount,
-		PlatformAddr:        pd.PlatformAddr,
+		PlatformAmount:      pd.PlatformFeeAmount,
+		PlatformAddr:        pd.PlatformFeeAddress,
 		CancelFeeAmount:     pd.CancelFeeAmount,
 		RefundAddress:       pd.RefundAddress,
 		PaymentMethod:       paymentMethod,
@@ -921,11 +921,11 @@ func hydratePaymentDataFromPendingInfo(order *models.Order, paymentData *models.
 	if paymentData.FundingDeadline == 0 {
 		paymentData.FundingDeadline = pending.FundingDeadline
 	}
-	if paymentData.EscrowServiceFee == 0 {
-		paymentData.EscrowServiceFee = pending.EscrowServiceFee
+	if paymentData.PlatformFeeAmount == "" {
+		paymentData.PlatformFeeAmount = strconv.FormatUint(pending.PlatformFeeAmount, 10)
 	}
-	if paymentData.PlatformAddr == "" {
-		paymentData.PlatformAddr = pending.PlatformFeeCollector
+	if paymentData.PlatformFeeAddress == "" {
+		paymentData.PlatformFeeAddress = pending.PlatformFeeAddress
 	}
 	if paymentData.RentCollector == "" {
 		paymentData.RentCollector = pending.RentCollector

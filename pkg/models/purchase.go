@@ -135,13 +135,17 @@ type PaymentData struct {
 	Coin          iwallet.CoinType      `json:"coin"`
 	Method        pb.PaymentSent_Method `json:"method"`
 	// SettlementSpec is the ADR-010 route triple for this payment instruction.
-	SettlementSpec   *PendingSettlementSpec `json:"settlementSpec,omitempty"`
-	ProviderID       string                 `json:"providerID,omitempty"`
-	ContractAddress  string                 `json:"contractAddress"`
-	PayerAddress     string                 `json:"payerAddress"`
-	Moderator        string                 `json:"moderator"`
-	ModeratorAddress string                 `json:"moderatorAddress"`
-	Amount           uint64                 `json:"amount,string"`
+	SettlementSpec         *PendingSettlementSpec `json:"settlementSpec,omitempty"`
+	ProviderID             string                 `json:"providerID,omitempty"`
+	ContractAddress        string                 `json:"contractAddress"`
+	PayerAddress           string                 `json:"payerAddress"`
+	Moderator              string                 `json:"moderator"`
+	ModeratorAddress       string                 `json:"moderatorAddress"`
+	ModeratorPayoutAddress string                 `json:"moderatorPayoutAddress,omitempty"`
+	ModeratorPayoutAmount  uint64                 `json:"moderatorPayoutAmount,omitempty,string"`
+	AffiliatePayoutAddress string                 `json:"affiliatePayoutAddress,omitempty"`
+	AffiliatePayoutAmount  uint64                 `json:"affiliatePayoutAmount,omitempty,string"`
+	Amount                 uint64                 `json:"amount,string"`
 	/*
 		id := make([]byte, 36)
 		copy(id[:32], prevHash[:])
@@ -156,9 +160,8 @@ type PaymentData struct {
 	UnlockTime         int64     `json:"unlockTime,omitempty"`
 	FundingDeadline    int64     `json:"fundingDeadline,omitempty"`
 	EscrowReleaseFee   string    `json:"escrowReleaseFee"`
-	EscrowServiceFee   uint64    `json:"escrowServiceFee,omitempty,string"`
-	PlatformAmount     string    `json:"platformAmount"`
-	PlatformAddr       string    `json:"platformAddr"`
+	PlatformFeeAmount  string    `json:"platformFeeAmount,omitempty"`
+	PlatformFeeAddress string    `json:"platformFeeAddress"`
 	CancelFeeAmount    string    `json:"cancelFeeAmount,omitempty"`
 	RentCollector      string    `json:"rentCollector,omitempty"`
 	PlatformRewardAddr string    `json:"platformRewardAddr"`

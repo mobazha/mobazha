@@ -505,8 +505,11 @@ func (w *BitcoinWallet) buildSweepTx(inputs []iwallet.SweepInput, signingKey btc
 		}
 		outputCount++
 	}
-	// P2WPKH: ~68 vbytes per input, ~31 vbytes per output + 10 overhead.
-	estimatedSize := int64(10 + len(inputs)*68 + outputCount*31)
+	// Upper-bound P2WPKH virtual size: 69 vbytes per input (including the
+	// witness stack's varints and a worst-case DER signature), ~31 per output,
+	// plus transaction framing. The previous 68-vbyte approximation could
+	// underpay by one satoshi at a 1 sat/vbyte relay floor.
+	estimatedSize := int64(10 + len(inputs)*69 + outputCount*31)
 	fee := estimatedSize * feePerByte
 	sellerAmount := totalInput - fee - affiliateAmount
 	if sellerAmount <= 0 {

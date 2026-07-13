@@ -499,7 +499,10 @@ func (w *LitecoinWallet) buildSweepTx(inputs []iwallet.SweepInput, signingKey bt
 		}
 		outputCount++
 	}
-	estimatedSize := int64(10 + len(inputs)*68 + outputCount*31)
+	// See BitcoinWallet: use the P2WPKH upper bound, not the rounded 68-vbyte
+	// approximation, so a wallet transfer never lands one satoshi below relay
+	// policy when the witness signature is maximal length.
+	estimatedSize := int64(10 + len(inputs)*69 + outputCount*31)
 	fee := estimatedSize * feePerByte
 	sellerAmount := totalInput - fee - affiliateAmount
 	if sellerAmount <= 0 {

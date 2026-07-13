@@ -20,6 +20,7 @@ import (
 	"github.com/mobazha/mobazha/internal/config"
 	"github.com/mobazha/mobazha/pkg/logging"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -842,6 +843,29 @@ func TestBitcoinWallet_BuildSweepTx(t *testing.T) {
 
 	fee := inputAmount - msgTx.TxOut[0].Value
 	t.Logf("Transaction fee: %d satoshis (%.1f sat/vB)", fee, float64(fee)/float64(10+68+31))
+}
+
+func TestBitcoinWallet_BuildTransferTx_CoversActualRelayFee(t *testing.T) {
+	w, err := newTestWallet()
+	require.NoError(t, err)
+	keyBytes, err := hex.DecodeString("84c8a01a81bf562aafafd4a9fccda533b33d6382b984c081a8cb7817bf909c18")
+	require.NoError(t, err)
+	privKey, pubKey := btcec.PrivKeyFromBytes(keyBytes)
+	change, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(pubKey.SerializeCompressed()), &chaincfg.TestNet3Params)
+	require.NoError(t, err)
+	inputAmount := int64(1_000_000)
+	rawTx, _, err := w.BuildTransferTx([]iwallet.SweepInput{{
+		TxHash: "bdb237bf8c5de6b60ba1e2dcfe364fc24f583e568d1682f851a9d0f11a45c78d", OutputIndex: 0, Value: inputAmount,
+	}}, *privKey, change.String(), testBTCTestnetAddr, 100_000, 1)
+	require.NoError(t, err)
+	var tx wire.MsgTx
+	require.NoError(t, tx.BtcDecode(bytes.NewReader(rawTx), wire.ProtocolVersion, wire.WitnessEncoding))
+	var outputs int64
+	for _, output := range tx.TxOut {
+		outputs += output.Value
+	}
+	virtualSize := int64((tx.SerializeSizeStripped()*3 + tx.SerializeSize() + 3) / 4)
+	require.GreaterOrEqual(t, inputAmount-outputs, virtualSize)
 }
 
 func TestBitcoinWallet_BuildSplitSweepTx_PreservesAffiliateAmount(t *testing.T) {

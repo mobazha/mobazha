@@ -229,10 +229,11 @@ func beginBuyerSettlementAuthorization(
 			escrowUnlockUnix = time.Now().UTC().Add(time.Duration(escrowTimeoutHours) * time.Hour).Unix()
 		}
 	}
-	buyerRefundAddress := ""
-	if solanaRail {
-		buyerRefundAddress = request.BuyerRefundAddress
-	}
+	// Freeze the buyer-selected refund destination for every new attempt. Older
+	// non-Solana offers may omit it and remain adoptable, but newly created
+	// UTXO, EVM/Safe, and Solana attempts all carry the same immutable economic
+	// output through every participant offer and the seller-signed terms.
+	buyerRefundAddress := request.BuyerRefundAddress
 	offer, err := paymentintent.IssueSettlementKeyOfferWithScopeAndUnlock(
 		ctx, identitySigner, settlementSigner,
 		contracts.SettlementKeyRef{

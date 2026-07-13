@@ -106,12 +106,10 @@ func (t PaymentAttemptSettlementTerms) Validate() error {
 	}
 	moderatorPeerID := strings.TrimSpace(t.ModeratorPeerID)
 	solanaRail := strings.HasPrefix(strings.TrimSpace(t.AssetID), "crypto:solana:")
-	if solanaRail {
+	if solanaRail || strings.TrimSpace(t.BuyerRefundAddress) != "" {
 		if err := ValidateRefundAddress(iwallet.CoinType(t.AssetID), strings.TrimSpace(t.BuyerRefundAddress)); err != nil {
 			return fmt.Errorf("invalid buyer refund address: %w", err)
 		}
-	} else if strings.TrimSpace(t.BuyerRefundAddress) != "" {
-		return fmt.Errorf("non-Solana settlement terms cannot bind buyer refund address")
 	}
 	if t.EscrowUnlockUnix < 0 || (solanaRail && (t.EscrowUnlockUnix == 0 || t.EscrowTimeoutHours == 0)) ||
 		(!solanaRail && t.EscrowUnlockUnix != 0) {

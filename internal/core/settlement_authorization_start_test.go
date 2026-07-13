@@ -130,7 +130,7 @@ func TestBeginBuyerSettlementAuthorization_PersistsDraftAndPublishesIdempotentOf
 	require.Equal(t, first.BuyerOffer, retry.BuyerOffer)
 	require.Equal(t, sellerPeerID.String(), first.SellerPeerID)
 	require.Equal(t, models.SettlementParticipantBuyer, first.BuyerOffer.ParticipantRole)
-	require.Empty(t, first.BuyerOffer.BuyerRefundAddress)
+	require.Equal(t, request.BuyerRefundAddress, first.BuyerOffer.BuyerRefundAddress)
 	require.Equal(t, []peer.ID{sellerTarget, sellerTarget}, publisher.targets)
 	require.Len(t, settlementSigner.keyRefs, 2)
 	require.Equal(t, "standard-order-participant:buyer", settlementSigner.keyRefs[0].Purpose)

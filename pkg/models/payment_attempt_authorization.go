@@ -246,12 +246,10 @@ func (o SettlementKeyOffer) validate(requireSignature bool) error {
 			return fmt.Errorf("non-moderator settlement offer cannot bind moderator payout")
 		}
 	}
-	if solanaRail {
+	if solanaRail || buyerRefundAddress != "" {
 		if err := ValidateRefundAddress(iwallet.CoinType(o.RailID), buyerRefundAddress); err != nil {
 			return fmt.Errorf("invalid settlement buyer refund address: %w", err)
 		}
-	} else if buyerRefundAddress != "" {
-		return fmt.Errorf("non-Solana settlement offer cannot bind buyer refund address")
 	}
 	if requireSignature && len(o.Signature) == 0 {
 		return fmt.Errorf("settlement key offer signature is required")
@@ -424,7 +422,7 @@ func ValidateSettlementTermsOfferBindings(
 			}
 			moderatorOffer = offer
 		}
-		if solanaRail && strings.TrimSpace(offer.BuyerRefundAddress) != strings.TrimSpace(terms.BuyerRefundAddress) {
+		if strings.TrimSpace(offer.BuyerRefundAddress) != strings.TrimSpace(terms.BuyerRefundAddress) {
 			return fmt.Errorf("%w: buyer refund terms do not match signed offers", ErrPaymentAttemptSettlementTermsConflict)
 		}
 	}

@@ -57,6 +57,15 @@ func TestPaymentAttemptSettlementTerms_CanonicalHashIsStable(t *testing.T) {
 	require.Len(t, firstHash, 64)
 }
 
+func TestPaymentAttemptSettlementTerms_ValidatesOptionalLegacyCompatibleEVMRefundAddress(t *testing.T) {
+	terms := validPaymentAttemptSettlementTerms()
+	terms.BuyerRefundAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+	require.NoError(t, terms.Validate())
+
+	terms.BuyerRefundAddress = "not-an-evm-address"
+	require.Error(t, terms.Validate())
+}
+
 func TestPaymentAttemptSettlementTerms_PreservesZeroAffiliateAllocation(t *testing.T) {
 	terms := validPaymentAttemptSettlementTerms()
 	terms.Affiliate.Amount = "0"

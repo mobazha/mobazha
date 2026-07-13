@@ -32,6 +32,46 @@ func TestExecuteSettlementAction_RejectsUnimplementedActionsBeforeDB(t *testing.
 	}
 }
 
+func TestApplyFrozenAttemptEconomicParams_UsesImmutableConfirmOutputs(t *testing.T) {
+	params := payment.ActionParams{
+		PayoutAddr:      "0xcurrent-seller",
+		AffiliatePayout: &models.AffiliateSettlementPayout{Address: "0xcurrent-promoter", Amount: "1"},
+	}
+	terms := models.PaymentAttemptSettlementTerms{
+		SellerAddress: "0xfrozen-seller",
+		Affiliate: &models.PaymentAttemptAffiliateTerm{
+			Address: "0xfrozen-promoter", Amount: "50",
+		},
+	}
+
+	require.NoError(t, applyFrozenAttemptEconomicParams(payment.SettlementActionConfirm, terms, &params))
+	require.Equal(t, "0xfrozen-seller", params.PayoutAddr)
+	require.Equal(t, &models.AffiliateSettlementPayout{Address: "0xfrozen-promoter", Amount: "50"}, params.AffiliatePayout)
+}
+
+func TestApplyFrozenAttemptEconomicParams_UsesImmutableRefundOutput(t *testing.T) {
+	params := payment.ActionParams{
+		PayoutAddr:      "0xcaller-refund",
+		AffiliatePayout: &models.AffiliateSettlementPayout{Address: "0xpromoter", Amount: "50"},
+	}
+	terms := models.PaymentAttemptSettlementTerms{BuyerRefundAddress: "0xfrozen-refund"}
+
+	require.NoError(t, applyFrozenAttemptEconomicParams(payment.SettlementActionCancel, terms, &params))
+	require.Equal(t, "0xfrozen-refund", params.PayoutAddr)
+	require.Nil(t, params.AffiliatePayout)
+}
+
+func TestApplyFrozenAttemptEconomicParams_PreservesLegacyRefundOutput(t *testing.T) {
+	params := payment.ActionParams{PayoutAddr: "0xlegacy-order-refund"}
+
+	require.NoError(t, applyFrozenAttemptEconomicParams(
+		payment.SettlementActionCancel,
+		models.PaymentAttemptSettlementTerms{},
+		&params,
+	))
+	require.Equal(t, "0xlegacy-order-refund", params.PayoutAddr)
+}
+
 func TestExecuteSettlementAction_ConfirmModeratedReturnsNoop(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)

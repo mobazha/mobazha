@@ -176,7 +176,7 @@ func (s *SettlementService) executeSettlementActionForOrderLocked(
 			out = toAddress.String()
 		}
 		params.PayoutAddr = out
-		if err := s.applyFrozenSettlementAttemptActionParams(ctx, strategy, order, coinType, &params); err != nil {
+		if err := s.applyFrozenSettlementAttemptActionParams(ctx, strategy, order, coinType, action, &params); err != nil {
 			return nil, coinType, err
 		}
 		result, cerr := strategy.Confirm(ctx, params)
@@ -208,7 +208,7 @@ func (s *SettlementService) executeSettlementActionForOrderLocked(
 			out = refundResult.Address
 		}
 		params.PayoutAddr = out
-		if err := s.applyFrozenSettlementAttemptActionParams(ctx, strategy, order, coinType, &params); err != nil {
+		if err := s.applyFrozenSettlementAttemptActionParams(ctx, strategy, order, coinType, action, &params); err != nil {
 			return nil, coinType, err
 		}
 		result, cerr := strategy.Cancel(ctx, params)
@@ -245,7 +245,7 @@ func (s *SettlementService) executeSettlementActionForOrderLocked(
 			out = refundResult.Address
 		}
 		params.PayoutAddr = out
-		if err := s.applyFrozenSettlementAttemptActionParams(ctx, strategy, order, coinType, &params); err != nil {
+		if err := s.applyFrozenSettlementAttemptActionParams(ctx, strategy, order, coinType, action, &params); err != nil {
 			return nil, coinType, err
 		}
 		var result *payment.ActionResult
@@ -272,6 +272,7 @@ func (s *SettlementService) applyFrozenSettlementAttemptActionParams(
 	strategy payment.ChainEscrowV2,
 	order *models.Order,
 	coinType iwallet.CoinType,
+	action string,
 	params *payment.ActionParams,
 ) error {
 	if _, ok := strategy.(payment.AttemptSettlementActionAuthorizer); !ok || s == nil || s.db == nil || order == nil || params == nil {
@@ -294,21 +295,27 @@ func (s *SettlementService) applyFrozenSettlementAttemptActionParams(
 	if len(attempts) == 0 {
 		return nil
 	}
-	if len(attempts) != 1 || attempts[0].Currency != coinType.String() || s.settlementSigner == nil {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+	if len(attempts) != 1 {
+		return fmt.Errorf("%w: expected one ready funding attempt, found %d", models.ErrPaymentAttemptSettlementTermsConflict, len(attempts))
+	}
+	if attempts[0].Currency != coinType.String() {
+		return fmt.Errorf("%w: ready funding attempt rail does not match settlement action", models.ErrPaymentAttemptSettlementTermsConflict)
+	}
+	if s.settlementSigner == nil {
+		return fmt.Errorf("%w: settlement signer is unavailable", models.ErrPaymentAttemptSettlementTermsConflict)
 	}
 	attempt := attempts[0]
 	terms, err := attempt.GetSettlementTerms()
 	if err != nil || terms == nil {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+		return fmt.Errorf("%w: frozen settlement terms are unavailable", models.ErrPaymentAttemptSettlementTermsConflict)
 	}
 	target, err := attempt.GetFundingTarget()
 	if err != nil || target == nil {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+		return fmt.Errorf("%w: frozen funding target is unavailable", models.ErrPaymentAttemptSettlementTermsConflict)
 	}
 	bundle, err := attempt.GetAuthorizationBundle()
 	if err != nil || bundle == nil {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+		return fmt.Errorf("%w: frozen authorization bundle is unavailable", models.ErrPaymentAttemptSettlementTermsConflict)
 	}
 	authorization := models.PaymentAttemptSettlementAuthorization{
 		Version: models.SettlementAuthorizationVersion,
@@ -327,7 +334,7 @@ func (s *SettlementService) applyFrozenSettlementAttemptActionParams(
 		localRole = models.SettlementParticipantSeller
 		expectedPeerID = terms.SellerPeerID
 	default:
-		return models.ErrPaymentAttemptSettlementTermsConflict
+		return fmt.Errorf("%w: local order role is not a settlement participant", models.ErrPaymentAttemptSettlementTermsConflict)
 	}
 	var localOffer *models.SettlementKeyOffer
 	for i := range bundle.Offers {
@@ -337,7 +344,7 @@ func (s *SettlementService) applyFrozenSettlementAttemptActionParams(
 		}
 	}
 	if localOffer == nil {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+		return fmt.Errorf("%w: local participant offer is unavailable", models.ErrPaymentAttemptSettlementTermsConflict)
 	}
 	keyRef := contracts.SettlementKeyRef{
 		TenantID: attempt.TenantID, RailID: attempt.Currency,
@@ -349,12 +356,47 @@ func (s *SettlementService) applyFrozenSettlementAttemptActionParams(
 		return err
 	}
 	if !bytes.Equal(publicKey, localOffer.PublicKey) {
-		return models.ErrPaymentAttemptSettlementTermsConflict
+		return fmt.Errorf("%w: local settlement key does not match the frozen participant offer", models.ErrPaymentAttemptSettlementTermsConflict)
+	}
+	if err := applyFrozenAttemptEconomicParams(action, *terms, params); err != nil {
+		return err
 	}
 	params.AttemptAuthorization = &authorization
 	params.AttemptTenantID = attempt.TenantID
 	params.AttemptLocalRole = localRole
 	params.AttemptSequence = 1
+	return nil
+}
+
+func applyFrozenAttemptEconomicParams(action string, terms models.PaymentAttemptSettlementTerms, params *payment.ActionParams) error {
+	if params == nil {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	switch action {
+	case payment.SettlementActionConfirm:
+		if strings.TrimSpace(terms.SellerAddress) == "" {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		params.PayoutAddr = terms.SellerAddress
+		params.AffiliatePayout = nil
+		if terms.Affiliate != nil && terms.Affiliate.Amount != "0" {
+			params.AffiliatePayout = &models.AffiliateSettlementPayout{
+				Address: terms.Affiliate.Address,
+				Amount:  terms.Affiliate.Amount,
+			}
+		}
+	case payment.SettlementActionCancel, payment.SettlementActionSellerDeclineRefund:
+		// New attempts bind this address in every participant offer. Preserve
+		// compatibility with already-ready non-Solana version-1 attempts, which
+		// legitimately omitted it and must continue using the order-derived
+		// refund destination already present in params.
+		if frozenRefund := strings.TrimSpace(terms.BuyerRefundAddress); frozenRefund != "" {
+			params.PayoutAddr = frozenRefund
+		} else if strings.TrimSpace(params.PayoutAddr) == "" {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		params.AffiliatePayout = nil
+	}
 	return nil
 }
 

@@ -38,6 +38,8 @@ type mockFiatService struct {
 	verifyErr       error
 	refundResult    *contracts.RefundResult
 	refundErr       error
+	disburseResult  *contracts.DisbursePaymentResult
+	disburseErr     error
 	onboardResult   *contracts.OnboardingResult
 	onboardErr      error
 	onboardCBResult *contracts.AccountStatus
@@ -68,6 +70,10 @@ func (m *mockFiatService) GetPayment(_ context.Context, _ string, _ string) (*co
 
 func (m *mockFiatService) RefundPayment(_ context.Context, _ string, _ contracts.RefundParams) (*contracts.RefundResult, error) {
 	return m.refundResult, m.refundErr
+}
+
+func (m *mockFiatService) DisbursePayment(_ context.Context, _ string, _ contracts.DisbursePaymentParams) (*contracts.DisbursePaymentResult, error) {
+	return m.disburseResult, m.disburseErr
 }
 
 func (m *mockFiatService) HandleWebhook(_ context.Context, _ string, _ []byte, _ map[string]string) error {

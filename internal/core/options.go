@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha/internal/core/checkoutsupply"
@@ -16,7 +15,6 @@ import (
 	corepayment "github.com/mobazha/mobazha/internal/core/payment"
 	coresettlement "github.com/mobazha/mobazha/internal/core/settlement"
 	"github.com/mobazha/mobazha/internal/logger"
-	obnet "github.com/mobazha/mobazha/internal/net"
 	"github.com/mobazha/mobazha/internal/storage"
 	pkgcollateral "github.com/mobazha/mobazha/pkg/collateral"
 	pkgconfig "github.com/mobazha/mobazha/pkg/config"
@@ -516,30 +514,12 @@ func (n *MobazhaNode) tryStandaloneMatrixProvision(currentURL, currentName strin
 		return currentURL, currentName
 	}
 
-	// Auto-register with SaaS to obtain an API key if we don't have one yet.
+	// Signed store registration runs at the composition root before options are
+	// applied. Matrix provisioning must never fall back to an unsigned or
+	// differently-scoped registration request.
 	if sm.standaloneAPIKey == "" {
-		logger.LogInfoWithID(log, n.nodeID, "Matrix chat: auto-registering with SaaS to get API key...")
-		ctx, cancel := context.WithTimeout(n.nodeCtx, 30*time.Second)
-		defer cancel()
-
-		apiKey, regErr := obnet.RegisterWithSaaS(ctx, sm.saasAPIURL, n.peerID.String(), "", "nat")
-		if regErr != nil {
-			logger.LogWarningWithIDf(log, n.nodeID, "SaaS auto-registration failed: %v", regErr)
-			return currentURL, currentName
-		}
-
-		sm.standaloneAPIKey = apiKey
-		// Persist to the top-level app data dir (where loadPersistedAPIKey reads),
-		// not the per-node dir, so the key survives restart.
-		persistDir := sm.appDataDir
-		if persistDir == "" {
-			persistDir = dataDir
-		}
-		if persistErr := PersistAPIKey(persistDir, apiKey); persistErr != nil {
-			logger.LogErrorWithIDf(log, n.nodeID, "Failed to persist SaaS API key: %v", persistErr)
-		} else {
-			logger.LogInfoWithIDf(log, n.nodeID, "SaaS API key obtained and persisted to %s", persistDir)
-		}
+		logger.LogWarningWithID(log, n.nodeID, "Matrix chat: signed SaaS store registration is not available yet")
+		return currentURL, currentName
 	}
 
 	logger.LogInfoWithID(log, n.nodeID, "Matrix chat: requesting provision from SaaS...")

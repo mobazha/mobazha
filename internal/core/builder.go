@@ -736,6 +736,48 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 			logger.LogInfoWithID(log, nodeID, "LibP2P HTTP proxy handler registered")
 		}
 	}
+
+	// Register before applyOptions because Matrix provisioning consumes the
+	// standalone API key while options are being applied. The signed Peer proof
+	// keeps this startup registration independent of Casdoor owner association.
+	hbSaaSURL := cfg.SaaSAPIURL
+	hbAPIKey := cfg.StandaloneAPIKey
+	if sharedManager != nil {
+		if hbSaaSURL == "" {
+			hbSaaSURL = sharedManager.saasAPIURL
+		}
+		if hbAPIKey == "" {
+			hbAPIKey = sharedManager.standaloneAPIKey
+		}
+	}
+	hbEndpointURL := cfg.StandaloneEndpointURL
+	if !cfg.SaaSMode && hbSaaSURL != "" && hbAPIKey == "" {
+		registerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		apiKey, registerErr := obnet.RegisterWithSaaS(
+			registerCtx,
+			hbSaaSURL,
+			obNode.peerID.String(),
+			hbEndpointURL,
+			"",
+			cfg.StandaloneConnectivity,
+			obNode.privKey,
+		)
+		cancel()
+		if registerErr != nil {
+			logger.LogWarningWithIDf(log, nodeID, "SaaS store registration failed: %v", registerErr)
+		} else {
+			hbAPIKey = apiKey
+			cfg.StandaloneAPIKey = apiKey
+			if sharedManager != nil {
+				sharedManager.standaloneAPIKey = apiKey
+			}
+			if persistErr := PersistAPIKey(cfg.DataDir, apiKey); persistErr != nil {
+				logger.LogErrorWithIDf(log, nodeID, "Failed to persist SaaS API key: %v", persistErr)
+			} else {
+				logger.LogInfoWithID(log, nodeID, "Standalone store registered with Peer proof")
+			}
+		}
+	}
 	obNode.applyOptions(append([]NodeOption{
 		WithNodeFeatureProvider(NewNodeFeatureProviderForConfig(cfg)),
 	}, options...))
@@ -749,29 +791,14 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 	obNode.registerHandlers()
 	obNode.listenNetworkEvents()
 
-	// Start heartbeat sender for standalone stores registered with SaaS.
-	// Runs after applyOptions which may auto-register and obtain an API key.
-	hbSaaSURL := cfg.SaaSAPIURL
-	hbAPIKey := cfg.StandaloneAPIKey
-	if sharedManager != nil {
-		if hbSaaSURL == "" {
-			hbSaaSURL = sharedManager.saasAPIURL
-		}
-		if hbAPIKey == "" {
-			hbAPIKey = sharedManager.standaloneAPIKey
-		}
-	}
+	// Start heartbeat delivery after all subsystems have been wired.
 	if !cfg.SaaSMode && hbSaaSURL != "" && hbAPIKey != "" {
 		hbCfg := obnet.StoreHeartbeatConfig{
-			SaaSURL: hbSaaSURL,
-			PeerID:  obNode.peerID.String(),
-			APIKey:  hbAPIKey,
-			Version: nodeVersion.String(),
-		}
-		if cfg.StandaloneConnectivity == "public" || cfg.StandaloneConnectivity == "tunnel" {
-			if len(cfg.SwarmAddrs) > 0 {
-				hbCfg.EndpointURL = cfg.SwarmAddrs[0]
-			}
+			SaaSURL:     hbSaaSURL,
+			PeerID:      obNode.peerID.String(),
+			EndpointURL: hbEndpointURL,
+			APIKey:      hbAPIKey,
+			Version:     nodeVersion.String(),
 		}
 		heartbeat := obnet.NewStoreHeartbeatSender(hbCfg)
 		heartbeat.Start(ctx)

@@ -3,17 +3,33 @@ package net
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
+
+	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 const (
 	defaultHeartbeatInterval = 5 * time.Minute
 	heartbeatTimeout         = 10 * time.Second
+	storeRegistrationPrefix  = "mobazha-store-registration-v1"
 )
+
+type storeRegistrationRequest struct {
+	PeerID       string `json:"peer_id"`
+	EndpointURL  string `json:"endpoint_url,omitempty"`
+	Domain       string `json:"domain,omitempty"`
+	Connectivity string `json:"connectivity,omitempty"`
+	Timestamp    int64  `json:"timestamp"`
+	Nonce        string `json:"nonce"`
+	Signature    string `json:"signature"`
+}
 
 // StoreHeartbeatConfig holds configuration for the heartbeat sender.
 type StoreHeartbeatConfig struct {
@@ -117,17 +133,18 @@ func (s *StoreHeartbeatSender) sendHeartbeat(ctx context.Context) {
 	}
 }
 
-// RegisterWithSaaS performs the initial store registration with the SaaS platform.
+// RegisterWithSaaS performs proof-of-possession registration with the SaaS
+// platform. The registration request is signed by the store's libp2p identity
+// key so an arbitrary caller cannot reserve another store's Peer ID.
 // On success, it returns the API key to be used for subsequent heartbeats.
-func RegisterWithSaaS(ctx context.Context, saasURL, peerID, endpointURL, connectivity string) (string, error) {
-	body := map[string]string{
-		"peer_id": peerID,
-	}
-	if endpointURL != "" {
-		body["endpoint_url"] = endpointURL
-	}
-	if connectivity != "" {
-		body["connectivity"] = connectivity
+func RegisterWithSaaS(
+	ctx context.Context,
+	saasURL, peerID, endpointURL, domain, connectivity string,
+	privateKey libp2pcrypto.PrivKey,
+) (string, error) {
+	body, err := newStoreRegistrationRequest(peerID, endpointURL, domain, connectivity, privateKey, time.Now())
+	if err != nil {
+		return "", err
 	}
 
 	jsonBody, err := json.Marshal(body)
@@ -167,4 +184,55 @@ func RegisterWithSaaS(ctx context.Context, saasURL, peerID, endpointURL, connect
 	}
 
 	return result.Data.APIKey, nil
+}
+
+func newStoreRegistrationRequest(
+	peerID, endpointURL, domain, connectivity string,
+	privateKey libp2pcrypto.PrivKey,
+	now time.Time,
+) (*storeRegistrationRequest, error) {
+	if privateKey == nil {
+		return nil, fmt.Errorf("store registration requires a private key")
+	}
+	derivedPeerID, err := peer.IDFromPrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("derive peer ID: %w", err)
+	}
+	if derivedPeerID.String() != peerID {
+		return nil, fmt.Errorf("private key does not match peer ID")
+	}
+
+	nonceBytes := make([]byte, 24)
+	if _, err := rand.Read(nonceBytes); err != nil {
+		return nil, fmt.Errorf("generate registration nonce: %w", err)
+	}
+	req := &storeRegistrationRequest{
+		PeerID:       peerID,
+		EndpointURL:  endpointURL,
+		Domain:       domain,
+		Connectivity: connectivity,
+		Timestamp:    now.Unix(),
+		Nonce:        base64.RawURLEncoding.EncodeToString(nonceBytes),
+	}
+	payload := storeRegistrationSignaturePayload(req)
+	signature, err := privateKey.Sign([]byte(payload))
+	if err != nil {
+		return nil, fmt.Errorf("sign store registration: %w", err)
+	}
+	req.Signature = base64.StdEncoding.EncodeToString(signature)
+	return req, nil
+}
+
+func storeRegistrationSignaturePayload(req *storeRegistrationRequest) string {
+	encode := base64.RawURLEncoding.EncodeToString
+	return fmt.Sprintf(
+		"%s:%s:%s:%s:%s:%d:%s",
+		storeRegistrationPrefix,
+		encode([]byte(req.PeerID)),
+		encode([]byte(req.EndpointURL)),
+		encode([]byte(req.Domain)),
+		encode([]byte(req.Connectivity)),
+		req.Timestamp,
+		req.Nonce,
+	)
 }

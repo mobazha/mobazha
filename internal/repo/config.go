@@ -184,8 +184,8 @@ type Config struct {
 	HTTPProxyLocalAddr string `long:"httpproxylocaladdr" description:"Local API address for libp2p HTTP proxy forwarding"`
 
 	// SaaSAPIURL is the SaaS platform URL for standalone stores to register
-	// and send heartbeats. When set together with StandaloneAPIKey, the node
-	// starts a heartbeat sender on boot.
+	// and send heartbeats. The node performs signed registration when no
+	// StandaloneAPIKey has been persisted yet.
 	SaaSAPIURL string `long:"saasapiurl" description:"SaaS platform URL for store registration and heartbeat"`
 
 	// StandaloneAPIKey is the API key obtained during store registration
@@ -195,6 +195,10 @@ type Config struct {
 	// StandaloneConnectivity describes how this standalone store is reachable:
 	// "public" (direct HTTPS), "tunnel" (Cloudflare Tunnel), or "nat" (libp2p only).
 	StandaloneConnectivity string `long:"standaloneconnectivity" description:"Connectivity mode: public, tunnel, or nat"`
+
+	// StandaloneEndpointURL is the public HTTP endpoint advertised to Hosting
+	// for direct cross-store requests. NAT-only stores leave it empty.
+	StandaloneEndpointURL string `long:"standaloneendpointurl" description:"Public HTTP endpoint advertised during standalone store registration"`
 
 	// CasdoorCertificate is the PEM-encoded public certificate of the SaaS
 	// Casdoor instance. Used by standalone nodes to verify JWT tokens issued

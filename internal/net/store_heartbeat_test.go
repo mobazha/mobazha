@@ -2,6 +2,7 @@ package net
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,7 +10,23 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
+
+func registrationIdentity(t *testing.T) (libp2pcrypto.PrivKey, string) {
+	t.Helper()
+	privateKey, _, err := libp2pcrypto.GenerateEd25519Key(nil)
+	if err != nil {
+		t.Fatalf("generate identity: %v", err)
+	}
+	peerID, err := peer.IDFromPrivateKey(privateKey)
+	if err != nil {
+		t.Fatalf("derive peer ID: %v", err)
+	}
+	return privateKey, peerID.String()
+}
 
 func TestStoreHeartbeatSender_SendsHeartbeat(t *testing.T) {
 	var received atomic.Int32
@@ -170,32 +187,45 @@ func TestStoreHeartbeatSender_StopsOnCancel(t *testing.T) {
 }
 
 func TestRegisterWithSaaS_Success(t *testing.T) {
+	privateKey, peerID := registrationIdentity(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/platform/v1/stores/register" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 			return
 		}
 
-		var body map[string]string
-		json.NewDecoder(r.Body).Decode(&body)
-		if body["peer_id"] != "12D3KooWTestReg" {
-			t.Errorf("unexpected peer_id: %s", body["peer_id"])
+		var body storeRegistrationRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode registration: %v", err)
+			return
 		}
-		if body["connectivity"] != "public" {
-			t.Errorf("expected connectivity=public, got=%s", body["connectivity"])
+		if body.PeerID != peerID {
+			t.Errorf("unexpected peer_id: %s", body.PeerID)
+		}
+		if body.Connectivity != "public" {
+			t.Errorf("expected connectivity=public, got=%s", body.Connectivity)
+		}
+		signature, err := base64.StdEncoding.DecodeString(body.Signature)
+		if err != nil {
+			t.Errorf("decode signature: %v", err)
+			return
+		}
+		ok, err := privateKey.GetPublic().Verify([]byte(storeRegistrationSignaturePayload(&body)), signature)
+		if err != nil || !ok {
+			t.Errorf("invalid Peer proof: ok=%v err=%v", ok, err)
 		}
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"data": map[string]string{
-				"peer_id": "12D3KooWTestReg",
+				"peer_id": peerID,
 				"api_key": "generated-key-abc",
 			},
 		})
 	}))
 	defer server.Close()
 
-	apiKey, err := RegisterWithSaaS(context.Background(), server.URL, "12D3KooWTestReg", "http://my-store:5102", "public")
+	apiKey, err := RegisterWithSaaS(context.Background(), server.URL, peerID, "http://my-store:5102", "", "public", privateKey)
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -205,24 +235,25 @@ func TestRegisterWithSaaS_Success(t *testing.T) {
 }
 
 func TestRegisterWithSaaS_NATOnly(t *testing.T) {
+	privateKey, peerID := registrationIdentity(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]string
+		var body storeRegistrationRequest
 		json.NewDecoder(r.Body).Decode(&body)
-		if body["endpoint_url"] != "" {
-			t.Errorf("NAT-only should not send endpoint_url, got=%s", body["endpoint_url"])
+		if body.EndpointURL != "" {
+			t.Errorf("NAT-only should not send endpoint_url, got=%s", body.EndpointURL)
 		}
-		if body["connectivity"] != "nat" {
-			t.Errorf("expected connectivity=nat, got=%s", body["connectivity"])
+		if body.Connectivity != "nat" {
+			t.Errorf("expected connectivity=nat, got=%s", body.Connectivity)
 		}
 
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": map[string]string{"peer_id": "peer-nat", "api_key": "nat-key"},
+			"data": map[string]string{"peer_id": peerID, "api_key": "nat-key"},
 		})
 	}))
 	defer server.Close()
 
-	apiKey, err := RegisterWithSaaS(context.Background(), server.URL, "peer-nat", "", "nat")
+	apiKey, err := RegisterWithSaaS(context.Background(), server.URL, peerID, "", "", "nat", privateKey)
 	if err != nil {
 		t.Fatalf("register NAT: %v", err)
 	}
@@ -232,14 +263,25 @@ func TestRegisterWithSaaS_NATOnly(t *testing.T) {
 }
 
 func TestRegisterWithSaaS_Failure(t *testing.T) {
+	privateKey, peerID := registrationIdentity(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "internal error")
 	}))
 	defer server.Close()
 
-	_, err := RegisterWithSaaS(context.Background(), server.URL, "peer1", "http://store:5102", "public")
+	_, err := RegisterWithSaaS(context.Background(), server.URL, peerID, "http://store:5102", "", "public", privateKey)
 	if err == nil {
 		t.Error("expected error for 500 response")
+	}
+}
+
+func TestRegisterWithSaaS_RejectsMismatchedIdentity(t *testing.T) {
+	privateKey, _ := registrationIdentity(t)
+	_, otherPeerID := registrationIdentity(t)
+
+	_, err := RegisterWithSaaS(context.Background(), "https://example.invalid", otherPeerID, "", "", "nat", privateKey)
+	if err == nil {
+		t.Fatal("expected mismatched private key to be rejected before HTTP request")
 	}
 }

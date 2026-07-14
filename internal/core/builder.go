@@ -800,6 +800,28 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 			APIKey:      hbAPIKey,
 			Version:     nodeVersion.String(),
 		}
+		hbCfg.OnUnauthorized = func(recoveryCtx context.Context) (string, error) {
+			apiKey, err := obnet.RegisterWithSaaS(
+				recoveryCtx,
+				hbSaaSURL,
+				obNode.peerID.String(),
+				hbEndpointURL,
+				"",
+				cfg.StandaloneConnectivity,
+				obNode.privKey,
+			)
+			if err != nil {
+				return "", err
+			}
+			cfg.StandaloneAPIKey = apiKey
+			if sharedManager != nil {
+				sharedManager.standaloneAPIKey = apiKey
+			}
+			if persistErr := PersistAPIKey(cfg.DataDir, apiKey); persistErr != nil {
+				logger.LogErrorWithIDf(log, nodeID, "Failed to persist rotated SaaS API key: %v", persistErr)
+			}
+			return apiKey, nil
+		}
 		heartbeat := obnet.NewStoreHeartbeatSender(hbCfg)
 		heartbeat.Start(ctx)
 		logger.LogInfoWithID(log, nodeID, "Store heartbeat sender started")

@@ -77,6 +77,44 @@ func TestStoreHeartbeatSender_SendsHeartbeat(t *testing.T) {
 	}
 }
 
+func TestStoreHeartbeatSender_RotatesRejectedCredential(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestNumber := requests.Add(1)
+		if requestNumber == 1 {
+			if got := r.Header.Get("X-Standalone-Store-Key"); got != "stale-key" {
+				t.Errorf("expected stale key on first request, got %q", got)
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if got := r.Header.Get("X-Standalone-Store-Key"); got != "rotated-key" {
+			t.Errorf("expected rotated key on retry, got %q", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	var recoveries atomic.Int32
+	sender := NewStoreHeartbeatSender(StoreHeartbeatConfig{
+		SaaSURL: server.URL,
+		PeerID:  "12D3KooWTest",
+		APIKey:  "stale-key",
+		OnUnauthorized: func(context.Context) (string, error) {
+			recoveries.Add(1)
+			return "rotated-key", nil
+		},
+	})
+	sender.sendHeartbeat(context.Background())
+
+	if got := requests.Load(); got != 2 {
+		t.Fatalf("expected rejected request plus one retry, got %d", got)
+	}
+	if got := recoveries.Load(); got != 1 {
+		t.Fatalf("expected one credential recovery, got %d", got)
+	}
+}
+
 func TestStoreHeartbeatSender_IncludesOwnerUserID(t *testing.T) {
 	var receivedOwnerID string
 

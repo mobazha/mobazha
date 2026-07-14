@@ -40,6 +40,9 @@ type StoreHeartbeatConfig struct {
 	Version     string // node version string
 
 	OwnerUserIDFn func() string // returns the Casdoor owner user ID (may be nil)
+	// OnUnauthorized replaces a rejected credential through a fresh signed
+	// registration and returns the new API key.
+	OnUnauthorized func(context.Context) (string, error)
 
 	Interval time.Duration // heartbeat interval (defaults to 5 minutes)
 }
@@ -87,6 +90,10 @@ func (s *StoreHeartbeatSender) Start(ctx context.Context) {
 }
 
 func (s *StoreHeartbeatSender) sendHeartbeat(ctx context.Context) {
+	s.sendHeartbeatWithRecovery(ctx, true)
+}
+
+func (s *StoreHeartbeatSender) sendHeartbeatWithRecovery(ctx context.Context, allowRecovery bool) {
 	payload := map[string]string{
 		"peer_id": s.cfg.PeerID,
 	}
@@ -127,6 +134,20 @@ func (s *StoreHeartbeatSender) sendHeartbeat(ctx context.Context) {
 	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK {
 		io.Copy(io.Discard, resp.Body)
 		log.Debugf("heartbeat sent successfully to %s", s.cfg.SaaSURL)
+	} else if resp.StatusCode == http.StatusUnauthorized && allowRecovery && s.cfg.OnUnauthorized != nil {
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		newAPIKey, recoveryErr := s.cfg.OnUnauthorized(ctx)
+		if recoveryErr != nil {
+			log.Warningf("heartbeat credential recovery failed after %d: %v, body=%s", resp.StatusCode, recoveryErr, string(respBody))
+			return
+		}
+		if newAPIKey == "" {
+			log.Warning("heartbeat credential recovery returned an empty API key")
+			return
+		}
+		s.cfg.APIKey = newAPIKey
+		log.Info("Store API key rotated after heartbeat rejection")
+		s.sendHeartbeatWithRecovery(ctx, false)
 	} else {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 		log.Warningf("heartbeat response: %d, body=%s", resp.StatusCode, string(respBody))

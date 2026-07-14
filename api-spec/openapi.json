@@ -19029,6 +19029,38 @@
         ]
       }
     },
+    "/v1/public/seller-affiliate/program": {
+      "get": {
+        "description": "Returns the active program owned by the selected store Peer so promoter discovery does not depend on an account-scoped platform route.",
+        "operationId": "seller-affiliate-public-program-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSellerAffiliateLinkView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Discover the active store affiliate program",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
     "/v1/public/seller-affiliate/programs/{programID}/links": {
       "post": {
         "description": "Creates an idempotent promoter link only when the promoter Peer signed a fresh, network- and seller-bound payout snapshot. Replays never reactivate revoked links.",

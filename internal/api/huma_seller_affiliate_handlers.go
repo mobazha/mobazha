@@ -143,6 +143,35 @@ type publicSellerAffiliatePromoterStatementInput struct {
 
 func (g *Gateway) registerNodeHumaSellerAffiliatePublicOperations(api huma.API) {
 	huma.Register(api, huma.Operation{
+		OperationID: "seller-affiliate-public-program-get",
+		Method:      http.MethodGet,
+		Path:        "/v1/public/seller-affiliate/program",
+		Summary:     "Discover the active store affiliate program",
+		Description: "Returns the active program owned by the selected store Peer so promoter discovery does not depend on an account-scoped platform route.",
+		Tags:        []string{"seller-affiliate"},
+	}, func(ctx context.Context, _ *struct{}) (*publicSellerAffiliateLinkOutput, error) {
+		service, sellerPeerID, err := sellerAffiliateStoreService(ctx)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		program, err := sellerAffiliateProgramForStore(ctx, service, sellerPeerID)
+		if err != nil {
+			if errors.Is(err, models.ErrSellerAffiliateConflict) {
+				err = models.ErrSellerAffiliateNotFound
+			}
+			return nil, sellerAffiliateOperationError(err)
+		}
+		if program.Status != models.AffiliateProgramStatusActive {
+			return nil, sellerAffiliateOperationError(models.ErrSellerAffiliateNotFound)
+		}
+		return &publicSellerAffiliateLinkOutput{Body: publicSellerAffiliateLinkView{
+			ProgramID: program.ID, SellerPeerID: program.SellerPeerID, Status: program.Status,
+			CommissionRateBPS:        program.CommissionRateBPS,
+			AttributionWindowSeconds: program.AttributionWindowSeconds,
+		}}, nil
+	})
+
+	huma.Register(api, huma.Operation{
 		OperationID: "seller-affiliate-public-promoter-statement-list",
 		Method:      http.MethodPost,
 		Path:        "/v1/public/seller-affiliate/statements/promoter",

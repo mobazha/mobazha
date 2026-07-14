@@ -372,6 +372,39 @@ func TestSellerAffiliatePublicLinkAndSessionResolveOnSelectedNode(t *testing.T) 
 	require.Equal(t, http.StatusNotFound, wrongStore.StatusCode)
 }
 
+func TestSellerAffiliatePublicProgramDiscoveryUsesSelectedStorePeer(t *testing.T) {
+	now := time.Now().UTC()
+	service := &sellerAffiliateHTTPTestService{
+		program: &models.AffiliateProgram{
+			ID: "program-1", Status: models.AffiliateProgramStatusActive,
+			CommissionRateBPS: 500, AttributionWindowSeconds: 86400, CreatedAt: now, UpdatedAt: now,
+		},
+	}
+	server, selectedSellerPeerID := newSellerAffiliateHTTPTestServer(t, service)
+	service.program.SellerPeerID = selectedSellerPeerID.String()
+
+	response := sellerAffiliateHTTPRequest(t, server, http.MethodGet, "/v1/public/seller-affiliate/program", "")
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	var envelope struct {
+		Data publicSellerAffiliateLinkView `json:"data"`
+	}
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&envelope))
+	require.Equal(t, "program-1", envelope.Data.ProgramID)
+	require.Equal(t, selectedSellerPeerID.String(), envelope.Data.SellerPeerID)
+	require.Equal(t, uint32(500), envelope.Data.CommissionRateBPS)
+
+	service.program.Status = models.AffiliateProgramStatusPaused
+	paused := sellerAffiliateHTTPRequest(t, server, http.MethodGet, "/v1/public/seller-affiliate/program", "")
+	require.Equal(t, http.StatusNotFound, paused.StatusCode)
+
+	otherIdentity, err := tnet.RandIdentity()
+	require.NoError(t, err)
+	service.program.Status = models.AffiliateProgramStatusActive
+	service.program.SellerPeerID = otherIdentity.ID().String()
+	wrongStore := sellerAffiliateHTTPRequest(t, server, http.MethodGet, "/v1/public/seller-affiliate/program", "")
+	require.Equal(t, http.StatusNotFound, wrongStore.StatusCode)
+}
+
 func TestSellerAffiliatePromoterEnrollmentIsPeerSignedIdempotentAndCannotReactivateRevokedLink(t *testing.T) {
 	now := time.Now().UTC()
 	sellerService := &sellerAffiliateHTTPTestService{

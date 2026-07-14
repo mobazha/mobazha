@@ -114,6 +114,7 @@ func (g *Gateway) registerHumaAPI(r chi.Router) (huma.API, error) {
 	g.registerNodeHumaFulfillmentPublicOperations(api)
 	g.registerNodeHumaSettingsPublicOperations(api)
 	g.registerNodeHumaAuthPublicOperations(api)
+	g.registerNodeHumaSellerAffiliatePublicOperations(api)
 
 	// Buyer portal and license validation are public endpoints. Guest buyer
 	// access uses an independent buyerPortalToken; license validation uses the
@@ -151,6 +152,7 @@ func (g *Gateway) registerHumaAPI(r chi.Router) (huma.API, error) {
 		g.registerNodeHumaShippingOperations(api)
 		g.registerNodeHumaSellerDigitalOperations(api)
 		g.registerNodeHumaCollateralOperations(api)
+		g.registerNodeHumaSellerAffiliateOperations(api)
 	}
 	if err := g.registerTrustedHumaModules(api); err != nil {
 		return nil, err

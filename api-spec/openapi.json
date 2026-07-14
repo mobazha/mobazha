@@ -20,6 +20,239 @@
         ],
         "type": "object"
       },
+      "AffiliateAttribution": {
+        "additionalProperties": false,
+        "properties": {
+          "attributedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "buyerKind": {
+            "type": "string"
+          },
+          "buyerPeerID": {
+            "type": "string"
+          },
+          "commissionRateBPSSnapshot": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "orderID": {
+            "type": "string"
+          },
+          "programID": {
+            "type": "string"
+          },
+          "promoterPayoutAddress": {
+            "type": "string"
+          },
+          "promoterPayoutDestinations": {
+            "$ref": "#/components/schemas/PayoutDestinationSet"
+          },
+          "promoterPeerID": {
+            "type": "string"
+          },
+          "promoterUTXOPayoutAddresses": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "referralSessionID": {
+            "type": "string"
+          },
+          "sellerPeerID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "orderID",
+          "referralSessionID",
+          "programID",
+          "sellerPeerID",
+          "buyerKind",
+          "promoterPeerID",
+          "commissionRateBPSSnapshot",
+          "promoterPayoutAddress",
+          "promoterUTXOPayoutAddresses",
+          "promoterPayoutDestinations",
+          "attributedAt"
+        ],
+        "type": "object"
+      },
+      "AffiliateCommissionLine": {
+        "additionalProperties": false,
+        "properties": {
+          "attributionID": {
+            "type": "string"
+          },
+          "commissionAtomic": {
+            "type": "string"
+          },
+          "commissionRateBPSSnapshot": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "netMerchandiseAtomic": {
+            "type": "string"
+          },
+          "orderID": {
+            "type": "string"
+          },
+          "orderLineID": {
+            "type": "string"
+          },
+          "reversalReason": {
+            "type": "string"
+          },
+          "reversedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attributionID",
+          "orderID",
+          "orderLineID",
+          "netMerchandiseAtomic",
+          "currency",
+          "commissionRateBPSSnapshot",
+          "commissionAtomic",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "AffiliateProgram": {
+        "additionalProperties": false,
+        "properties": {
+          "attributionWindowSeconds": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "commissionRateBPS": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "sellerPeerID": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sellerPeerID",
+          "status",
+          "commissionRateBPS",
+          "attributionWindowSeconds",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "AffiliateSettlementOutput": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actionId": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "coin": {
+            "type": "string"
+          },
+          "confirmations": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "confirmedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "txHash": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "actionId",
+          "action",
+          "state",
+          "coin",
+          "amount",
+          "address",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "AffiliateStatementLine": {
+        "additionalProperties": false,
+        "properties": {
+          "attribution": {
+            "$ref": "#/components/schemas/AffiliateAttribution"
+          },
+          "commissionLine": {
+            "$ref": "#/components/schemas/AffiliateCommissionLine"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/AffiliateSettlementOutput"
+          }
+        },
+        "required": [
+          "attribution",
+          "commissionLine"
+        ],
+        "type": "object"
+      },
       "AgentProductImportAdvanceCounts": {
         "additionalProperties": false,
         "properties": {
@@ -1664,6 +1897,99 @@
         ],
         "type": "object"
       },
+      "PayoutDestination": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "railID": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "version": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "railID",
+          "address",
+          "version"
+        ],
+        "type": "object"
+      },
+      "PayoutDestinationSet": {
+        "additionalProperties": false,
+        "properties": {
+          "destinations": {
+            "items": {
+              "$ref": "#/components/schemas/PayoutDestination"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "PublicSellerAffiliateLinkView": {
+        "additionalProperties": false,
+        "properties": {
+          "attributionWindowSeconds": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "commissionRateBPS": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "programID": {
+            "type": "string"
+          },
+          "sellerPeerID": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "programID",
+          "sellerPeerID",
+          "status",
+          "commissionRateBPS",
+          "attributionWindowSeconds"
+        ],
+        "type": "object"
+      },
+      "PublicSellerAffiliateSessionView": {
+        "additionalProperties": false,
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "referralSessionID": {
+            "type": "string"
+          },
+          "sellerPeerID": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "referralSessionID",
+          "sellerPeerID",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
       "RailDescriptor": {
         "additionalProperties": false,
         "properties": {
@@ -1715,6 +2041,229 @@
           "supportsClaimSlash",
           "supportsReconciliation",
           "hasReceiptVerification"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliateCapabilitiesView": {
+        "additionalProperties": false,
+        "properties": {
+          "rails": {
+            "items": {
+              "$ref": "#/components/schemas/SellerAffiliateRailCapability"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "version": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "rails"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliateLinkView": {
+        "additionalProperties": false,
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "payoutRails": {
+            "items": {
+              "$ref": "#/components/schemas/SellerAffiliatePayoutRailView"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "programID": {
+            "type": "string"
+          },
+          "promoterPayoutAddress": {
+            "type": "string"
+          },
+          "promoterPayoutDestinations": {
+            "$ref": "#/components/schemas/PayoutDestinationSet"
+          },
+          "promoterPeerID": {
+            "type": "string"
+          },
+          "promoterUTXOPayoutAddresses": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "publicPath": {
+            "type": "string"
+          },
+          "publicToken": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "publicPath",
+          "payoutRails",
+          "id",
+          "programID",
+          "promoterPeerID",
+          "promoterPayoutAddress",
+          "promoterUTXOPayoutAddresses",
+          "promoterPayoutDestinations",
+          "publicToken",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliateLinksView": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SellerAffiliateLinkView"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliatePayoutRailView": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "railID": {
+            "type": "string"
+          },
+          "railLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "railID",
+          "railLabel",
+          "address"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliateProgramInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "attributionWindowSeconds": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "commissionRateBPS": {
+            "format": "int32",
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "paused"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "commissionRateBPS",
+          "attributionWindowSeconds"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliateRailCapability": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "assetScope": {
+            "enum": [
+              "exact"
+            ],
+            "type": "string"
+          },
+          "guestSupport": {
+            "type": "boolean"
+          },
+          "orderKinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "railID": {
+            "type": "string"
+          },
+          "railLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "railID",
+          "railLabel",
+          "assetScope",
+          "orderKinds",
+          "actions",
+          "guestSupport"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliateStatementsView": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AffiliateStatementLine"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -18183,6 +18732,94 @@
         ]
       }
     },
+    "/v1/public/seller-affiliate-links/{token}": {
+      "get": {
+        "description": "Resolves an active token against the selected seller Node. The response contains no account identity.",
+        "operationId": "seller-affiliate-public-link-get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSellerAffiliateLinkView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Resolve a store affiliate link",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
+    "/v1/public/seller-affiliate-links/{token}/sessions": {
+      "post": {
+        "description": "Freezes the active program, link, and promoter payout facts on the selected seller Node for later checkout attribution.",
+        "operationId": "seller-affiliate-public-session-create",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicSellerAffiliateSessionView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Create a store affiliate referral session",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
     "/v1/purchases": {
       "get": {
         "operationId": "purchases-get-query",
@@ -18728,6 +19365,339 @@
         "tags": [
           "orders",
           "sales"
+        ]
+      }
+    },
+    "/v1/seller-affiliate/capabilities": {
+      "get": {
+        "description": "Returns only reviewed settlement rails supported by the active Node's effective payment and wallet capabilities.",
+        "operationId": "seller-affiliate-capabilities-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAffiliateCapabilitiesView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Get store affiliate settlement capabilities",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
+    "/v1/seller-affiliate/links": {
+      "get": {
+        "description": "Returns promoter links from the active store's tenant-local affiliate database.",
+        "operationId": "seller-affiliate-links-list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAffiliateLinksView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "List store affiliate links",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
+    "/v1/seller-affiliate/links/{linkID}/reissue": {
+      "post": {
+        "description": "Rotates the public token while retaining the promoter's frozen payout destinations. Existing sessions and accepted orders are unchanged.",
+        "operationId": "seller-affiliate-link-reissue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "linkID",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAffiliateLinkView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Reissue a store affiliate link",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
+    "/v1/seller-affiliate/links/{linkID}/revoke": {
+      "post": {
+        "description": "Prevents the link from issuing new referral sessions without changing accepted orders or historical statements.",
+        "operationId": "seller-affiliate-link-revoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "linkID",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAffiliateLinkView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Revoke a store affiliate link",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
+    "/v1/seller-affiliate/program": {
+      "get": {
+        "description": "Returns the single affiliate program owned by the active store Peer.",
+        "operationId": "seller-affiliate-program-get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffiliateProgram"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Get the store affiliate program",
+        "tags": [
+          "seller-affiliate"
+        ]
+      },
+      "put": {
+        "description": "Writes program policy under the active store Peer. Seller identity is derived from the Node and cannot be supplied by the client.",
+        "operationId": "seller-affiliate-program-put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SellerAffiliateProgramInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffiliateProgram"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Create or update the store affiliate program",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
+    "/v1/seller-affiliate/statements/seller": {
+      "get": {
+        "description": "Returns commission facts and canonical settlement evidence from the active store Node.",
+        "operationId": "seller-affiliate-statements-seller-list",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAffiliateStatementsView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "List the store affiliate statement",
+        "tags": [
+          "seller-affiliate"
         ]
       }
     },

@@ -42,6 +42,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerNodeHumaFulfillmentPublicOperations(api)
 	g.registerNodeHumaSettingsPublicOperations(api)
 	g.registerNodeHumaAuthPublicOperations(api)
+	g.registerNodeHumaSellerAffiliatePublicOperations(api)
 	// Admin operations.
 	g.registerNodeHumaListingAdminOperations(api)
 	g.registerNodeHumaMediaAdminOperations(api)
@@ -66,6 +67,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 	g.registerAIHTTPCapabilities(api)
 	g.registerNodeHumaShippingOperations(api)
 	g.registerNodeHumaCollateralOperations(api)
+	g.registerNodeHumaSellerAffiliateOperations(api)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/openapi.json", nil)
@@ -96,6 +98,15 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 
 	expectedOps := []string{
 		"node-huma-ping",
+		"seller-affiliate-program-get",
+		"seller-affiliate-program-put",
+		"seller-affiliate-capabilities-get",
+		"seller-affiliate-links-list",
+		"seller-affiliate-link-revoke",
+		"seller-affiliate-link-reissue",
+		"seller-affiliate-statements-seller-list",
+		"seller-affiliate-public-link-get",
+		"seller-affiliate-public-session-create",
 		"collateral-capabilities-get",
 		"collateral-accounts-open",
 		"collateral-accounts-list",

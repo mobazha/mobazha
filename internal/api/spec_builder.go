@@ -82,6 +82,7 @@ func BuildOpenAPISpec() []byte {
 	g.registerNodeHumaFulfillmentPublicOperations(api)
 	g.registerNodeHumaSettingsPublicOperations(api)
 	g.registerNodeHumaAuthPublicOperations(api)
+	g.registerNodeHumaSellerAffiliatePublicOperations(api)
 	// Admin operations.
 	g.registerNodeHumaListingAdminOperations(api)
 	g.registerNodeHumaMediaAdminOperations(api)
@@ -108,6 +109,7 @@ func BuildOpenAPISpec() []byte {
 	g.registerNodeHumaDigitalOperations(api)
 	g.registerNodeHumaSellerDigitalOperations(api)
 	g.registerNodeHumaCollateralOperations(api)
+	g.registerNodeHumaSellerAffiliateOperations(api)
 
 	spec, err := json.MarshalIndent(api.OpenAPI(), "", "  ")
 	if err != nil {

@@ -504,6 +504,87 @@ func TestValidateSellerPaymentAttemptFundingBasis_UsesFreshSellerRateFloor(t *te
 	)
 }
 
+func TestValidateSellerPaymentAttemptFundingBasis_RejectsBindingAndRoundUpViolations(t *testing.T) {
+	now := time.Date(2026, time.July, 15, 8, 0, 0, 0, time.UTC)
+	open := &pb.OrderOpen{PricingCoin: "USD", Amount: "4"}
+	openBytes, err := protojson.Marshal(open)
+	require.NoError(t, err)
+	order := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: "tenant-seller"}, ID: "order-binding",
+		MyRole: string(models.RoleVendor), SerializedOrderOpen: openBytes,
+	}
+	orderHash, err := order.OrderOpenCanonicalHash()
+	require.NoError(t, err)
+	basis := models.PaymentAttemptFundingBasis{
+		Version: models.PaymentAttemptFundingBasisVersion, OrderID: order.ID.String(), AttemptID: "attempt-binding",
+		AuthorizationContextID: strings.Repeat("c", 64),
+		OrderOpenHash:          orderHash, PricingCurrency: "USD", PricingAmount: "4", PricingDivisibility: 2,
+		PaymentAssetID: "crypto:eip155:1:native", PaymentCurrency: "ETH", PaymentDivisibility: 18,
+		ConversionRequired: true, ExchangeRate: "4000000000000000000", ExchangeRateBase: "ETH", ExchangeRateQuote: "USD",
+		ExchangeRateQuoteDivisibility: 2, RateSourceUpdatedUnix: now.Add(-2 * time.Minute).Unix(),
+		RoundingPolicy: models.PaymentAttemptFundingRoundingCeilV1, PaymentSubtotal: "1",
+		ProviderOrNetworkCost: "0", PlatformPaymentCost: "0", BuyerPaymentTotal: "1",
+		QuoteID: "quote-binding", QuotePolicyVersion: models.PaymentSelectionQuotePilotZeroFeeV1,
+		QuoteIssuer: "buyer-peer", IssuedAtUnix: now.Add(-time.Minute).Unix(), ExpiresAtUnix: now.Add(time.Minute).Unix(),
+	}
+
+	rates := &settlementAuthorizationExchangeRate{rate: iwallet.NewAmount("4000000000000000000"), updatedAt: now.Add(-time.Minute)}
+	require.NoError(t, validateSellerPaymentAttemptFundingBasis(basis, order, open, "buyer-peer", rates, now))
+
+	for _, test := range []struct {
+		name    string
+		mutate  func(*models.PaymentAttemptFundingBasis)
+		buyerID string
+		want    string
+	}{
+		{
+			name:    "wrong quote issuer",
+			mutate:  func(b *models.PaymentAttemptFundingBasis) {},
+			buyerID: "another-buyer",
+		},
+		{
+			name:    "wrong signed order hash",
+			mutate:  func(b *models.PaymentAttemptFundingBasis) { b.OrderOpenHash = strings.Repeat("d", 64) },
+			buyerID: "buyer-peer",
+		},
+		{
+			name:    "expired before authorization",
+			mutate:  func(b *models.PaymentAttemptFundingBasis) { b.ExpiresAtUnix = now.Unix() },
+			buyerID: "buyer-peer",
+		},
+		{
+			name: "nonzero unapproved cost",
+			mutate: func(b *models.PaymentAttemptFundingBasis) {
+				b.ProviderOrNetworkCost = "1"
+				b.BuyerPaymentTotal = "2"
+			},
+			buyerID: "buyer-peer",
+			want:    "does not admit proposed payment costs",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			candidate := basis
+			test.mutate(&candidate)
+			err := validateSellerPaymentAttemptFundingBasis(candidate, order, open, test.buyerID, rates, now)
+			require.Error(t, err)
+			if test.want != "" {
+				require.ErrorContains(t, err, test.want)
+			} else {
+				require.ErrorIs(t, err, models.ErrPaymentAttemptSettlementTermsConflict)
+			}
+		})
+	}
+
+	// 4 pricing atomic units at a seller rate of 3 payment-scaled units require
+	// ceil(4/3) = 2 payment atomic units. The buyer's quote-derived total of 1
+	// must therefore be rejected instead of silently rounding down.
+	rates.rate = iwallet.NewAmount("3000000000000000000")
+	require.ErrorContains(t,
+		validateSellerPaymentAttemptFundingBasis(basis, order, open, "buyer-peer", rates, now),
+		"below seller exchange-rate policy minimum",
+	)
+}
+
 func TestRespondSellerSettlementAuthorization_RejectsOtherKeyPurpose(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:seller-authorization-purpose-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)

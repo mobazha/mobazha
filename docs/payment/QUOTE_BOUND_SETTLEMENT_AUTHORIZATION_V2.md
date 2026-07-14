@@ -109,10 +109,16 @@ new attempt.
 - No mixed-version peer negotiation, legacy-node fallback, or historical
   cross-currency attempt backfill is part of the development scope.
 
-Implemented protocol cases cover signed wire round trips, immutable proposal
-inbox semantics, stale and underfunded seller-rate rejection, v1/v2 downgrade
-rejection, token-rail quote binding, and seller-finalize/buyer-adopt v2.
-Remaining release conformance includes USD-to-BTC, USD-to-ETH, USD-to-token,
-crypto-to-crypto, round-up boundaries, stale quote, wrong issuer, wrong order,
-revision/rail/amount mismatch, replay, moderated and Affiliate allocations,
-restart before and after quote expiry, and tampered canonical bytes.
+Implemented protocol cases cover signed wire round trips and canonical-byte
+tamper rejection; immutable proposal inbox and replay semantics; stale and
+underfunded seller-rate rejection; round-up, issuer, signed-order, expiry, and
+zero-fee-policy checks; pre-authorization quote-expiry terminalization; v1/v2
+downgrade rejection; token-rail quote binding; and seller-finalize,
+buyer-adopt, and moderator-adopt v2 binding.
+
+Remaining release conformance is rail-lifecycle rather than legacy protocol
+fallback: USD-to-BTC/ETH/token and crypto-to-crypto against real rail writers,
+UTXO and Solana finalization/adoption/recovery, fully moderated and Affiliate
+allocations, restart before and after quote expiry, funding observation,
+refund/dispute behavior, stable client denial codes, and tagged release
+evidence.

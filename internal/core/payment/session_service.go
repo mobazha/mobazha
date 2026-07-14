@@ -164,6 +164,20 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		return nil, fmt.Errorf("payment session: CreateSession: %w", err)
 	}
 	if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptAuthorizationDraft && s.crypto != nil {
+		expired, expiryErr := s.crypto.expireQuoteBoundSettlementAuthorizationDraft(
+			ctx, input.order, input.cryptoAttempt, s.currentTime(),
+		)
+		if expiryErr != nil {
+			return nil, expiryErr
+		}
+		if expired {
+			input, err = s.projector.fetchProjectInput(req.OrderID)
+			if err != nil {
+				return nil, fmt.Errorf("payment session: reload expired authorization draft: %w", err)
+			}
+		}
+	}
+	if input.cryptoAttempt != nil && input.cryptoAttempt.State == models.PaymentAttemptAuthorizationDraft && s.crypto != nil {
 		abandoned, abandonErr := s.crypto.abandonUnsupportedSettlementAuthorizationDraft(ctx, input.order, input.cryptoAttempt)
 		if abandonErr != nil {
 			return nil, abandonErr

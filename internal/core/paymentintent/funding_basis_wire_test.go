@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha/pkg/models"
+	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -42,6 +44,42 @@ func TestFundingBasisProposalWire_RoundTripsCanonicalSnapshot(t *testing.T) {
 	wire.AttemptID = "another-attempt"
 	_, err = FundingBasisProposalFromProto(wire)
 	require.ErrorIs(t, err, models.ErrPaymentAttemptSettlementTermsConflict)
+}
+
+func TestFundingBasisProposalWire_RejectsTamperedOrNonCanonicalPayload(t *testing.T) {
+	attempt, _, _, _, _, _, _ := cryptoAttemptFixture(t)
+	basis := paymentIntentFundingBasis(attempt)
+	wire, err := FundingBasisProposalToProto(basis)
+	require.NoError(t, err)
+
+	for _, mutate := range []struct {
+		name  string
+		apply func(*pb.SettlementFundingBasisProposal)
+	}{
+		{
+			name: "non canonical whitespace",
+			apply: func(wire *pb.SettlementFundingBasisProposal) {
+				wire.FundingBasis = append(wire.FundingBasis, ' ')
+			},
+		},
+		{
+			name: "tampered canonical amount",
+			apply: func(wire *pb.SettlementFundingBasisProposal) {
+				wire.FundingBasis = []byte(strings.Replace(
+					string(wire.FundingBasis),
+					`"buyerPaymentTotal":"`+basis.BuyerPaymentTotal+`"`,
+					`"buyerPaymentTotal":"`+basis.BuyerPaymentTotal+`1"`, 1,
+				))
+			},
+		},
+	} {
+		t.Run(mutate.name, func(t *testing.T) {
+			candidate := proto.Clone(wire).(*pb.SettlementFundingBasisProposal)
+			mutate.apply(candidate)
+			_, err := FundingBasisProposalFromProto(candidate)
+			require.Error(t, err)
+		})
+	}
 }
 
 func TestRetainReceivedFundingBasisProposal_IsIdempotentAndImmutable(t *testing.T) {

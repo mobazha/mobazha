@@ -396,6 +396,39 @@ func TestFinalizeAndAdoptSettlementAuthorization_QuoteBoundV2(t *testing.T) {
 	require.Equal(t, models.PaymentAttemptFundingTargetReady, adopted.Attempt.State)
 	require.Equal(t, finalized.Attempt.FundingBasisHash, adopted.Attempt.FundingBasisHash)
 	require.Equal(t, finalized.Terms.FundingBasisHash, adopted.Terms.FundingBasisHash)
+
+	// A moderator does not receive the buyer's non-actionable proposal directly.
+	// It must durably bind the canonical basis carried by the seller-finalized v2
+	// authorization before validating and freezing its local attempt.
+	moderatorDB, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:moderator-authorization-v2-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, moderatorDB.AutoMigrate(
+		&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{},
+	))
+	require.NoError(t, moderatorDB.Transaction(func(tx *gorm.DB) error {
+		if err := paymentintent.RetainReceivedSettlementKeyOfferInTransaction(tx, attempt.TenantID, buyerOffer); err != nil {
+			return err
+		}
+		return paymentintent.RetainReceivedSettlementKeyOfferInTransaction(tx, attempt.TenantID, sellerOffer)
+	}))
+	moderatorAttempt, moderatorRoute, err := paymentintent.PrepareCryptoPaymentAttemptDraft(
+		moderatorDB,
+		paymentintent.CryptoPaymentAttemptDraftRequest{
+			TenantID: attempt.TenantID, AttemptID: attempt.AttemptID, OrderID: attempt.OrderID,
+			AmountAtomic: attempt.AmountValue, RailID: attempt.Currency,
+		},
+		route,
+	)
+	require.NoError(t, err)
+	require.Equal(t, finalized.Terms.RouteBindingID, moderatorRoute.RouteBindingID)
+	require.Empty(t, moderatorAttempt.FundingBasis)
+	moderatorAdopted, err := adoptModeratorSettlementAuthorizationSnapshot(
+		t.Context(), moderatorDB, moderatorAttempt.TenantID, projector, finalized.SettlementAuthorization,
+	)
+	require.NoError(t, err)
+	require.Equal(t, models.PaymentAttemptFundingTargetReady, moderatorAdopted.Attempt.State)
+	require.Equal(t, basis, *mustAttemptFundingBasis(t, moderatorAdopted.Attempt))
+	require.Equal(t, finalized.Attempt.FundingBasisHash, moderatorAdopted.Attempt.FundingBasisHash)
 }
 
 func TestStandardOrderUTXOFundingTargetProjector_ModeratedUsesTwoOfThreeWithTimeout(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"time"
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha/internal/core/paymentintent"
@@ -285,6 +286,35 @@ func (c *CryptoPaymentFacade) abandonUnsupportedSettlementAuthorizationDraft(
 		tenantID = database.StandaloneTenantID
 	}
 	return paymentintent.AbandonCryptoPaymentAttemptDraft(
+		rawProvider.RawDB().WithContext(ctx), tenantID, order.ID.String(), attempt.AttemptID,
+	)
+}
+
+func (c *CryptoPaymentFacade) expireQuoteBoundSettlementAuthorizationDraft(
+	ctx context.Context,
+	order *models.Order,
+	attempt *models.PaymentAttempt,
+	now time.Time,
+) (bool, error) {
+	if c == nil || order == nil || attempt == nil || attempt.State != models.PaymentAttemptAuthorizationDraft {
+		return false, nil
+	}
+	basis, err := attempt.GetFundingBasis()
+	if err != nil {
+		return false, fmt.Errorf("crypto facade: load quote-bound settlement funding basis: %w", err)
+	}
+	if basis == nil || basis.ExpiresAtUnix > now.UTC().Unix() {
+		return false, nil
+	}
+	rawProvider, ok := c.db.(rawDBProvider)
+	if !ok || rawProvider.RawDB() == nil {
+		return false, fmt.Errorf("crypto facade: raw database is unavailable for quote-bound draft expiry")
+	}
+	tenantID := strings.TrimSpace(order.TenantID)
+	if tenantID == "" {
+		tenantID = database.StandaloneTenantID
+	}
+	return paymentintent.ExpireCryptoPaymentAttemptDraft(
 		rawProvider.RawDB().WithContext(ctx), tenantID, order.ID.String(), attempt.AttemptID,
 	)
 }

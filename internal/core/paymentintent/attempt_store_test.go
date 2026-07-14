@@ -543,6 +543,38 @@ func TestAbandonCryptoPaymentAttemptDraft_RetiresOnlyMatchingDraftAndOffers(t *t
 	require.False(t, abandoned)
 }
 
+func TestExpireCryptoPaymentAttemptDraft_RetiresOnlyMatchingDraftAndOffers(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:crypto-attempt-expire-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentAttemptSettlementOffer{}))
+	attempt := models.PaymentAttempt{
+		TenantID: "tenant-a", AttemptID: "attempt-expired", Kind: models.PaymentAttemptKindCryptoFundingTarget,
+		PaymentSessionID: "session-expired", OrderID: "order-expired", RouteBindingID: "route-expired",
+		IdempotencyKey: "idempotency-expired", State: models.PaymentAttemptAuthorizationDraft,
+	}
+	require.NoError(t, db.Create(&attempt).Error)
+	require.NoError(t, db.Create(&models.PaymentAttemptSettlementOffer{
+		TenantID: attempt.TenantID, AttemptID: attempt.AttemptID, ParticipantRole: models.SettlementParticipantBuyer,
+		OrderID: attempt.OrderID, AuthorizationContextID: "context-expired", RailID: "crypto:eip155:1:native",
+		Offer: []byte("offer"), OfferHash: "hash", PublicKeyHash: "public-key", CreatedAt: time.Now().UTC(),
+	}).Error)
+
+	expired, err := ExpireCryptoPaymentAttemptDraft(db, attempt.TenantID, attempt.OrderID, attempt.AttemptID)
+	require.NoError(t, err)
+	require.True(t, expired)
+	require.NoError(t, db.First(&attempt, "tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).Error)
+	require.Equal(t, models.PaymentAttemptExpired, attempt.State)
+	require.Contains(t, attempt.LastError, "expired before seller authorization")
+	var offers int64
+	require.NoError(t, db.Model(&models.PaymentAttemptSettlementOffer{}).
+		Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).Count(&offers).Error)
+	require.Zero(t, offers)
+
+	expired, err = ExpireCryptoPaymentAttemptDraft(db, attempt.TenantID, attempt.OrderID, attempt.AttemptID)
+	require.NoError(t, err)
+	require.False(t, expired)
+}
+
 func TestNewSettlementSignRequest_UsesOnlyFrozenAttemptBindings(t *testing.T) {
 	attempt, _, terms, signer, signature, bundle, target := cryptoAttemptFixture(t)
 	attempt.TenantID = "tenant-a"

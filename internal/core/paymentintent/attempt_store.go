@@ -247,6 +247,38 @@ func AbandonCryptoPaymentAttemptDraft(db *gorm.DB, tenantID, orderID, attemptID 
 	return abandoned, nil
 }
 
+// ExpireCryptoPaymentAttemptDraft atomically retires a non-actionable
+// quote-bound draft whose immutable quote has expired before seller
+// authorization. Frozen attempts deliberately remain valid: their funding
+// basis is already covered by seller-authorized settlement terms.
+func ExpireCryptoPaymentAttemptDraft(db *gorm.DB, tenantID, orderID, attemptID string) (bool, error) {
+	if db == nil || strings.TrimSpace(tenantID) == "" || strings.TrimSpace(orderID) == "" || strings.TrimSpace(attemptID) == "" {
+		return false, fmt.Errorf("expire crypto payment attempt draft: scope is required")
+	}
+	expired := false
+	err := db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.PaymentAttempt{}).
+			Where("tenant_id = ? AND order_id = ? AND attempt_id = ? AND kind = ? AND state = ?",
+				tenantID, orderID, attemptID, models.PaymentAttemptKindCryptoFundingTarget, models.PaymentAttemptAuthorizationDraft).
+			Updates(map[string]interface{}{
+				"state":      models.PaymentAttemptExpired,
+				"last_error": "quote-bound settlement authorization expired before seller authorization",
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return nil
+		}
+		expired = true
+		return deleteCryptoPaymentAttemptDraftOffers(tx, tenantID, attemptID)
+	})
+	if err != nil {
+		return false, fmt.Errorf("expire crypto payment attempt draft: %w", err)
+	}
+	return expired, nil
+}
+
 func sameCryptoPaymentAttemptIdentity(left, right models.PaymentAttempt) bool {
 	return left.TenantID == right.TenantID && left.AttemptID == right.AttemptID &&
 		left.Kind == right.Kind && left.PaymentSessionID == right.PaymentSessionID &&

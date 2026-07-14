@@ -217,6 +217,19 @@ func adoptModeratorSettlementAuthorizationSnapshot(
 		route.RouteBindingID != authorization.Terms.RouteBindingID {
 		return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
+	if authorization.FundingBasis == nil {
+		if len(attempt.FundingBasis) != 0 || strings.TrimSpace(attempt.FundingBasisHash) != "" {
+			return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+	} else {
+		boundAttempt, err := paymentintent.BindCryptoPaymentAttemptFundingBasis(
+			db, tenantID, attempt.AttemptID, *authorization.FundingBasis,
+		)
+		if err != nil {
+			return StandardOrderSettlementAuthorizationFinalization{}, err
+		}
+		attempt = boundAttempt
+	}
 	offers, err := paymentintent.ListCryptoPaymentAttemptSettlementKeyOffers(db, tenantID, attempt.AttemptID)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err

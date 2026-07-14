@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -565,4 +566,58 @@ func TestCryptoPaymentFacade_CreateSession_CrossCurrencyUsesQuoteBoundV2Writer(t
 	require.Equal(t, orderID, started.OrderID)
 	require.Equal(t, "quote-v2", started.PaymentSelectionQuoteID)
 	require.Equal(t, "19600000000000000", started.AmountAtomic)
+}
+
+func TestCryptoPaymentFacade_ExpireQuoteBoundDraft_RetiresOnlyPreAuthorizationAttempt(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	now := time.Date(2026, time.July, 15, 10, 0, 0, 0, time.UTC)
+	attempt := models.PaymentAttempt{
+		TenantID: database.StandaloneTenantID, AttemptID: "attempt-expired-quote",
+		OrderID: "order-expired-quote", Kind: models.PaymentAttemptKindCryptoFundingTarget,
+		State: models.PaymentAttemptAuthorizationDraft, Currency: "crypto:eip155:1:native",
+		AmountValue: "19600000000000000", AuthorizationContextID: strings.Repeat("b", 64),
+	}
+	basis := models.PaymentAttemptFundingBasis{
+		Version: models.PaymentAttemptFundingBasisVersion, OrderID: attempt.OrderID, AttemptID: attempt.AttemptID,
+		AuthorizationContextID: attempt.AuthorizationContextID, OrderOpenHash: strings.Repeat("a", 64),
+		PricingCurrency: "USD", PricingAmount: "4900", PricingDivisibility: 2,
+		PaymentAssetID: attempt.Currency, PaymentCurrency: "ETH", PaymentDivisibility: 18,
+		ConversionRequired: true, ExchangeRate: "250000", ExchangeRateBase: "ETH", ExchangeRateQuote: "USD",
+		ExchangeRateQuoteDivisibility: 2, RateSourceUpdatedUnix: now.Add(-2 * time.Minute).Unix(),
+		RoundingPolicy: models.PaymentAttemptFundingRoundingCeilV1, PaymentSubtotal: attempt.AmountValue,
+		ProviderOrNetworkCost: "0", PlatformPaymentCost: "0", BuyerPaymentTotal: attempt.AmountValue,
+		QuoteID: "quote-expired", QuotePolicyVersion: models.PaymentSelectionQuotePilotZeroFeeV1,
+		QuoteIssuer: "buyer-peer", IssuedAtUnix: now.Add(-time.Minute).Unix(), ExpiresAtUnix: now.Unix(),
+	}
+	require.NoError(t, attempt.SetFundingBasis(basis))
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&models.PaymentAttempt{}); err != nil {
+			return err
+		}
+		return tx.Save(&attempt)
+	}))
+
+	facade := NewCryptoPaymentFacade(db, nil, nil, nil)
+	order := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: database.StandaloneTenantID}, ID: models.OrderID(attempt.OrderID),
+	}
+	expired, err := facade.expireQuoteBoundSettlementAuthorizationDraft(context.Background(), order, &attempt, now)
+	require.NoError(t, err)
+	require.True(t, expired)
+
+	var stored models.PaymentAttempt
+	require.NoError(t, db.View(func(tx database.Tx) error {
+		return tx.Read().Where("tenant_id = ? AND attempt_id = ?", attempt.TenantID, attempt.AttemptID).First(&stored).Error
+	}))
+	require.Equal(t, models.PaymentAttemptExpired, stored.State)
+	require.Contains(t, stored.LastError, "expired before seller authorization")
+
+	ready := stored
+	ready.State = models.PaymentAttemptFundingTargetReady
+	expired, err = facade.expireQuoteBoundSettlementAuthorizationDraft(context.Background(), order, &ready, now.Add(time.Hour))
+	require.NoError(t, err)
+	require.False(t, expired)
 }

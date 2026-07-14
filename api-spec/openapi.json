@@ -1981,6 +1981,18 @@
         ],
         "type": "object"
       },
+      "PublicSellerAffiliatePromoterStatementInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "$ref": "#/components/schemas/SellerAffiliatePromoterEnrollmentEvidence"
+          }
+        },
+        "required": [
+          "evidence"
+        ],
+        "type": "object"
+      },
       "PublicSellerAffiliateSessionView": {
         "additionalProperties": false,
         "properties": {
@@ -19066,6 +19078,48 @@
           }
         },
         "summary": "Enroll a promoter link with Peer evidence",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
+    "/v1/public/seller-affiliate/statements/promoter": {
+      "post": {
+        "description": "Returns only the requesting promoter Peer's statement after verifying fresh seller-, network-, and program-bound evidence.",
+        "operationId": "seller-affiliate-public-promoter-statement-list",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicSellerAffiliatePromoterStatementInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAffiliateStatementsView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List a promoter statement with Peer evidence",
         "tags": [
           "seller-affiliate"
         ]

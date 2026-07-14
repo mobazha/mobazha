@@ -182,6 +182,16 @@ func (s *sellerAffiliateHTTPTestService) ListSellerStatement(context.Context) ([
 	return append([]models.AffiliateStatementLine(nil), s.statements...), nil
 }
 
+func (s *sellerAffiliateHTTPTestService) ListPromoterStatement(_ context.Context, promoterPeerID string) ([]models.AffiliateStatementLine, error) {
+	items := make([]models.AffiliateStatementLine, 0)
+	for _, statement := range s.statements {
+		if statement.Attribution.PromoterPeerID == promoterPeerID {
+			items = append(items, statement)
+		}
+	}
+	return items, nil
+}
+
 func (s *sellerAffiliateHTTPTestService) CreateReferralSession(_ context.Context, token string, issuedAt time.Time) (*models.AffiliateReferralSession, error) {
 	link, err := s.GetLinkByToken(context.Background(), token)
 	if err != nil || link.Status != models.AffiliateLinkStatusActive || s.program == nil || s.program.Status != models.AffiliateProgramStatusActive {
@@ -401,6 +411,10 @@ func TestSellerAffiliatePromoterEnrollmentIsPeerSignedIdempotentAndCannotReactiv
 		"/v1/public/seller-affiliate/programs/program-1/links", string(payload))
 	require.Equal(t, http.StatusOK, replay.StatusCode)
 	require.Equal(t, originalToken, sellerService.links["link-enrolled"].PublicToken)
+
+	statement := sellerAffiliateHTTPRequest(t, sellerServer, http.MethodPost,
+		"/v1/public/seller-affiliate/statements/promoter", string(payload))
+	require.Equal(t, http.StatusOK, statement.StatusCode)
 
 	sellerService.links["link-enrolled"].Status = models.AffiliateLinkStatusRevoked
 	revokedReplay := sellerAffiliateHTTPRequest(t, sellerServer, http.MethodPost,

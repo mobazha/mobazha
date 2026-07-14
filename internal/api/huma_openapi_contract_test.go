@@ -109,6 +109,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"seller-affiliate-public-session-create",
 		"seller-affiliate-public-link-enroll",
 		"seller-affiliate-promoter-enrollment-issue",
+		"seller-affiliate-public-promoter-statement-list",
 		"collateral-capabilities-get",
 		"collateral-accounts-open",
 		"collateral-accounts-list",

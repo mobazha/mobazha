@@ -135,7 +135,50 @@ type publicSellerAffiliateLinkEnrollmentInput struct {
 	}
 }
 
+type publicSellerAffiliatePromoterStatementInput struct {
+	Body struct {
+		Evidence models.SellerAffiliatePromoterEnrollmentEvidence `json:"evidence"`
+	}
+}
+
 func (g *Gateway) registerNodeHumaSellerAffiliatePublicOperations(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "seller-affiliate-public-promoter-statement-list",
+		Method:      http.MethodPost,
+		Path:        "/v1/public/seller-affiliate/statements/promoter",
+		Summary:     "List a promoter statement with Peer evidence",
+		Description: "Returns only the requesting promoter Peer's statement after verifying fresh seller-, network-, and program-bound evidence.",
+		Tags:        []string{"seller-affiliate"},
+	}, func(ctx context.Context, input *publicSellerAffiliatePromoterStatementInput) (*sellerAffiliateStatementsOutput, error) {
+		service, sellerPeerID, err := sellerAffiliateStoreService(ctx)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		network, err := sellerAffiliateNodeNetwork(ctx)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		evidence := input.Body.Evidence
+		if err := evidence.Verify(sellerPeerID, network, time.Now().UTC()); err != nil {
+			return nil, sellerAffiliateOperationError(fmt.Errorf("%w: %v", models.ErrInvalidSellerAffiliate, err))
+		}
+		program, err := sellerAffiliateProgramForStore(ctx, service, sellerPeerID)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		if evidence.ProgramID != program.ID {
+			return nil, sellerAffiliateOperationError(models.ErrSellerAffiliateConflict)
+		}
+		items, err := service.ListPromoterStatement(ctx, evidence.IssuerPromoterPeerID)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		if items == nil {
+			items = []models.AffiliateStatementLine{}
+		}
+		return &sellerAffiliateStatementsOutput{Body: sellerAffiliateStatementsView{Items: items}}, nil
+	})
+
 	huma.Register(api, huma.Operation{
 		OperationID: "seller-affiliate-public-link-enroll",
 		Method:      http.MethodPost,

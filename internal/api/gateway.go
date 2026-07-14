@@ -158,6 +158,63 @@ type Gateway struct {
 	authLimiter       *authRateLimiter
 	editionPolicy     edition.Policy
 	aiHTTPPolicy      distribution.AIHTTPPolicy
+	// storeCredentialRefresher performs a fresh Peer-signed platform
+	// registration. It is installed by the standalone composition after the
+	// local node identity is available; the gateway never handles the private
+	// key itself.
+	storeCredentialRefresher func(context.Context) (string, error)
+}
+
+// StandaloneAPIKey returns the current platform credential used by the
+// standalone reverse proxy. The credential can rotate while the process is
+// running, so callers must not retain the startup snapshot.
+func (g *Gateway) StandaloneAPIKey() string {
+	if g == nil {
+		return ""
+	}
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	if g.config == nil {
+		return ""
+	}
+	return g.config.StandaloneAPIKey
+}
+
+// SetStandaloneAPIKey hot-reloads the platform credential without restarting
+// the node. The value is never returned by an HTTP response.
+func (g *Gateway) SetStandaloneAPIKey(apiKey string) {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.config != nil {
+		g.config.StandaloneAPIKey = apiKey
+	}
+}
+
+// SetStoreCredentialRefresher installs the composition-owned Peer-signing
+// callback used by the local administrator recovery endpoint.
+func (g *Gateway) SetStoreCredentialRefresher(refresh func(context.Context) (string, error)) {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	g.storeCredentialRefresher = refresh
+	g.mu.Unlock()
+}
+
+func (g *Gateway) refreshStoreCredential(ctx context.Context) (string, error) {
+	if g == nil {
+		return "", fmt.Errorf("platform credential recovery is unavailable")
+	}
+	g.mu.RLock()
+	refresh := g.storeCredentialRefresher
+	g.mu.RUnlock()
+	if refresh == nil {
+		return "", fmt.Errorf("platform credential recovery is unavailable")
+	}
+	return refresh(ctx)
 }
 
 // NewGateway instantiates a new gateway.
@@ -291,8 +348,8 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			proxy := httputil.NewSingleHostReverseProxy(saasTarget)
 			topMux.Handle("/platform/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				r.Host = saasTarget.Host
-				if config.StandaloneAPIKey != "" {
-					r.Header.Set("X-Standalone-Store-Key", config.StandaloneAPIKey)
+				if apiKey := g.StandaloneAPIKey(); apiKey != "" {
+					r.Header.Set("X-Standalone-Store-Key", apiKey)
 				}
 				proxy.ServeHTTP(w, r)
 			}))

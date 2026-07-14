@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +26,9 @@ func TestPOSTClaimStorePersistsOwnerUserID(t *testing.T) {
 		}
 		if got := r.Header.Get("X-Standalone-Store-Key"); got != "store-key" {
 			t.Fatalf("standalone key = %q, want store-key", got)
+		}
+		if got := r.Header.Get("Authorization"); !strings.HasPrefix(got, "Bearer ") {
+			t.Fatalf("account proof was not forwarded: %q", got)
 		}
 		w.WriteHeader(http.StatusOK)
 	}))

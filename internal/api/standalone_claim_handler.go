@@ -37,7 +37,7 @@ func (g *Gateway) handlePOSTClaimStore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if g.config.SaaSAPIURL == "" || g.config.StandaloneAPIKey == "" {
+	if g.config.SaaSAPIURL == "" || g.StandaloneAPIKey() == "" {
 		response.Error(w, http.StatusServiceUnavailable, response.CodeInternalError,
 			"SaaS integration not configured")
 		return
@@ -95,7 +95,7 @@ func (g *Gateway) handlePOSTClaimStore(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
-	if err := g.callSaaSClaim(ctx, localPeerID, claims.Id); err != nil {
+	if err := g.callSaaSClaim(ctx, localPeerID, claims.Id, tokenStr); err != nil {
 		log.Errorf("SaaS claim failed: %v", err)
 		if strings.Contains(err.Error(), "already claimed") {
 			response.Error(w, http.StatusForbidden, response.CodeForbidden,
@@ -129,7 +129,7 @@ func (g *Gateway) handlePOSTClaimStore(w http.ResponseWriter, r *http.Request) {
 }
 
 // callSaaSClaim calls the hosting platform to atomically claim the store.
-func (g *Gateway) callSaaSClaim(ctx context.Context, peerID, casdoorUserID string) error {
+func (g *Gateway) callSaaSClaim(ctx context.Context, peerID, casdoorUserID, accountToken string) error {
 	payload, err := json.Marshal(map[string]string{
 		"casdoor_user_id": casdoorUserID,
 	})
@@ -143,7 +143,8 @@ func (g *Gateway) callSaaSClaim(ctx context.Context, peerID, casdoorUserID strin
 		return fmt.Errorf("request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Standalone-Store-Key", g.config.StandaloneAPIKey)
+	req.Header.Set("Authorization", "Bearer "+accountToken)
+	req.Header.Set("X-Standalone-Store-Key", g.StandaloneAPIKey())
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -161,4 +162,26 @@ func (g *Gateway) callSaaSClaim(ctx context.Context, peerID, casdoorUserID strin
 		return fmt.Errorf("already claimed: %s", string(body))
 	}
 	return fmt.Errorf("SaaS claim failed (%d): %s", resp.StatusCode, string(body))
+}
+
+// callSaaSOwnerDisconnect clears the optional Hosting owner association using
+// the store credential as authority. It never deletes or rotates the store.
+func (g *Gateway) callSaaSOwnerDisconnect(ctx context.Context, peerID string) (int, error) {
+	url := fmt.Sprintf("%s/platform/v1/stores/%s/owner", g.config.SaaSAPIURL, peerID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("request: %w", err)
+	}
+	req.Header.Set("X-Standalone-Store-Key", g.StandaloneAPIKey())
+
+	resp, err := (&http.Client{}).Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("call SaaS: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNoContent {
+		return resp.StatusCode, nil
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	return resp.StatusCode, fmt.Errorf("SaaS owner disconnect failed (%d): %s", resp.StatusCode, string(body))
 }

@@ -401,6 +401,23 @@ func (im *SharedManager) SetHTTPGateway(gw *api.Gateway) {
 	im.httpGateway = gw
 }
 
+// SetStandaloneAPIKey updates every in-process consumer of the rotatable
+// Hosting credential. The gateway owns the reverse-proxy snapshot; keeping it
+// in sync here prevents a successful heartbeat recovery from requiring a node
+// restart before seller platform requests work again.
+func (im *SharedManager) SetStandaloneAPIKey(apiKey string) {
+	if im == nil {
+		return
+	}
+	im.mu.Lock()
+	im.standaloneAPIKey = apiKey
+	gateway := im.httpGateway
+	im.mu.Unlock()
+	if gateway != nil {
+		gateway.SetStandaloneAPIKey(apiKey)
+	}
+}
+
 func (im *SharedManager) AddNode(nodeID string, node contracts.NodeService) {
 	im.mu.Lock()
 	defer im.mu.Unlock()

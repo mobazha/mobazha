@@ -406,6 +406,8 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"system-cache-delete",
 		"system-claim-store-post",
 		"system-connect-platform-post",
+		"system-connect-platform-delete",
+		"system-refresh-platform-credential-post",
 		"system-diagnostics-get",
 		"system-doctor-get",
 		"system-domain-get",

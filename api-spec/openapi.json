@@ -16302,6 +16302,132 @@
         ]
       }
     },
+    "/v1/orders/{orderID}/payment-session/onramp": {
+      "post": {
+        "description": "Initiates (or idempotently resumes) an onramp purchase funding the order's current payable attempt. The settlement asset, network, and amount are fixed by the frozen attempt terms; the purchase is a funding source, not a settlement mode, and funded/verified still come only from the on-chain funding observation.",
+        "operationId": "orders-post-payment-session-onramp",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Initiate or resume onramp funding",
+        "tags": [
+          "orders",
+          "payments"
+        ]
+      }
+    },
+    "/v1/orders/{orderID}/payment-session/onramp/refresh": {
+      "post": {
+        "description": "Polls the onramp provider for the order's in-flight purchase, persists the transition, and returns the current onramp funding view (null when nothing is in flight).",
+        "operationId": "orders-post-payment-session-onramp-refresh",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Refresh onramp funding status",
+        "tags": [
+          "orders",
+          "payments"
+        ]
+      }
+    },
     "/v1/orders/{orderID}/payment/cancel-partial": {
       "post": {
         "operationId": "orders-post-payment-cancel-partial",
@@ -20732,6 +20858,47 @@
       }
     },
     "/v1/system/connect-platform": {
+      "delete": {
+        "description": "Removes the account association while preserving the store Peer identity, platform credential, and commerce history.",
+        "operationId": "system-connect-platform-delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Disconnect the optional platform owner account",
+        "tags": [
+          "system"
+        ]
+      },
       "post": {
         "operationId": "system-connect-platform-post",
         "requestBody": {
@@ -21573,6 +21740,49 @@
           }
         ],
         "summary": "Publish store data",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/v1/system/refresh-platform-credential": {
+      "post": {
+        "description": "Re-registers the local store with its libp2p identity. This does not connect or switch a Casdoor account.",
+        "operationId": "system-refresh-platform-credential-post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Refresh the Peer-signed platform credential",
         "tags": [
           "system"
         ]

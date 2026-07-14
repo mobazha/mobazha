@@ -148,6 +148,44 @@ func (g *Gateway) registerFullNodeHumaSystemAdminOperations(api huma.API) {
 		return &nodeDataOutput{Body: data}, nil
 	})
 
+	huma.Register(api, huma.Operation{
+		OperationID: "system-refresh-platform-credential-post",
+		Method:      http.MethodPost,
+		Path:        "/v1/system/refresh-platform-credential",
+		Summary:     "Refresh the Peer-signed platform credential",
+		Description: "Re-registers the local store with its libp2p identity. This does not connect or switch a Casdoor account.",
+		Tags:        []string{"system"},
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/system/refresh-platform-credential", http.NoBody)
+		rr := httptest.NewRecorder()
+		g.handlePOSTRefreshPlatformCredential(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "system-connect-platform-delete",
+		Method:      http.MethodDelete,
+		Path:        "/v1/system/connect-platform",
+		Summary:     "Disconnect the optional platform owner account",
+		Description: "Removes the account association while preserving the store Peer identity, platform credential, and commerce history.",
+		Tags:        []string{"system"},
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodDelete, "/v1/system/connect-platform", http.NoBody)
+		rr := httptest.NewRecorder()
+		g.handleDELETEConnectPlatform(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
 	// claim-store POST uses custom auth logic (JWT + admin proof), so no
 	// Security: nodeAuthSecurity.
 	huma.Register(api, huma.Operation{

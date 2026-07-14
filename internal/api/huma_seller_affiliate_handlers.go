@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -116,7 +117,74 @@ type publicSellerAffiliateSessionOutput struct {
 	Body publicSellerAffiliateSessionView
 }
 
+type sellerAffiliatePromoterEnrollmentInput struct {
+	Body struct {
+		SellerPeerID string `json:"sellerPeerID" minLength:"1" maxLength:"128"`
+		ProgramID    string `json:"programID" minLength:"1" maxLength:"256"`
+	}
+}
+
+type sellerAffiliatePromoterEnrollmentOutput struct {
+	Body models.SellerAffiliatePromoterEnrollmentEvidence
+}
+
+type publicSellerAffiliateLinkEnrollmentInput struct {
+	ProgramID string `path:"programID" minLength:"1" maxLength:"256"`
+	Body      struct {
+		Evidence models.SellerAffiliatePromoterEnrollmentEvidence `json:"evidence"`
+	}
+}
+
 func (g *Gateway) registerNodeHumaSellerAffiliatePublicOperations(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "seller-affiliate-public-link-enroll",
+		Method:      http.MethodPost,
+		Path:        "/v1/public/seller-affiliate/programs/{programID}/links",
+		Summary:     "Enroll a promoter link with Peer evidence",
+		Description: "Creates an idempotent promoter link only when the promoter Peer signed a fresh, network- and seller-bound payout snapshot. Replays never reactivate revoked links.",
+		Tags:        []string{"seller-affiliate"},
+	}, func(ctx context.Context, input *publicSellerAffiliateLinkEnrollmentInput) (*sellerAffiliateLinkOutput, error) {
+		service, sellerPeerID, err := sellerAffiliateStoreService(ctx)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		network, err := sellerAffiliateNodeNetwork(ctx)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		evidence := input.Body.Evidence
+		if evidence.ProgramID != strings.TrimSpace(input.ProgramID) {
+			return nil, sellerAffiliateOperationError(models.ErrInvalidSellerAffiliate)
+		}
+		if err := evidence.Verify(sellerPeerID, network, time.Now().UTC()); err != nil {
+			return nil, sellerAffiliateOperationError(fmt.Errorf("%w: %v", models.ErrInvalidSellerAffiliate, err))
+		}
+		program, err := sellerAffiliateProgramForStore(ctx, service, sellerPeerID)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		if program.ID != evidence.ProgramID || program.Status != models.AffiliateProgramStatusActive {
+			return nil, sellerAffiliateOperationError(models.ErrSellerAffiliateConflict)
+		}
+		token, err := newNodeSellerAffiliatePublicToken()
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		link, err := service.CreateLink(
+			ctx,
+			evidence.IssuerPromoterPeerID,
+			token,
+			evidence.PromoterPayoutDestinations,
+		)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		if link == nil || link.Status != models.AffiliateLinkStatusActive {
+			return nil, sellerAffiliateOperationError(models.ErrSellerAffiliateConflict)
+		}
+		return &sellerAffiliateLinkOutput{Body: sellerAffiliateLinkProjection(*link)}, nil
+	})
+
 	huma.Register(api, huma.Operation{
 		OperationID: "seller-affiliate-public-link-get",
 		Method:      http.MethodGet,
@@ -173,6 +241,64 @@ func (g *Gateway) registerNodeHumaSellerAffiliatePublicOperations(api huma.API) 
 }
 
 func (g *Gateway) registerNodeHumaSellerAffiliateOperations(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "seller-affiliate-promoter-enrollment-issue",
+		Method:      http.MethodPost,
+		Path:        "/v1/seller-affiliate/promoter-enrollments",
+		Summary:     "Issue promoter Peer enrollment evidence",
+		Description: "Signs this Node's published payout destinations for one seller Peer and program. The evidence is short-lived and contains no account identity.",
+		Tags:        []string{"seller-affiliate"},
+		Security:    adminOnlyAuthSecurity,
+	}, func(ctx context.Context, input *sellerAffiliatePromoterEnrollmentInput) (*sellerAffiliatePromoterEnrollmentOutput, error) {
+		node, ok := ctx.Value(nodeContextKey).(sellerAffiliateEnrollmentIssuerNode)
+		if !ok || node == nil || node.IdentityInfo() == nil || node.Profile() == nil {
+			return nil, sellerAffiliateOperationError(errSellerAffiliateUnavailable)
+		}
+		profile, err := node.Profile().GetMyProfile()
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		if profile == nil || len(profile.PayoutDestinationSet.Destinations) == 0 || !profile.PayoutDestinationSet.Valid() {
+			return nil, sellerAffiliateOperationError(models.ErrInvalidSellerAffiliate)
+		}
+		evidenceID, err := newNodeSellerAffiliatePublicToken()
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		network := models.SellerAffiliateNetworkMainnet
+		if node.IdentityInfo().UsingTestnet() {
+			network = models.SellerAffiliateNetworkTestnet
+		}
+		evidence, err := models.NewSellerAffiliatePromoterEnrollmentEvidence(
+			evidenceID,
+			node.IdentityInfo().Identity().String(),
+			input.Body.SellerPeerID,
+			input.Body.ProgramID,
+			network,
+			profile.PayoutDestinationSet,
+			time.Now().UTC(),
+		)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		signable, err := evidence.SignableBytes()
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		signature, publicKey, err := node.IdentityInfo().SignMessage(signable)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		if !bytes.Equal(publicKey, evidence.IssuerPublicKey) {
+			return nil, sellerAffiliateOperationError(errors.New("seller affiliate signer does not match the promoter Peer"))
+		}
+		evidence.Signature = append([]byte(nil), signature...)
+		if err := evidence.Verify(input.Body.SellerPeerID, network, time.Now().UTC()); err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
+		return &sellerAffiliatePromoterEnrollmentOutput{Body: evidence}, nil
+	})
+
 	huma.Register(api, huma.Operation{
 		OperationID: "seller-affiliate-program-get",
 		Method:      http.MethodGet,
@@ -363,6 +489,11 @@ type sellerAffiliateNode interface {
 	IdentityInfo() contracts.IdentityService
 }
 
+type sellerAffiliateEnrollmentIssuerNode interface {
+	sellerAffiliateNode
+	Profile() contracts.ProfileService
+}
+
 func sellerAffiliateStoreService(ctx context.Context) (contracts.SellerAffiliateService, string, error) {
 	node, ok := ctx.Value(nodeContextKey).(sellerAffiliateNode)
 	if !ok || node == nil || node.IdentityInfo() == nil {
@@ -405,6 +536,17 @@ func sellerAffiliateSignedReferralEvidence(ctx context.Context, session *models.
 		return models.SellerAffiliateReferralEvidence{}, err
 	}
 	return evidence, nil
+}
+
+func sellerAffiliateNodeNetwork(ctx context.Context) (string, error) {
+	node, ok := ctx.Value(nodeContextKey).(sellerAffiliateNode)
+	if !ok || node == nil || node.IdentityInfo() == nil {
+		return "", errSellerAffiliateUnavailable
+	}
+	if node.IdentityInfo().UsingTestnet() {
+		return models.SellerAffiliateNetworkTestnet, nil
+	}
+	return models.SellerAffiliateNetworkMainnet, nil
 }
 
 func sellerAffiliateUsablePublicLink(

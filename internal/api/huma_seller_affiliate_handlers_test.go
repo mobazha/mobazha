@@ -46,11 +46,27 @@ type sellerAffiliateHTTPTestNode struct {
 	contracts.NodeService
 	identity contracts.IdentityService
 	service  contracts.SellerAffiliateService
+	profile  contracts.ProfileService
 }
 
 func (n *sellerAffiliateHTTPTestNode) IdentityInfo() contracts.IdentityService { return n.identity }
 func (n *sellerAffiliateHTTPTestNode) SellerAffiliate() contracts.SellerAffiliateService {
 	return n.service
+}
+func (n *sellerAffiliateHTTPTestNode) Profile() contracts.ProfileService { return n.profile }
+
+type sellerAffiliateHTTPTestProfileService struct {
+	contracts.ProfileService
+	profile *models.Profile
+}
+
+func (s sellerAffiliateHTTPTestProfileService) GetMyProfile() (*models.Profile, error) {
+	if s.profile == nil {
+		return nil, models.ErrSellerAffiliateNotFound
+	}
+	copy := *s.profile
+	copy.PayoutDestinationSet = s.profile.PayoutDestinationSet.Clone()
+	return &copy, nil
 }
 
 type sellerAffiliateHTTPTestService struct {
@@ -109,6 +125,33 @@ func (s *sellerAffiliateHTTPTestService) GetLinkByToken(_ context.Context, token
 		}
 	}
 	return nil, models.ErrSellerAffiliateNotFound
+}
+
+func (s *sellerAffiliateHTTPTestService) CreateLink(_ context.Context, promoterPeerID, publicToken string, destinations models.PayoutDestinationSet) (*models.AffiliateLink, error) {
+	for _, link := range s.links {
+		if link.PromoterPeerID == promoterPeerID {
+			if !link.PromoterPayoutDestinations.Equal(destinations) {
+				return nil, models.ErrSellerAffiliateConflict
+			}
+			copy := *link
+			return &copy, nil
+		}
+	}
+	if s.program == nil {
+		return nil, models.ErrSellerAffiliateNotFound
+	}
+	if s.links == nil {
+		s.links = make(map[string]*models.AffiliateLink)
+	}
+	now := time.Now().UTC()
+	link := &models.AffiliateLink{
+		ID: "link-enrolled", ProgramID: s.program.ID, PromoterPeerID: promoterPeerID,
+		PublicToken: publicToken, Status: models.AffiliateLinkStatusActive,
+		PromoterPayoutDestinations: destinations.Clone(), CreatedAt: now, UpdatedAt: now,
+	}
+	s.links[link.ID] = link
+	copy := *link
+	return &copy, nil
 }
 
 func (s *sellerAffiliateHTTPTestService) RevokeLink(_ context.Context, linkID string) (*models.AffiliateLink, error) {
@@ -173,6 +216,12 @@ func newSellerAffiliateHTTPTestServer(t *testing.T, service contracts.SellerAffi
 	node := &sellerAffiliateHTTPTestNode{
 		identity: sellerAffiliateHTTPTestIdentity{peerID: peerID, privateKey: privateKey},
 		service:  service,
+		profile: sellerAffiliateHTTPTestProfileService{profile: &models.Profile{
+			PeerID: peerID.String(),
+			PayoutDestinationSet: models.PayoutDestinationSet{Destinations: []models.PayoutDestination{
+				{RailID: "crypto:bip122:000000000019d6689c085ae165831e93:native", Address: "bc1qpromoter", Version: 1},
+			}},
+		}},
 	}
 	gateway := &Gateway{
 		nodeManager: &mockNodeManager{nodes: map[string]contracts.NodeService{"store": node}},
@@ -311,6 +360,53 @@ func TestSellerAffiliatePublicLinkAndSessionResolveOnSelectedNode(t *testing.T) 
 	service.program.SellerPeerID = identity.ID().String()
 	wrongStore := sellerAffiliateHTTPRequest(t, server, http.MethodGet, "/v1/public/seller-affiliate-links/public-token", "")
 	require.Equal(t, http.StatusNotFound, wrongStore.StatusCode)
+}
+
+func TestSellerAffiliatePromoterEnrollmentIsPeerSignedIdempotentAndCannotReactivateRevokedLink(t *testing.T) {
+	now := time.Now().UTC()
+	sellerService := &sellerAffiliateHTTPTestService{
+		program: &models.AffiliateProgram{
+			ID: "program-1", Status: models.AffiliateProgramStatusActive,
+			CommissionRateBPS: 500, AttributionWindowSeconds: 86400, CreatedAt: now, UpdatedAt: now,
+		},
+		links: make(map[string]*models.AffiliateLink),
+	}
+	sellerServer, sellerPeerID := newSellerAffiliateHTTPTestServer(t, sellerService)
+	sellerService.program.SellerPeerID = sellerPeerID.String()
+
+	promoterService := &sellerAffiliateHTTPTestService{}
+	promoterServer, promoterPeerID := newSellerAffiliateHTTPTestServer(t, promoterService)
+	issued := sellerAffiliateHTTPRequest(t, promoterServer, http.MethodPost, "/v1/seller-affiliate/promoter-enrollments",
+		`{"sellerPeerID":"`+sellerPeerID.String()+`","programID":"program-1"}`)
+	require.Equal(t, http.StatusOK, issued.StatusCode)
+	var issuedEnvelope struct {
+		Data models.SellerAffiliatePromoterEnrollmentEvidence `json:"data"`
+	}
+	require.NoError(t, json.NewDecoder(issued.Body).Decode(&issuedEnvelope))
+	require.Equal(t, promoterPeerID.String(), issuedEnvelope.Data.IssuerPromoterPeerID)
+	require.NoError(t, issuedEnvelope.Data.Verify(sellerPeerID.String(), models.SellerAffiliateNetworkTestnet, time.Now().UTC()))
+
+	payload, err := json.Marshal(map[string]any{"evidence": issuedEnvelope.Data})
+	require.NoError(t, err)
+	enrolled := sellerAffiliateHTTPRequest(t, sellerServer, http.MethodPost,
+		"/v1/public/seller-affiliate/programs/program-1/links", string(payload))
+	require.Equal(t, http.StatusOK, enrolled.StatusCode)
+	require.Len(t, sellerService.links, 1)
+	link := sellerService.links["link-enrolled"]
+	require.NotNil(t, link)
+	require.Equal(t, promoterPeerID.String(), link.PromoterPeerID)
+	originalToken := link.PublicToken
+
+	replay := sellerAffiliateHTTPRequest(t, sellerServer, http.MethodPost,
+		"/v1/public/seller-affiliate/programs/program-1/links", string(payload))
+	require.Equal(t, http.StatusOK, replay.StatusCode)
+	require.Equal(t, originalToken, sellerService.links["link-enrolled"].PublicToken)
+
+	sellerService.links["link-enrolled"].Status = models.AffiliateLinkStatusRevoked
+	revokedReplay := sellerAffiliateHTTPRequest(t, sellerServer, http.MethodPost,
+		"/v1/public/seller-affiliate/programs/program-1/links", string(payload))
+	require.Equal(t, http.StatusConflict, revokedReplay.StatusCode)
+	require.Equal(t, models.AffiliateLinkStatusRevoked, sellerService.links["link-enrolled"].Status)
 }
 
 type sellerAffiliateCapabilitiesTestPayment struct {

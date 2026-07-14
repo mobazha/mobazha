@@ -1937,6 +1937,18 @@
         },
         "type": "object"
       },
+      "PublicSellerAffiliateLinkEnrollmentInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "$ref": "#/components/schemas/SellerAffiliatePromoterEnrollmentEvidence"
+          }
+        },
+        "required": [
+          "evidence"
+        ],
+        "type": "object"
+      },
       "PublicSellerAffiliateLinkView": {
         "additionalProperties": false,
         "properties": {
@@ -2203,6 +2215,96 @@
           "status",
           "commissionRateBPS",
           "attributionWindowSeconds"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliatePromoterEnrollmentEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "audienceSellerPeerID": {
+            "type": "string"
+          },
+          "domain": {
+            "enum": [
+              "mobazha:seller-affiliate-promoter-enrollment:v1"
+            ],
+            "type": "string"
+          },
+          "evidenceID": {
+            "type": "string"
+          },
+          "expiresAtUnix": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "issuedAtUnix": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "issuerPromoterPeerID": {
+            "type": "string"
+          },
+          "issuerPublicKey": {
+            "contentEncoding": "base64",
+            "type": "string"
+          },
+          "network": {
+            "enum": [
+              "mainnet",
+              "testnet"
+            ],
+            "type": "string"
+          },
+          "programID": {
+            "type": "string"
+          },
+          "promoterPayoutDestinations": {
+            "$ref": "#/components/schemas/PayoutDestinationSet"
+          },
+          "signature": {
+            "contentEncoding": "base64",
+            "type": "string"
+          },
+          "version": {
+            "enum": [
+              "1"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "version",
+          "network",
+          "evidenceID",
+          "issuerPromoterPeerID",
+          "audienceSellerPeerID",
+          "programID",
+          "promoterPayoutDestinations",
+          "issuedAtUnix",
+          "expiresAtUnix",
+          "issuerPublicKey",
+          "signature"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliatePromoterEnrollmentInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "programID": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "sellerPeerID": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sellerPeerID",
+          "programID"
         ],
         "type": "object"
       },
@@ -18915,6 +19017,60 @@
         ]
       }
     },
+    "/v1/public/seller-affiliate/programs/{programID}/links": {
+      "post": {
+        "description": "Creates an idempotent promoter link only when the promoter Peer signed a fresh, network- and seller-bound payout snapshot. Replays never reactivate revoked links.",
+        "operationId": "seller-affiliate-public-link-enroll",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "programID",
+            "required": true,
+            "schema": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicSellerAffiliateLinkEnrollmentInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAffiliateLinkView"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Enroll a promoter link with Peer evidence",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
     "/v1/purchases": {
       "get": {
         "operationId": "purchases-get-query",
@@ -19748,6 +19904,59 @@
           }
         ],
         "summary": "Create or update the store affiliate program",
+        "tags": [
+          "seller-affiliate"
+        ]
+      }
+    },
+    "/v1/seller-affiliate/promoter-enrollments": {
+      "post": {
+        "description": "Signs this Node's published payout destinations for one seller Peer and program. The evidence is short-lived and contains no account identity.",
+        "operationId": "seller-affiliate-promoter-enrollment-issue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SellerAffiliatePromoterEnrollmentInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellerAffiliatePromoterEnrollmentEvidence"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Issue promoter Peer enrollment evidence",
         "tags": [
           "seller-affiliate"
         ]

@@ -57,6 +57,17 @@ type CryptoPaymentFacade struct {
 	sellerPolicyResolver sellerStorePolicyResolver
 	settlementStarter    standardOrderSettlementAuthorizationStarter
 	settlementEligible   func(iwallet.CoinType) bool
+	quoteBoundEligible   func(iwallet.CoinType) bool
+}
+
+// SetQuoteBoundSettlementAuthorizationEligibility wires the rail-scoped v2
+// writer capability. It is evaluated separately from v1 route capability.
+func (c *CryptoPaymentFacade) SetQuoteBoundSettlementAuthorizationEligibility(
+	eligible func(iwallet.CoinType) bool,
+) {
+	if c != nil {
+		c.quoteBoundEligible = eligible
+	}
 }
 
 // SetStandardOrderSettlementAuthorizationEligibility wires the runtime
@@ -145,8 +156,11 @@ func (c *CryptoPaymentFacade) CreateSession(
 	if err != nil {
 		return nil, err
 	}
-	if c.settlementStarter != nil && c.settlementEligible != nil && c.settlementEligible(coin) &&
-		standardOrderSettlementAuthorizationV1Eligible(coin, orderOpen) {
+	v1Eligible := c.settlementEligible != nil && c.settlementEligible(coin) &&
+		standardOrderSettlementAuthorizationV1Eligible(coin, orderOpen)
+	v2Eligible := c.quoteBoundEligible != nil && c.quoteBoundEligible(coin) &&
+		standardOrderSettlementAuthorizationV2Eligible(coin, orderOpen, req.PaymentSelectionQuoteID)
+	if c.settlementStarter != nil && (v1Eligible || v2Eligible) {
 		if standardOrderSettlementAuthorizationEconomicEligible(order) {
 			setupParams, err := buildPaymentSetupParamsFromOrder(
 				order, orderOpen, coin, req.PayerAddress, refundAddr, moderator,
@@ -227,6 +241,15 @@ func standardOrderSettlementAuthorizationV1Eligible(coin iwallet.CoinType, order
 		return false
 	}
 	return coin.MatchesPricingCurrency(orderOpen.PricingCoin)
+}
+
+func standardOrderSettlementAuthorizationV2Eligible(
+	coin iwallet.CoinType,
+	orderOpen *porderpb.OrderOpen,
+	quoteID string,
+) bool {
+	return orderOpen != nil && strings.TrimSpace(quoteID) != "" &&
+		!coin.MatchesPricingCurrency(orderOpen.PricingCoin)
 }
 
 func standardOrderSettlementAuthorizationEconomicEligible(order *models.Order) bool {

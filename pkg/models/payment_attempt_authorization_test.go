@@ -263,14 +263,15 @@ func TestPaymentAttemptSettlementAuthorization_RejectsSellerMutationOfModeratorF
 	t.Run("quote-bound v2 validates complete funding basis", func(t *testing.T) {
 		basis := PaymentAttemptFundingBasis{
 			Version: PaymentAttemptFundingBasisVersion, OrderID: orderID, AttemptID: attemptID,
-			OrderOpenHash: strings.Repeat("a", 64), PricingCurrency: "USD", PricingAmount: "250", PricingDivisibility: 2,
+			AuthorizationContextID: contextID,
+			OrderOpenHash:          strings.Repeat("a", 64), PricingCurrency: "USD", PricingAmount: "250", PricingDivisibility: 2,
 			PaymentAssetID: railID, PaymentCurrency: "BTC", PaymentDivisibility: 8,
 			ConversionRequired: true, ExchangeRate: "250000", ExchangeRateBase: "BTC", ExchangeRateQuote: "USD",
 			ExchangeRateQuoteDivisibility: 2, RateSourceUpdatedUnix: 1784015970,
 			RoundingPolicy: PaymentAttemptFundingRoundingCeilV1, PaymentSubtotal: fundingAmount,
 			ProviderOrNetworkCost: "0", PlatformPaymentCost: "0", BuyerPaymentTotal: fundingAmount,
 			QuoteID: "quote-v2", QuotePolicyVersion: PaymentSelectionQuotePilotZeroFeeV1,
-			QuoteIssuer: "seller-authorized-core", IssuedAtUnix: 1784016000, ExpiresAtUnix: 1784016900,
+			QuoteIssuer: "buyer-proposal-core", IssuedAtUnix: 1784016000, ExpiresAtUnix: 1784016900,
 		}
 		_, basisHash, err := basis.CanonicalBytesAndHash()
 		require.NoError(t, err)

@@ -1,7 +1,9 @@
 package models
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -677,6 +679,17 @@ func (o *Order) OrderOpenMessage() (*pb.OrderOpen, error) {
 		return nil, err
 	}
 	return orderOpen, nil
+}
+
+// OrderOpenCanonicalHash returns the SHA-256 commitment of the canonical
+// protojson OrderOpen representation shared by every order participant.
+func (o *Order) OrderOpenCanonicalHash() (string, error) {
+	orderOpen, err := o.OrderOpenMessage()
+	if err != nil {
+		return "", err
+	}
+	digest := sha256.Sum256([]byte(marshaler.Format(orderOpen)))
+	return hex.EncodeToString(digest[:]), nil
 }
 
 // PaymentProgressInfo summarizes the running tally of confirmed-and-deduplicated

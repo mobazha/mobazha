@@ -584,6 +584,7 @@ func autoMigrateDatabase(db database.Database) error {
 		&models.PaymentAttempt{},
 		&models.PaymentAttemptSettlementOffer{},
 		&models.PaymentAttemptSettlementAuthorizationRecord{},
+		&models.PaymentAttemptFundingBasisProposalRecord{},
 		&models.PaymentSelectionQuote{},
 		&models.PaymentProviderBinding{},
 		&models.PaymentProviderCredential{},

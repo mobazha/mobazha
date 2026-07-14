@@ -10,14 +10,15 @@ import (
 func validCrossCurrencyFundingBasis() PaymentAttemptFundingBasis {
 	return PaymentAttemptFundingBasis{
 		Version: PaymentAttemptFundingBasisVersion, OrderID: "order-funding-basis", AttemptID: "attempt-funding-basis",
-		OrderOpenHash: strings.Repeat("a", 64), PricingCurrency: "USD", PricingAmount: "4900", PricingDivisibility: 2,
+		AuthorizationContextID: strings.Repeat("b", 64),
+		OrderOpenHash:          strings.Repeat("a", 64), PricingCurrency: "USD", PricingAmount: "4900", PricingDivisibility: 2,
 		PaymentAssetID: "crypto:eip155:1:native", PaymentCurrency: "ETH", PaymentDivisibility: 18,
 		ConversionRequired: true, ExchangeRate: "250000", ExchangeRateBase: "ETH", ExchangeRateQuote: "USD",
 		ExchangeRateQuoteDivisibility: 2, RateSourceUpdatedUnix: 1784015970,
 		RoundingPolicy: PaymentAttemptFundingRoundingCeilV1, PaymentSubtotal: "19600000000000000",
 		ProviderOrNetworkCost: "0", PlatformPaymentCost: "0", BuyerPaymentTotal: "19600000000000000",
 		QuoteID: "quote-funding-basis", QuotePolicyVersion: PaymentSelectionQuotePilotZeroFeeV1,
-		QuoteIssuer: "seller-authorized-core", IssuedAtUnix: 1784016000, ExpiresAtUnix: 1784016900,
+		QuoteIssuer: "buyer-proposal-core", IssuedAtUnix: 1784016000, ExpiresAtUnix: 1784016900,
 	}
 }
 
@@ -55,7 +56,8 @@ func TestPaymentAttemptFundingBasis_FreezesOnAttempt(t *testing.T) {
 	basis := validCrossCurrencyFundingBasis()
 	attempt := PaymentAttempt{
 		Kind: PaymentAttemptKindCryptoFundingTarget, OrderID: basis.OrderID, AttemptID: basis.AttemptID,
-		Currency: basis.PaymentAssetID, AmountValue: basis.BuyerPaymentTotal,
+		AuthorizationContextID: basis.AuthorizationContextID,
+		Currency:               basis.PaymentAssetID, AmountValue: basis.BuyerPaymentTotal,
 	}
 	require.NoError(t, attempt.SetFundingBasis(basis))
 	require.NoError(t, attempt.SetFundingBasis(basis), "byte-identical retry must be idempotent")
@@ -90,7 +92,8 @@ func TestPaymentAttemptFundingBasis_BindsQuoteBoundSettlementTerms(t *testing.T)
 
 	attempt := PaymentAttempt{
 		Kind: PaymentAttemptKindCryptoFundingTarget, OrderID: basis.OrderID, AttemptID: basis.AttemptID,
-		Currency: basis.PaymentAssetID, AmountValue: basis.BuyerPaymentTotal,
+		AuthorizationContextID: basis.AuthorizationContextID,
+		Currency:               basis.PaymentAssetID, AmountValue: basis.BuyerPaymentTotal,
 	}
 	require.NoError(t, attempt.SetFundingBasis(basis))
 	terms.Version = PaymentAttemptSettlementTermsQuoteBoundVersion

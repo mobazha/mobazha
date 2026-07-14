@@ -6,6 +6,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/models"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/driver/sqlite"
@@ -44,6 +46,37 @@ type retainingSettlementOfferPublisher struct {
 	tenantID string
 	targets  []peer.ID
 	offers   []models.SettlementKeyOffer
+	bases    []models.PaymentAttemptFundingBasis
+}
+
+type settlementAuthorizationExchangeRate struct {
+	rate       iwallet.Amount
+	updatedAt  time.Time
+	base       models.CurrencyCode
+	to         models.CurrencyCode
+	breakCache bool
+}
+
+func (r *settlementAuthorizationExchangeRate) GetAllRates(models.CurrencyCode, bool) (map[models.CurrencyCode]iwallet.Amount, error) {
+	return nil, nil
+}
+
+func (r *settlementAuthorizationExchangeRate) GetRate(base, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error) {
+	r.base, r.to, r.breakCache = base, to, breakCache
+	return r.rate, nil
+}
+
+func (r *settlementAuthorizationExchangeRate) LastUpdated(models.CurrencyCode) time.Time {
+	return r.updatedAt
+}
+
+func (p *retainingSettlementOfferPublisher) PublishSettlementFundingBasisProposal(
+	_ context.Context,
+	_ peer.ID,
+	basis models.PaymentAttemptFundingBasis,
+) error {
+	p.bases = append(p.bases, basis)
+	return nil
 }
 
 func (p *retainingSettlementOfferPublisher) PublishSettlementKeyOffer(
@@ -186,6 +219,7 @@ func TestBeginBuyerSettlementAuthorization_AcceptsCanonicalTokenRail(t *testing.
 	sellerPeerID, err := identity.PeerIDFromPublicKey(sellerKeys.PubKey)
 	require.NoError(t, err)
 	openBytes, err := protojson.Marshal(&pb.OrderOpen{
+		PricingCoin: "USD", Amount: "1000",
 		BuyerID:  &pb.ID{PeerID: buyerPeerID.String()},
 		Listings: []*pb.SignedListing{{Listing: &pb.Listing{VendorID: &pb.ID{PeerID: sellerPeerID.String()}}}},
 	})
@@ -194,16 +228,18 @@ func TestBeginBuyerSettlementAuthorization_AcceptsCanonicalTokenRail(t *testing.
 		TenantMixin: models.TenantMixin{TenantID: "tenant-a"}, ID: "order-token",
 		MyRole: string(models.RoleBuyer), SerializedOrderOpen: openBytes, PaymentSelectionQuoteID: "quote-token",
 	}
-	tokenRail := "crypto:eip155:1:erc20:0x1111111111111111111111111111111111111111"
+	tokenRail := "crypto:eip155:1:erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7"
+	now := time.Now().UTC()
 	require.NoError(t, db.Create(&models.PaymentSelectionQuote{
 		TenantID: order.TenantID, QuoteID: order.PaymentSelectionQuoteID, OrderID: order.ID.String(),
 		FeeQuoteID: "fee-token", DealLinkID: "deal-token", TermsHash: "terms-token",
 		SchemaVersion: 1, PolicyVersion: models.PaymentSelectionQuotePilotZeroFeeV1,
 		PricingCurrency: "USD", PricingAmount: "1000", PricingDivisibility: 2,
-		PaymentCoin: tokenRail, PaymentCurrency: "USDT", PaymentDivisibility: 6,
-		ExchangeRate: "1", ExchangeRateBase: "USD", ExchangeRateQuote: "USDT",
-		ExchangeRateQuoteDivisibility: 6, PaymentSubtotal: "1000", ProviderOrNetworkCost: "0",
-		PlatformPaymentCost: "0", BuyerPaymentTotal: "1000", ExpiresAt: time.Now().Add(time.Hour), CreatedAt: time.Now(),
+		PaymentCoin: tokenRail, PaymentCurrency: "ETHUSDT", PaymentDivisibility: 6,
+		ConversionRequired: true, ExchangeRate: "100", ExchangeRateBase: "ETHUSDT", ExchangeRateQuote: "USD",
+		ExchangeRateQuoteDivisibility: 2, RateSourceUpdatedAt: now.Add(-time.Second),
+		PaymentSubtotal: "10000000", ProviderOrNetworkCost: "0",
+		PlatformPaymentCost: "0", BuyerPaymentTotal: "10000000", ExpiresAt: now.Add(time.Hour), CreatedAt: now,
 	}).Error)
 	publisher := &retainingSettlementOfferPublisher{db: db, tenantID: order.TenantID}
 	started, err := beginBuyerSettlementAuthorization(
@@ -215,13 +251,17 @@ func TestBeginBuyerSettlementAuthorization_AcceptsCanonicalTokenRail(t *testing.
 		},
 		StandardOrderSettlementAuthorizationRequest{
 			OrderID: order.ID.String(), PaymentSelectionQuoteID: order.PaymentSelectionQuoteID,
-			RailID: tokenRail, AmountAtomic: "1000",
+			RailID: tokenRail, AmountAtomic: "10000000",
 		},
 	)
 	require.NoError(t, err)
 	require.Equal(t, tokenRail, started.Attempt.Currency)
+	require.Equal(t, "10000000", started.Attempt.AmountValue)
 	require.Equal(t, tokenRail, started.BuyerOffer.RailID)
 	require.Len(t, publisher.offers, 1)
+	require.Len(t, publisher.bases, 1)
+	require.Equal(t, buyerPeerID.String(), publisher.bases[0].QuoteIssuer)
+	require.Equal(t, started.Attempt.FundingBasisHash, mustFundingBasisHash(t, publisher.bases[0]))
 	var attempts int64
 	require.NoError(t, db.Model(&models.PaymentAttempt{}).Count(&attempts).Error)
 	require.Equal(t, int64(1), attempts)
@@ -232,6 +272,7 @@ func TestRespondSellerSettlementAuthorization_AdoptsBuyerAttemptAndPublishesIdem
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(
 		&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{},
+		&models.PaymentAttemptFundingBasisProposalRecord{},
 	))
 
 	buyerKeys, err := identity.GenerateKeyPair()
@@ -282,11 +323,11 @@ func TestRespondSellerSettlementAuthorization_AdoptsBuyerAttemptAndPublishesIdem
 	publisher := &retainingSettlementOfferPublisher{db: db, tenantID: order.TenantID}
 	identitySigner := contracts.NewKeyPairSigner(sellerKeys, sellerPeerID)
 	first, err := respondSellerSettlementAuthorization(
-		t.Context(), db, order, buyerOffer, identitySigner, settlementSigner, publisher, route,
+		t.Context(), db, order, buyerOffer, identitySigner, settlementSigner, publisher, route, nil,
 	)
 	require.NoError(t, err)
 	retry, err := respondSellerSettlementAuthorization(
-		t.Context(), db, order, buyerOffer, identitySigner, settlementSigner, publisher, route,
+		t.Context(), db, order, buyerOffer, identitySigner, settlementSigner, publisher, route, nil,
 	)
 	require.NoError(t, err)
 
@@ -315,11 +356,12 @@ func TestRespondSellerSettlementAuthorization_AdoptsBuyerAttemptAndPublishesIdem
 	require.Equal(t, models.SettlementParticipantSeller, offers[1].ParticipantRole)
 }
 
-func TestRespondSellerSettlementAuthorization_RejectsCrossCurrencyBeforeDraft(t *testing.T) {
+func TestRespondSellerSettlementAuthorization_RequiresAndBindsCrossCurrencyFundingBasis(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:seller-authorization-cross-currency-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(
 		&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{},
+		&models.PaymentAttemptFundingBasisProposalRecord{},
 	))
 	buyerKeys, err := identity.GenerateKeyPair()
 	require.NoError(t, err)
@@ -355,19 +397,111 @@ func TestRespondSellerSettlementAuthorization_RejectsCrossCurrencyBeforeDraft(t 
 		return paymentintent.RetainReceivedSettlementKeyOfferInTransaction(tx, order.TenantID, buyerOffer)
 	}))
 
+	route := payment.RouteIdentity{
+		ContributionID: "managed-evm.eip155-1", ModuleID: "managed-evm", ImplementationGeneration: "v1",
+		RailKind: "escrow", NetworkID: "eip155:1", AssetID: buyerOffer.RailID,
+		ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
 	_, err = respondSellerSettlementAuthorization(
 		t.Context(), db, order, buyerOffer, contracts.NewKeyPairSigner(sellerKeys, sellerPeerID),
 		new(buyerStartSettlementSigner), &retainingSettlementOfferPublisher{db: db, tenantID: order.TenantID},
-		payment.RouteIdentity{
-			ContributionID: "managed-evm.eip155-1", ModuleID: "managed-evm", ImplementationGeneration: "v1",
-			RailKind: "escrow", NetworkID: "eip155:1", AssetID: buyerOffer.RailID,
-			ProtocolVersion: "1", StateSchemaVersion: "1",
-		},
+		route,
+		nil,
 	)
-	require.ErrorContains(t, err, "same-currency signed order amount")
+	require.ErrorContains(t, err, "load retained settlement funding basis")
 	var attempts int64
 	require.NoError(t, db.Model(&models.PaymentAttempt{}).Count(&attempts).Error)
 	require.Zero(t, attempts)
+
+	now := time.Now().UTC()
+	orderHash, err := order.OrderOpenCanonicalHash()
+	require.NoError(t, err)
+	basis := models.PaymentAttemptFundingBasis{
+		Version: models.PaymentAttemptFundingBasisVersion, OrderID: order.ID.String(), AttemptID: buyerOffer.AttemptID,
+		AuthorizationContextID: buyerOffer.AuthorizationContextID,
+		OrderOpenHash:          orderHash, PricingCurrency: "BTC", PricingAmount: "1000", PricingDivisibility: 8,
+		PaymentAssetID: buyerOffer.RailID, PaymentCurrency: "ETH", PaymentDivisibility: 18,
+		ConversionRequired: true, ExchangeRate: "500000", ExchangeRateBase: "ETH", ExchangeRateQuote: "BTC",
+		ExchangeRateQuoteDivisibility: 8, RateSourceUpdatedUnix: now.Add(-2 * time.Minute).Unix(),
+		RoundingPolicy: models.PaymentAttemptFundingRoundingCeilV1, PaymentSubtotal: "2000000000000000",
+		ProviderOrNetworkCost: "0", PlatformPaymentCost: "0", BuyerPaymentTotal: "2000000000000000",
+		QuoteID: "quote-cross-currency", QuotePolicyVersion: models.PaymentSelectionQuotePilotZeroFeeV1,
+		QuoteIssuer: buyerPeerID.String(), IssuedAtUnix: now.Add(-time.Minute).Unix(), ExpiresAtUnix: now.Add(10 * time.Minute).Unix(),
+	}
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return paymentintent.RetainReceivedFundingBasisProposalInTransaction(tx, order.TenantID, basis)
+	}))
+	rates := &settlementAuthorizationExchangeRate{rate: iwallet.NewAmount("500000"), updatedAt: now.Add(-time.Minute)}
+	response, err := respondSellerSettlementAuthorization(
+		t.Context(), db, order, buyerOffer, contracts.NewKeyPairSigner(sellerKeys, sellerPeerID),
+		new(buyerStartSettlementSigner), &retainingSettlementOfferPublisher{db: db, tenantID: order.TenantID},
+		route, rates,
+	)
+	require.NoError(t, err)
+	require.Equal(t, basis.BuyerPaymentTotal, response.Attempt.AmountValue)
+	require.Equal(t, mustFundingBasisHash(t, basis), response.Attempt.FundingBasisHash)
+	require.Equal(t, basis, *mustAttemptFundingBasis(t, response.Attempt))
+}
+
+func mustFundingBasisHash(t *testing.T, basis models.PaymentAttemptFundingBasis) string {
+	t.Helper()
+	_, hash, err := basis.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	return hash
+}
+
+func mustAttemptFundingBasis(t *testing.T, attempt models.PaymentAttempt) *models.PaymentAttemptFundingBasis {
+	t.Helper()
+	basis, err := attempt.GetFundingBasis()
+	require.NoError(t, err)
+	require.NotNil(t, basis)
+	return basis
+}
+
+func TestValidateSellerPaymentAttemptFundingBasis_UsesFreshSellerRateFloor(t *testing.T) {
+	now := time.Date(2026, time.July, 15, 8, 0, 0, 0, time.UTC)
+	open := &pb.OrderOpen{PricingCoin: "USD", Amount: "4900"}
+	openBytes, err := protojson.Marshal(open)
+	require.NoError(t, err)
+	order := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: "tenant-seller"}, ID: "order-rate-floor",
+		MyRole: string(models.RoleVendor), SerializedOrderOpen: openBytes,
+	}
+	orderHash, err := order.OrderOpenCanonicalHash()
+	require.NoError(t, err)
+	basis := models.PaymentAttemptFundingBasis{
+		Version: models.PaymentAttemptFundingBasisVersion, OrderID: order.ID.String(), AttemptID: "attempt-rate-floor",
+		AuthorizationContextID: strings.Repeat("b", 64),
+		OrderOpenHash:          orderHash, PricingCurrency: "USD", PricingAmount: "4900", PricingDivisibility: 2,
+		PaymentAssetID: "crypto:eip155:1:native", PaymentCurrency: "ETH", PaymentDivisibility: 18,
+		ConversionRequired: true, ExchangeRate: "250000", ExchangeRateBase: "ETH", ExchangeRateQuote: "USD",
+		ExchangeRateQuoteDivisibility: 2, RateSourceUpdatedUnix: now.Add(-2 * time.Minute).Unix(),
+		RoundingPolicy: models.PaymentAttemptFundingRoundingCeilV1, PaymentSubtotal: "19600000000000000",
+		ProviderOrNetworkCost: "0", PlatformPaymentCost: "0", BuyerPaymentTotal: "19600000000000000",
+		QuoteID: "quote-rate-floor", QuotePolicyVersion: models.PaymentSelectionQuotePilotZeroFeeV1,
+		QuoteIssuer: "buyer-peer", IssuedAtUnix: now.Add(-time.Minute).Unix(), ExpiresAtUnix: now.Add(10 * time.Minute).Unix(),
+	}
+
+	// A seller rate of 2550 USD/ETH admits the buyer's 0.0196 ETH proposal.
+	rates := &settlementAuthorizationExchangeRate{rate: iwallet.NewAmount("255000"), updatedAt: now.Add(-time.Minute)}
+	require.NoError(t, validateSellerPaymentAttemptFundingBasis(basis, order, open, "buyer-peer", rates, now))
+	require.Equal(t, models.CurrencyCode("ETH"), rates.base)
+	require.Equal(t, models.CurrencyCode("USD"), rates.to)
+	require.True(t, rates.breakCache, "seller acceptance must refresh its own provider snapshot")
+
+	// A seller rate of 2450 USD/ETH requires 0.02 ETH, so this proposal underfunds it.
+	rates.rate = iwallet.NewAmount("245000")
+	require.ErrorContains(t,
+		validateSellerPaymentAttemptFundingBasis(basis, order, open, "buyer-peer", rates, now),
+		"below seller exchange-rate policy minimum",
+	)
+
+	rates.rate = iwallet.NewAmount("255000")
+	rates.updatedAt = now.Add(-maxSellerSettlementRateAge)
+	require.ErrorContains(t,
+		validateSellerPaymentAttemptFundingBasis(basis, order, open, "buyer-peer", rates, now),
+		"snapshot is stale",
+	)
 }
 
 func TestRespondSellerSettlementAuthorization_RejectsOtherKeyPurpose(t *testing.T) {
@@ -400,6 +534,7 @@ func TestRespondSellerSettlementAuthorization_RejectsOtherKeyPurpose(t *testing.
 		&models.Order{ID: models.OrderID(buyerOffer.OrderID), MyRole: string(models.RoleVendor)},
 		buyerOffer, contracts.NewKeyPairSigner(sellerKeys, sellerPeerID), new(buyerStartSettlementSigner),
 		&retainingSettlementOfferPublisher{db: db}, payment.RouteIdentity{AssetID: buyerOffer.RailID},
+		nil,
 	)
 	require.ErrorContains(t, err, "purpose does not match standard order protocol")
 }

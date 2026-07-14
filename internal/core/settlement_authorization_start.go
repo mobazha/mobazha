@@ -56,6 +56,7 @@ type StandardOrderSettlementAuthorizationResponse struct {
 
 type settlementKeyOfferPublisher interface {
 	PublishSettlementKeyOffer(context.Context, peer.ID, models.SettlementKeyOffer) error
+	PublishSettlementFundingBasisProposal(context.Context, peer.ID, models.PaymentAttemptFundingBasis) error
 }
 
 type rawSettlementAuthorizationDB interface {
@@ -160,6 +161,7 @@ func (n *MobazhaNode) RespondStandardOrderSettlementAuthorization(
 	}
 	return respondSellerSettlementAuthorization(
 		ctx, rawProvider.RawDB(), &order, buyerOffer, n.signer, n.settlementSigner, n.orderService, route,
+		n.ExchangeRate(),
 	)
 }
 
@@ -214,6 +216,23 @@ func beginBuyerSettlementAuthorization(
 	}, route)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationStart{}, err
+	}
+	if !iwallet.CoinType(request.RailID).MatchesPricingCurrency(orderOpen.PricingCoin) {
+		basis, err := buildBuyerPaymentAttemptFundingBasis(
+			db, order, orderOpen, attempt, request.PaymentSelectionQuoteID, buyerPeerID,
+		)
+		if err != nil {
+			return StandardOrderSettlementAuthorizationStart{}, err
+		}
+		attempt, err = paymentintent.BindCryptoPaymentAttemptFundingBasis(
+			db, tenantID, attempt.AttemptID, basis,
+		)
+		if err != nil {
+			return StandardOrderSettlementAuthorizationStart{}, err
+		}
+		if err := publisher.PublishSettlementFundingBasisProposal(ctx, seller, basis); err != nil {
+			return StandardOrderSettlementAuthorizationStart{}, fmt.Errorf("publish buyer settlement funding basis: %w", err)
+		}
 	}
 	offerAmount := ""
 	escrowTimeoutHours := uint32(0)
@@ -272,6 +291,7 @@ func respondSellerSettlementAuthorization(
 	settlementSigner contracts.SettlementSigner,
 	publisher settlementKeyOfferPublisher,
 	route payment.RouteIdentity,
+	exchange contracts.ExchangeRateService,
 ) (StandardOrderSettlementAuthorizationResponse, error) {
 	if db == nil || order == nil || identitySigner == nil || settlementSigner == nil || publisher == nil {
 		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization dependencies are required")
@@ -302,9 +322,28 @@ func respondSellerSettlementAuthorization(
 		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("settlement key offer participants do not match signed order")
 	}
 	amountAtomic := strings.TrimSpace(orderOpen.Amount)
-	if !iwallet.CoinType(buyerOffer.RailID).MatchesPricingCurrency(orderOpen.PricingCoin) ||
-		amountAtomic == "" {
-		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization requires same-currency signed order amount")
+	var fundingBasis *models.PaymentAttemptFundingBasis
+	if !iwallet.CoinType(buyerOffer.RailID).MatchesPricingCurrency(orderOpen.PricingCoin) {
+		basis, err := paymentintent.LoadRetainedFundingBasisProposal(
+			db, strings.TrimSpace(order.TenantID), buyerOffer.AttemptID,
+		)
+		if err != nil {
+			return StandardOrderSettlementAuthorizationResponse{}, err
+		}
+		if basis.AttemptID != buyerOffer.AttemptID || basis.AuthorizationContextID != buyerOffer.AuthorizationContextID ||
+			basis.PaymentAssetID != buyerOffer.RailID {
+			return StandardOrderSettlementAuthorizationResponse{}, models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		if err := validateSellerPaymentAttemptFundingBasis(
+			basis, order, orderOpen, buyerPeerID, exchange, time.Now().UTC(),
+		); err != nil {
+			return StandardOrderSettlementAuthorizationResponse{}, err
+		}
+		amountAtomic = basis.BuyerPaymentTotal
+		fundingBasis = &basis
+	}
+	if amountAtomic == "" {
+		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("seller settlement authorization requires a funding amount")
 	}
 	if buyerOffer.ExpectedModeratorPeerID != "" && buyerOffer.AmountAtomic != amountAtomic {
 		return StandardOrderSettlementAuthorizationResponse{}, fmt.Errorf("buyer settlement key offer amount does not match signed order")
@@ -340,6 +379,12 @@ func respondSellerSettlementAuthorization(
 	}, route)
 	if err != nil {
 		return StandardOrderSettlementAuthorizationResponse{}, err
+	}
+	if fundingBasis != nil {
+		attempt, err = paymentintent.BindCryptoPaymentAttemptFundingBasis(db, tenantID, attempt.AttemptID, *fundingBasis)
+		if err != nil {
+			return StandardOrderSettlementAuthorizationResponse{}, err
+		}
 	}
 	if attempt.AuthorizationContextID != buyerOffer.AuthorizationContextID {
 		return StandardOrderSettlementAuthorizationResponse{}, models.ErrPaymentAttemptSettlementTermsConflict

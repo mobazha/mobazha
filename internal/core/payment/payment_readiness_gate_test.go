@@ -514,3 +514,49 @@ func TestCryptoPaymentFacade_CreateSession_CrossCurrencyUsesAdmittedConversionRo
 	require.Equal(t, 1, rates.calls)
 	require.Equal(t, uint64(19600000000000000), setup.params.Amount)
 }
+
+func TestCryptoPaymentFacade_CreateSession_CrossCurrencyUsesQuoteBoundV2Writer(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	const orderID = "QmCrossCurrencyQuoteBoundV2"
+	readyAt := time.Now()
+	raw, err := (protojson.MarshalOptions{}).Marshal(&porderpb.OrderOpen{
+		PricingCoin: "USD", Amount: "4900",
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&models.Order{}); err != nil {
+			return err
+		}
+		return tx.Save(&models.Order{
+			ID: models.OrderID(orderID), MyRole: string(models.RoleBuyer), Open: true,
+			PaymentReadyAt: &readyAt, SerializedOrderOpen: raw,
+		})
+	}))
+
+	wantErr := errors.New("stop after recording v2 writer")
+	setup := &recordingFailingSetupService{err: errors.New("legacy setup must not run")}
+	facade := NewCryptoPaymentFacade(db, nil, setup, nil, nil)
+	facade.SetStandardOrderSettlementAuthorizationEligibility(func(iwallet.CoinType) bool { return true })
+	facade.SetQuoteBoundSettlementAuthorizationEligibility(func(iwallet.CoinType) bool { return true })
+	var started StandardOrderSettlementAuthorizationStartRequest
+	facade.SetStandardOrderSettlementAuthorizationStarter(func(
+		_ context.Context,
+		request StandardOrderSettlementAuthorizationStartRequest,
+	) error {
+		started = request
+		return wantErr
+	})
+
+	_, err = facade.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
+		OrderID: orderID, PaymentCoin: "crypto:eip155:1:native",
+		PaymentSelectionQuoteID: "quote-v2", AuthorizedPaymentAmount: "19600000000000000",
+	})
+	require.ErrorIs(t, err, wantErr)
+	require.Equal(t, 0, setup.calls)
+	require.Equal(t, orderID, started.OrderID)
+	require.Equal(t, "quote-v2", started.PaymentSelectionQuoteID)
+	require.Equal(t, "19600000000000000", started.AmountAtomic)
+}

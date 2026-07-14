@@ -355,6 +355,15 @@ message SettlementAuthorization {
     bytes authorization                  = 4;
 }
 
+// SettlementFundingBasisProposal carries the buyer-authored, non-actionable
+// quote snapshot to the seller before seller acceptance and authorization.
+message SettlementFundingBasisProposal {
+    uint32 version                       = 1;
+    string orderID                       = 2;
+    string attemptID                     = 3;
+    bytes fundingBasis                   = 4;
+}
+
 message PaymentFinalized {
     google.protobuf.Timestamp timestamp = 1;
 }

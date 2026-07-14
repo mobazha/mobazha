@@ -55,6 +55,9 @@ func MigrateFiatModels(db pkgdb.Database) error {
 		if err := tx.Migrate(&models.PaymentAttemptSettlementOffer{}); err != nil {
 			return err
 		}
-		return tx.Migrate(&models.PaymentAttemptSettlementAuthorizationRecord{})
+		if err := tx.Migrate(&models.PaymentAttemptSettlementAuthorizationRecord{}); err != nil {
+			return err
+		}
+		return tx.Migrate(&models.PaymentAttemptFundingBasisProposalRecord{})
 	})
 }

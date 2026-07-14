@@ -40,6 +40,23 @@ type settlementAuthorizationPaymentWatch struct {
 	calls        int
 }
 
+type fixedSettlementFundingTargetProjector struct {
+	address string
+}
+
+func (p fixedSettlementFundingTargetProjector) ProjectStandardOrderFundingTarget(
+	_ context.Context,
+	attempt models.PaymentAttempt,
+	_ models.PaymentRouteBinding,
+	_ []models.SettlementKeyOffer,
+) (models.PaymentAttemptFundingTarget, error) {
+	return models.PaymentAttemptFundingTarget{
+		Version: models.PaymentAttemptFundingTargetVersion, AttemptID: attempt.AttemptID,
+		Type: models.PaymentAttemptFundingTargetAddress, AssetID: attempt.Currency,
+		AmountAtomic: attempt.AmountValue, Address: p.address,
+	}, nil
+}
+
 func (w *settlementAuthorizationPaymentWatch) WatchPaymentAddress(
 	orderID, address string,
 	chain iwallet.ChainType,
@@ -252,6 +269,133 @@ func TestFinalizeSellerSettlementAuthorization_FreezesDeterministicUTXOTarget(t 
 	require.Equal(t, first.Target.Address, watch.address)
 	require.Equal(t, iwallet.ChainBitcoin, watch.chain)
 	require.NotEmpty(t, watch.scriptPubKey)
+}
+
+func TestFinalizeAndAdoptSettlementAuthorization_QuoteBoundV2(t *testing.T) {
+	sellerDB, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:seller-authorization-v2-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, sellerDB.AutoMigrate(
+		&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{},
+		&models.PaymentAttemptFundingBasisProposalRecord{},
+	))
+	route := payment.RouteIdentity{
+		ContributionID: "managed-evm.eip155-1", ModuleID: "managed-evm", ImplementationGeneration: "v1",
+		RailKind: "escrow", NetworkID: "eip155:1", AssetID: "crypto:eip155:1:native",
+		ProtocolVersion: "1", StateSchemaVersion: "1",
+	}
+	attempt, _, err := paymentintent.PrepareCryptoPaymentAttemptDraft(
+		sellerDB,
+		paymentintent.CryptoPaymentAttemptDraftRequest{
+			TenantID: "tenant-seller-v2", AttemptID: "attempt-finalize-v2", OrderID: "order-finalize-v2",
+			AmountAtomic: "19600000000000000", RailID: route.AssetID,
+		},
+		route,
+	)
+	require.NoError(t, err)
+
+	buyerKeys, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	buyerPeerID, err := identity.PeerIDFromPublicKey(buyerKeys.PubKey)
+	require.NoError(t, err)
+	sellerKeys, err := identity.GenerateKeyPair()
+	require.NoError(t, err)
+	sellerPeerID, err := identity.PeerIDFromPublicKey(sellerKeys.PubKey)
+	require.NoError(t, err)
+	openBytes, err := protojson.Marshal(&pb.OrderOpen{
+		Amount: "4900", PricingCoin: "USD", BuyerID: &pb.ID{PeerID: buyerPeerID.String()},
+		Listings: []*pb.SignedListing{{Listing: &pb.Listing{VendorID: &pb.ID{PeerID: sellerPeerID.String()}}}},
+	})
+	require.NoError(t, err)
+	order := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: attempt.TenantID}, ID: models.OrderID(attempt.OrderID),
+		MyRole: string(models.RoleVendor), SerializedOrderOpen: openBytes,
+	}
+	orderHash, err := order.OrderOpenCanonicalHash()
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	basis := models.PaymentAttemptFundingBasis{
+		Version: models.PaymentAttemptFundingBasisVersion, OrderID: attempt.OrderID, AttemptID: attempt.AttemptID,
+		AuthorizationContextID: attempt.AuthorizationContextID,
+		OrderOpenHash:          orderHash, PricingCurrency: "USD", PricingAmount: "4900", PricingDivisibility: 2,
+		PaymentAssetID: route.AssetID, PaymentCurrency: "ETH", PaymentDivisibility: 18,
+		ConversionRequired: true, ExchangeRate: "250000", ExchangeRateBase: "ETH", ExchangeRateQuote: "USD",
+		ExchangeRateQuoteDivisibility: 2, RateSourceUpdatedUnix: now.Add(-2 * time.Minute).Unix(),
+		RoundingPolicy: models.PaymentAttemptFundingRoundingCeilV1, PaymentSubtotal: attempt.AmountValue,
+		ProviderOrNetworkCost: "0", PlatformPaymentCost: "0", BuyerPaymentTotal: attempt.AmountValue,
+		QuoteID: "quote-finalize-v2", QuotePolicyVersion: models.PaymentSelectionQuotePilotZeroFeeV1,
+		QuoteIssuer: buyerPeerID.String(), IssuedAtUnix: now.Add(-time.Minute).Unix(), ExpiresAtUnix: now.Add(10 * time.Minute).Unix(),
+	}
+	attempt, err = paymentintent.BindCryptoPaymentAttemptFundingBasis(sellerDB, attempt.TenantID, attempt.AttemptID, basis)
+	require.NoError(t, err)
+
+	keyRef := contracts.SettlementKeyRef{
+		TenantID: attempt.TenantID, RailID: attempt.Currency,
+		Purpose: standardOrderSettlementKeyPurpose, ReferenceID: attempt.AuthorizationContextID,
+	}
+	buyerOffer, err := paymentintent.IssueSettlementKeyOffer(
+		t.Context(), contracts.NewKeyPairSigner(buyerKeys, buyerPeerID),
+		&buyerStartSettlementSigner{publicKey: []byte("buyer-v2-settlement-key")},
+		keyRef, attempt.OrderID, attempt.AttemptID, models.SettlementParticipantBuyer,
+	)
+	require.NoError(t, err)
+	sellerOffer, err := paymentintent.IssueSettlementKeyOffer(
+		t.Context(), contracts.NewKeyPairSigner(sellerKeys, sellerPeerID),
+		&buyerStartSettlementSigner{publicKey: []byte("seller-v2-settlement-key")},
+		keyRef, attempt.OrderID, attempt.AttemptID, models.SettlementParticipantSeller,
+	)
+	require.NoError(t, err)
+	require.NoError(t, paymentintent.StoreCryptoPaymentAttemptSettlementKeyOffer(sellerDB, attempt.TenantID, attempt.AttemptID, buyerOffer))
+	require.NoError(t, paymentintent.StoreCryptoPaymentAttemptSettlementKeyOffer(sellerDB, attempt.TenantID, attempt.AttemptID, sellerOffer))
+
+	projector := fixedSettlementFundingTargetProjector{address: "0x3333333333333333333333333333333333333333"}
+	walletAccounts := &settlementFinalizationWalletAccounts{destination: contracts.ReservedDestination{
+		Destination: contracts.Destination{RailID: attempt.Currency, Address: "0x1111111111111111111111111111111111111111", Version: 1},
+	}}
+	finalized, err := finalizeSellerSettlementAuthorization(
+		t.Context(), sellerDB, order, contracts.NewKeyPairSigner(sellerKeys, sellerPeerID),
+		walletAccounts, projector, attempt.AttemptID, nil,
+	)
+	require.NoError(t, err)
+	require.Equal(t, uint32(models.PaymentAttemptSettlementAuthorizationQuoteBoundVersion), finalized.SettlementAuthorization.Version)
+	require.Equal(t, uint32(models.PaymentAttemptSettlementTermsQuoteBoundVersion), finalized.Terms.Version)
+	require.Equal(t, finalized.Attempt.FundingBasisHash, finalized.Terms.FundingBasisHash)
+	require.Equal(t, basis, *finalized.SettlementAuthorization.FundingBasis)
+	require.NoError(t, finalized.Terms.VerifySellerAuthorization(sellerPeerID.String(), finalized.SellerSignature))
+
+	buyerDB, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:buyer-authorization-v2-%d?mode=memory&cache=shared", time.Now().UnixNano())), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, buyerDB.AutoMigrate(
+		&models.PaymentAttempt{}, &models.PaymentRouteBinding{}, &models.PaymentAttemptSettlementOffer{},
+	))
+	require.NoError(t, buyerDB.Transaction(func(tx *gorm.DB) error {
+		if err := paymentintent.RetainReceivedSettlementKeyOfferInTransaction(tx, attempt.TenantID, buyerOffer); err != nil {
+			return err
+		}
+		return paymentintent.RetainReceivedSettlementKeyOfferInTransaction(tx, attempt.TenantID, sellerOffer)
+	}))
+	buyerAttempt, _, err := paymentintent.PrepareCryptoPaymentAttemptDraft(
+		buyerDB,
+		paymentintent.CryptoPaymentAttemptDraftRequest{
+			TenantID: attempt.TenantID, AttemptID: attempt.AttemptID, OrderID: attempt.OrderID,
+			AmountAtomic: attempt.AmountValue, RailID: attempt.Currency,
+		},
+		route,
+	)
+	require.NoError(t, err)
+	_, err = paymentintent.BindCryptoPaymentAttemptFundingBasis(buyerDB, buyerAttempt.TenantID, buyerAttempt.AttemptID, basis)
+	require.NoError(t, err)
+	buyerOrder := &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: attempt.TenantID}, ID: models.OrderID(attempt.OrderID),
+		MyRole: string(models.RoleBuyer), SerializedOrderOpen: openBytes,
+	}
+	adopted, err := adoptBuyerSettlementAuthorization(
+		t.Context(), buyerDB, buyerOrder, contracts.NewKeyPairSigner(buyerKeys, buyerPeerID),
+		projector, finalized.SettlementAuthorization,
+	)
+	require.NoError(t, err)
+	require.Equal(t, models.PaymentAttemptFundingTargetReady, adopted.Attempt.State)
+	require.Equal(t, finalized.Attempt.FundingBasisHash, adopted.Attempt.FundingBasisHash)
+	require.Equal(t, finalized.Terms.FundingBasisHash, adopted.Terms.FundingBasisHash)
 }
 
 func TestStandardOrderUTXOFundingTargetProjector_ModeratedUsesTwoOfThreeWithTimeout(t *testing.T) {

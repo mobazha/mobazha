@@ -39,6 +39,24 @@ func RetainReceivedSettlementAuthorizationInTransaction(
 		(attempt.State != models.PaymentAttemptAuthorizationDraft && attempt.State != models.PaymentAttemptFundingTargetReady) {
 		return models.ErrPaymentAttemptSettlementTermsConflict
 	}
+	localHasFundingBasis := len(attempt.FundingBasis) != 0 || strings.TrimSpace(attempt.FundingBasisHash) != ""
+	if localHasFundingBasis != (authorization.FundingBasis != nil) {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	if authorization.FundingBasis != nil {
+		basis, err := attempt.GetFundingBasis()
+		if err != nil || basis == nil {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+		localBytes, _, err := basis.CanonicalBytesAndHash()
+		if err != nil {
+			return err
+		}
+		receivedBytes, _, err := authorization.FundingBasis.CanonicalBytesAndHash()
+		if err != nil || string(localBytes) != string(receivedBytes) {
+			return models.ErrPaymentAttemptSettlementTermsConflict
+		}
+	}
 	var existing models.PaymentAttemptSettlementAuthorizationRecord
 	err = tx.Session(&gorm.Session{NewDB: true}).Where(
 		"tenant_id = ? AND attempt_id = ?", tenantID, attempt.AttemptID,

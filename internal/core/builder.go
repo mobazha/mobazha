@@ -1681,6 +1681,9 @@ func initPaymentSessionSubsystem(obNode *MobazhaNode) {
 			cryptoFacade.SetStandardOrderSettlementAuthorizationEligibility(func(coin iwallet.CoinType) bool {
 				return obNode.supportsStandardOrderSettlementAuthorization(coin)
 			})
+			cryptoFacade.SetQuoteBoundSettlementAuthorizationEligibility(func(coin iwallet.CoinType) bool {
+				return obNode.supportsQuoteBoundSettlementAuthorization(coin)
+			})
 		}
 		svc.SetCryptoFacade(cryptoFacade)
 		logger.LogInfoWithID(log, obNode.nodeID, "PaymentSession: CryptoPaymentFacade wired")

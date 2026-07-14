@@ -184,7 +184,8 @@ func (a *PaymentAttempt) SetFundingBasis(basis PaymentAttemptFundingBasis) error
 	if a == nil || a.Kind != PaymentAttemptKindCryptoFundingTarget {
 		return fmt.Errorf("funding bases require a crypto payment attempt")
 	}
-	if basis.OrderID != a.OrderID || basis.AttemptID != a.AttemptID || basis.PaymentAssetID != a.Currency ||
+	if basis.OrderID != a.OrderID || basis.AttemptID != a.AttemptID ||
+		basis.AuthorizationContextID != a.AuthorizationContextID || basis.PaymentAssetID != a.Currency ||
 		(strings.TrimSpace(a.AmountValue) != "" && basis.BuyerPaymentTotal != a.AmountValue) {
 		return ErrPaymentAttemptSettlementTermsConflict
 	}

@@ -312,9 +312,23 @@ func finalizeSellerSettlementAuthorization(
 		(affiliateTerm != nil && (affiliateTerm.ReferralSessionID != referralSessionID || affiliateTerm.BuyerPeerID != buyerPeerID)) {
 		return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
-	if !iwallet.CoinType(attempt.Currency).MatchesPricingCurrency(orderOpen.PricingCoin) ||
-		strings.TrimSpace(orderOpen.Amount) != attempt.AmountValue {
-		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("seller settlement finalization requires same-currency signed order amount")
+	fundingBasis, err := attempt.GetFundingBasis()
+	if err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, err
+	}
+	if fundingBasis == nil {
+		if !iwallet.CoinType(attempt.Currency).MatchesPricingCurrency(orderOpen.PricingCoin) ||
+			strings.TrimSpace(orderOpen.Amount) != attempt.AmountValue {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("seller settlement finalization requires signed order amount or funding basis")
+		}
+	} else {
+		orderHash, hashErr := order.OrderOpenCanonicalHash()
+		if hashErr != nil || fundingBasis.OrderOpenHash != orderHash || fundingBasis.QuoteIssuer != buyerPeerID ||
+			fundingBasis.AuthorizationContextID != attempt.AuthorizationContextID ||
+			fundingBasis.PaymentAssetID != attempt.Currency || fundingBasis.BuyerPaymentTotal != attempt.AmountValue ||
+			fundingBasis.ExpiresAtUnix <= time.Now().UTC().Unix() {
+			return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
+		}
 	}
 	offers, err := paymentintent.ListCryptoPaymentAttemptSettlementKeyOffers(db, tenantID, attempt.AttemptID)
 	if err != nil {
@@ -368,9 +382,16 @@ func finalizeSellerSettlementAuthorization(
 	if payout.RailID != string(payoutRail) || strings.TrimSpace(payout.Address) == "" {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("seller settlement payout does not match attempt chain")
 	}
+	termsVersion := uint32(models.PaymentAttemptSettlementTermsVersion)
+	fundingBasisHash := ""
+	if fundingBasis != nil {
+		termsVersion = models.PaymentAttemptSettlementTermsQuoteBoundVersion
+		fundingBasisHash = attempt.FundingBasisHash
+	}
 	terms := models.PaymentAttemptSettlementTerms{
-		Version: models.PaymentAttemptSettlementTermsVersion, OrderID: attempt.OrderID,
+		Version: termsVersion, OrderID: attempt.OrderID,
 		AttemptID: attempt.AttemptID, AssetID: attempt.Currency, FundingAmount: attempt.AmountValue,
+		FundingBasisHash:     fundingBasisHash,
 		FundingTargetAddress: target.Address, RouteBindingID: route.RouteBindingID,
 		BuyerPeerID: buyerPeerID, SellerPeerID: sellerPeerID, ModeratorPeerID: attempt.ExpectedModeratorPeerID,
 		BuyerRefundAddress: buyerRefundAddress,
@@ -405,10 +426,7 @@ func finalizeSellerSettlementAuthorization(
 	if err := db.Where("tenant_id = ? AND attempt_id = ?", tenantID, attempt.AttemptID).First(&attempt).Error; err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("reload frozen seller settlement attempt: %w", err)
 	}
-	settlementAuthorization := models.PaymentAttemptSettlementAuthorization{
-		Version: models.SettlementAuthorizationVersion,
-		Terms:   terms, Target: target, Authorization: authorization,
-	}
+	settlementAuthorization := settlementAuthorizationForAttempt(terms, target, authorization, fundingBasis)
 	if _, _, err := settlementAuthorization.CanonicalBytesAndHash(); err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
@@ -439,10 +457,11 @@ func loadFrozenSellerSettlementFinalization(
 	if err := terms.VerifySellerAuthorization(attempt.SellerTermsSigner, attempt.SellerTermsSignature); err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
-	settlementAuthorization := models.PaymentAttemptSettlementAuthorization{
-		Version: models.SettlementAuthorizationVersion,
-		Terms:   *terms, Target: *target, Authorization: *authorization,
+	fundingBasis, err := attempt.GetFundingBasis()
+	if err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
+	settlementAuthorization := settlementAuthorizationForAttempt(*terms, *target, *authorization, fundingBasis)
 	if _, _, err := settlementAuthorization.CanonicalBytesAndHash(); err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
@@ -570,9 +589,19 @@ func adoptBuyerSettlementAuthorization(
 		authorization.Terms.SellerPeerID != sellerPeerID {
 		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("settlement authorization participants do not match signed order")
 	}
-	if !iwallet.CoinType(authorization.Terms.AssetID).MatchesPricingCurrency(orderOpen.PricingCoin) ||
-		authorization.Terms.FundingAmount != strings.TrimSpace(orderOpen.Amount) {
-		return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("buyer settlement adoption requires same-currency signed order amount")
+	if authorization.FundingBasis == nil {
+		if !iwallet.CoinType(authorization.Terms.AssetID).MatchesPricingCurrency(orderOpen.PricingCoin) ||
+			authorization.Terms.FundingAmount != strings.TrimSpace(orderOpen.Amount) {
+			return StandardOrderSettlementAuthorizationFinalization{}, fmt.Errorf("buyer settlement adoption requires signed order amount or funding basis")
+		}
+	} else {
+		orderHash, hashErr := order.OrderOpenCanonicalHash()
+		if hashErr != nil || authorization.FundingBasis.OrderOpenHash != orderHash ||
+			authorization.FundingBasis.QuoteIssuer != buyerPeerID ||
+			authorization.FundingBasis.PricingCurrency != strings.ToUpper(strings.TrimSpace(orderOpen.PricingCoin)) ||
+			authorization.FundingBasis.PricingAmount != strings.TrimSpace(orderOpen.Amount) {
+			return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
+		}
 	}
 	tenantID := strings.TrimSpace(order.TenantID)
 	var attempt models.PaymentAttempt
@@ -662,10 +691,11 @@ func loadMatchingFrozenSettlementFinalization(
 	if err != nil || bundle == nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, models.ErrPaymentAttemptSettlementTermsConflict
 	}
-	stored := models.PaymentAttemptSettlementAuthorization{
-		Version: models.SettlementAuthorizationVersion,
-		Terms:   *terms, Target: *target, Authorization: *bundle,
+	fundingBasis, err := attempt.GetFundingBasis()
+	if err != nil {
+		return StandardOrderSettlementAuthorizationFinalization{}, err
 	}
+	stored := settlementAuthorizationForAttempt(*terms, *target, *bundle, fundingBasis)
 	storedBytes, _, err := stored.CanonicalBytesAndHash()
 	if err != nil {
 		return StandardOrderSettlementAuthorizationFinalization{}, err
@@ -679,4 +709,19 @@ func loadMatchingFrozenSettlementFinalization(
 		Authorization: *bundle, SettlementAuthorization: stored,
 		SellerSignature: append([]byte(nil), attempt.SellerTermsSignature...),
 	}, nil
+}
+
+func settlementAuthorizationForAttempt(
+	terms models.PaymentAttemptSettlementTerms,
+	target models.PaymentAttemptFundingTarget,
+	bundle models.PaymentAttemptAuthorizationBundle,
+	fundingBasis *models.PaymentAttemptFundingBasis,
+) models.PaymentAttemptSettlementAuthorization {
+	version := uint32(models.SettlementAuthorizationVersion)
+	if fundingBasis != nil {
+		version = models.PaymentAttemptSettlementAuthorizationQuoteBoundVersion
+	}
+	return models.PaymentAttemptSettlementAuthorization{
+		Version: version, FundingBasis: fundingBasis, Terms: terms, Target: target, Authorization: bundle,
+	}
 }

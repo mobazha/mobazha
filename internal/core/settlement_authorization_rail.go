@@ -109,6 +109,11 @@ func (n *MobazhaNode) supportsStandardOrderSettlementAuthorization(coin iwallet.
 	return err == nil
 }
 
+func (n *MobazhaNode) supportsQuoteBoundSettlementAuthorization(coin iwallet.CoinType) bool {
+	_, err := n.standardOrderFundingTargetProjectorForRail(string(coin))
+	return err == nil
+}
+
 func (n *MobazhaNode) activateFrozenStandardOrderSettlementAttempt(
 	ctx context.Context,
 	finalization StandardOrderSettlementAuthorizationFinalization,

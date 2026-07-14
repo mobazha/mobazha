@@ -62,6 +62,7 @@ message OrderMessage {
         AFTER_SALE_DISPUTE_OPEN     = 15;
         SETTLEMENT_KEY_OFFER        = 16;
         SETTLEMENT_AUTHORIZATION    = 17;
+        SETTLEMENT_FUNDING_BASIS    = 18;
     }
 }
 

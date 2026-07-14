@@ -82,6 +82,7 @@ func (a PaymentAttemptSettlementAuthorization) Validate() error {
 	}
 	if a.FundingBasis != nil &&
 		(a.FundingBasis.OrderID != a.Terms.OrderID || a.FundingBasis.AttemptID != a.Terms.AttemptID ||
+			a.FundingBasis.AuthorizationContextID != a.Authorization.AuthorizationContextID ||
 			a.FundingBasis.PaymentAssetID != a.Terms.AssetID ||
 			a.FundingBasis.BuyerPaymentTotal != a.Terms.FundingAmount ||
 			a.Terms.FundingBasisHash != fundingBasisHash) {

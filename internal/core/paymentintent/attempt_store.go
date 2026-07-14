@@ -207,6 +207,14 @@ func deleteCryptoPaymentAttemptDraftOffers(tx *gorm.DB, tenantID, attemptID stri
 	if result.Error != nil {
 		return fmt.Errorf("delete frozen payment attempt draft offers: %w", result.Error)
 	}
+	// Older databases and focused v1 tests can legitimately lack the v2 inbox
+	// table. The attempt and participant offers are already frozen without it.
+	if tx.Migrator().HasTable(&models.PaymentAttemptFundingBasisProposalRecord{}) {
+		if err := tx.Where("tenant_id = ? AND attempt_id = ?", tenantID, attemptID).
+			Delete(&models.PaymentAttemptFundingBasisProposalRecord{}).Error; err != nil {
+			return fmt.Errorf("delete frozen payment attempt funding-basis proposal: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -294,6 +302,8 @@ func verifyFrozenCryptoAttempt(existing, expected models.PaymentAttempt) error {
 		existing.OrderID != expected.OrderID || existing.AmountValue != expected.AmountValue ||
 		existing.Currency != expected.Currency || existing.RouteBindingID != expected.RouteBindingID ||
 		existing.IdempotencyKey != expected.IdempotencyKey || existing.State != expected.State ||
+		existing.FundingBasisHash != expected.FundingBasisHash ||
+		string(existing.FundingBasis) != string(expected.FundingBasis) ||
 		existing.SettlementTermsHash != expected.SettlementTermsHash ||
 		string(existing.SettlementTerms) != string(expected.SettlementTerms) ||
 		existing.SellerTermsSigner != expected.SellerTermsSigner ||

@@ -30,6 +30,7 @@ type PaymentAttemptFundingBasis struct {
 	Version                       uint32 `json:"version"`
 	OrderID                       string `json:"orderID"`
 	AttemptID                     string `json:"attemptID"`
+	AuthorizationContextID        string `json:"authorizationContextID"`
 	OrderOpenHash                 string `json:"orderOpenHash"`
 	PricingCurrency               string `json:"pricingCurrency"`
 	PricingAmount                 string `json:"pricingAmount"`
@@ -74,6 +75,7 @@ func (b PaymentAttemptFundingBasis) CanonicalBytesAndHash() ([]byte, string, err
 func (b PaymentAttemptFundingBasis) Validate() error {
 	if b.Version != PaymentAttemptFundingBasisVersion ||
 		strings.TrimSpace(b.OrderID) == "" || strings.TrimSpace(b.AttemptID) == "" ||
+		!validSettlementAuthorizationContextID(b.AuthorizationContextID) ||
 		strings.TrimSpace(b.QuoteID) == "" || strings.TrimSpace(b.QuotePolicyVersion) == "" ||
 		strings.TrimSpace(b.QuoteIssuer) == "" {
 		return fmt.Errorf("invalid payment attempt funding basis identity")

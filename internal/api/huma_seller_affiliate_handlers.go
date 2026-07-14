@@ -4,6 +4,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -105,9 +106,10 @@ type publicSellerAffiliateLinkInput struct {
 }
 
 type publicSellerAffiliateSessionView struct {
-	ReferralSessionID string    `json:"referralSessionID"`
-	SellerPeerID      string    `json:"sellerPeerID"`
-	ExpiresAt         time.Time `json:"expiresAt"`
+	ReferralSessionID string                                 `json:"referralSessionID"`
+	SellerPeerID      string                                 `json:"sellerPeerID"`
+	ExpiresAt         time.Time                              `json:"expiresAt"`
+	Evidence          models.SellerAffiliateReferralEvidence `json:"evidence"`
 }
 
 type publicSellerAffiliateSessionOutput struct {
@@ -157,10 +159,15 @@ func (g *Gateway) registerNodeHumaSellerAffiliatePublicOperations(api huma.API) 
 		if err != nil {
 			return nil, sellerAffiliateOperationError(err)
 		}
+		evidence, err := sellerAffiliateSignedReferralEvidence(ctx, session)
+		if err != nil {
+			return nil, sellerAffiliateOperationError(err)
+		}
 		return &publicSellerAffiliateSessionOutput{Body: publicSellerAffiliateSessionView{
 			ReferralSessionID: session.ID,
 			SellerPeerID:      session.SellerPeerID,
 			ExpiresAt:         session.ExpiresAt.UTC(),
+			Evidence:          evidence,
 		}}, nil
 	})
 }
@@ -367,6 +374,37 @@ func sellerAffiliateStoreService(ctx context.Context) (contracts.SellerAffiliate
 		return nil, "", errSellerAffiliateUnavailable
 	}
 	return service, peerID, nil
+}
+
+func sellerAffiliateSignedReferralEvidence(ctx context.Context, session *models.AffiliateReferralSession) (models.SellerAffiliateReferralEvidence, error) {
+	node, ok := ctx.Value(nodeContextKey).(sellerAffiliateNode)
+	if !ok || node == nil || node.IdentityInfo() == nil {
+		return models.SellerAffiliateReferralEvidence{}, errSellerAffiliateUnavailable
+	}
+	network := models.SellerAffiliateNetworkMainnet
+	if node.IdentityInfo().UsingTestnet() {
+		network = models.SellerAffiliateNetworkTestnet
+	}
+	evidence, err := models.NewSellerAffiliateReferralEvidence(session, network)
+	if err != nil {
+		return models.SellerAffiliateReferralEvidence{}, err
+	}
+	signable, err := evidence.SignableBytes()
+	if err != nil {
+		return models.SellerAffiliateReferralEvidence{}, err
+	}
+	signature, publicKey, err := node.IdentityInfo().SignMessage(signable)
+	if err != nil {
+		return models.SellerAffiliateReferralEvidence{}, err
+	}
+	if !bytes.Equal(publicKey, evidence.IssuerPublicKey) {
+		return models.SellerAffiliateReferralEvidence{}, errors.New("seller affiliate signer does not match the active store Peer")
+	}
+	evidence.Signature = append([]byte(nil), signature...)
+	if err := evidence.Verify(session.SellerPeerID, network, time.Now().UTC()); err != nil {
+		return models.SellerAffiliateReferralEvidence{}, err
+	}
+	return evidence, nil
 }
 
 func sellerAffiliateUsablePublicLink(

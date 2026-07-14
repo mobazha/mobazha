@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	tnet "github.com/libp2p/go-libp2p-testing/net"
+	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/distribution"
@@ -22,13 +24,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type sellerAffiliateHTTPTestIdentity struct{ peerID peer.ID }
+type sellerAffiliateHTTPTestIdentity struct {
+	peerID     peer.ID
+	privateKey libp2pcrypto.PrivKey
+}
 
 func (i sellerAffiliateHTTPTestIdentity) GetNodeID() string { return i.peerID.String() }
 func (i sellerAffiliateHTTPTestIdentity) Identity() peer.ID { return i.peerID }
 func (sellerAffiliateHTTPTestIdentity) UsingTestnet() bool  { return true }
-func (sellerAffiliateHTTPTestIdentity) SignMessage([]byte) ([]byte, []byte, error) {
-	return nil, nil, nil
+func (i sellerAffiliateHTTPTestIdentity) SignMessage(payload []byte) ([]byte, []byte, error) {
+	signature, err := i.privateKey.Sign(payload)
+	if err != nil {
+		return nil, nil, err
+	}
+	publicKey, err := i.privateKey.GetPublic().Raw()
+	return signature, publicKey, err
 }
 func (sellerAffiliateHTTPTestIdentity) IsGlobalBanned(peer.ID) bool { return false }
 
@@ -134,18 +144,34 @@ func (s *sellerAffiliateHTTPTestService) CreateReferralSession(_ context.Context
 	if err != nil || link.Status != models.AffiliateLinkStatusActive || s.program == nil || s.program.Status != models.AffiliateProgramStatusActive {
 		return nil, models.ErrSellerAffiliateNotFound
 	}
+	window := time.Duration(s.program.AttributionWindowSeconds) * time.Second
+	if window <= 0 {
+		window = time.Hour
+	}
 	return &models.AffiliateReferralSession{
-		ID: "session-1", SellerPeerID: s.program.SellerPeerID,
-		IssuedAt: issuedAt, ExpiresAt: issuedAt.Add(time.Hour),
+		ID: "session-1", AffiliateLinkID: link.ID, ProgramID: link.ProgramID,
+		SellerPeerID: s.program.SellerPeerID, PromoterPeerID: link.PromoterPeerID,
+		CommissionRateBPSSnapshot:  linkCommissionRate(s.program),
+		PromoterPayoutDestinations: link.PromoterPayoutDestinations.Clone(),
+		IssuedAt:                   issuedAt, ExpiresAt: issuedAt.Add(window), CreatedAt: issuedAt,
 	}, nil
+}
+
+func linkCommissionRate(program *models.AffiliateProgram) uint32 {
+	if program == nil {
+		return 0
+	}
+	return program.CommissionRateBPS
 }
 
 func newSellerAffiliateHTTPTestServer(t *testing.T, service contracts.SellerAffiliateService) (*httptest.Server, peer.ID) {
 	t.Helper()
-	identity, err := tnet.RandIdentity()
+	privateKey, publicKey, err := libp2pcrypto.GenerateEd25519Key(rand.Reader)
+	require.NoError(t, err)
+	peerID, err := peer.IDFromPublicKey(publicKey)
 	require.NoError(t, err)
 	node := &sellerAffiliateHTTPTestNode{
-		identity: sellerAffiliateHTTPTestIdentity{peerID: identity.ID()},
+		identity: sellerAffiliateHTTPTestIdentity{peerID: peerID, privateKey: privateKey},
 		service:  service,
 	}
 	gateway := &Gateway{
@@ -162,7 +188,7 @@ func newSellerAffiliateHTTPTestServer(t *testing.T, service contracts.SellerAffi
 	outer.Mount("/", mustNewV1Router(t, gateway, false, false))
 	server := httptest.NewServer(outer)
 	t.Cleanup(server.Close)
-	return server, identity.ID()
+	return server, peerID
 }
 
 func sellerAffiliateHTTPRequest(t *testing.T, server *httptest.Server, method, path, body string) *http.Response {
@@ -254,6 +280,9 @@ func TestSellerAffiliatePublicLinkAndSessionResolveOnSelectedNode(t *testing.T) 
 		links: map[string]*models.AffiliateLink{"link-1": {
 			ID: "link-1", ProgramID: "program-1", PromoterPeerID: identity.ID().String(),
 			PublicToken: "public-token", Status: models.AffiliateLinkStatusActive,
+			PromoterPayoutDestinations: models.PayoutDestinationSet{Destinations: []models.PayoutDestination{
+				{RailID: "crypto:bip122:000000000019d6689c085ae165831e93:native", Address: "bc1qpromoter", Version: 1},
+			}},
 			CreatedAt: now, UpdatedAt: now,
 		}},
 	}
@@ -265,6 +294,14 @@ func TestSellerAffiliatePublicLinkAndSessionResolveOnSelectedNode(t *testing.T) 
 
 	session := sellerAffiliateHTTPRequest(t, server, http.MethodPost, "/v1/public/seller-affiliate-links/public-token/sessions", "")
 	require.Equal(t, http.StatusOK, session.StatusCode)
+	var sessionEnvelope struct {
+		Data publicSellerAffiliateSessionView `json:"data"`
+	}
+	require.NoError(t, json.NewDecoder(session.Body).Decode(&sessionEnvelope))
+	require.Equal(t, "session-1", sessionEnvelope.Data.ReferralSessionID)
+	require.NoError(t, sessionEnvelope.Data.Evidence.Verify(
+		selectedSellerPeerID.String(), models.SellerAffiliateNetworkTestnet, time.Now().UTC(),
+	))
 
 	service.links["link-1"].Status = models.AffiliateLinkStatusRevoked
 	revoked := sellerAffiliateHTTPRequest(t, server, http.MethodGet, "/v1/public/seller-affiliate-links/public-token", "")

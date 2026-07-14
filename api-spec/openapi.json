@@ -1972,6 +1972,9 @@
       "PublicSellerAffiliateSessionView": {
         "additionalProperties": false,
         "properties": {
+          "evidence": {
+            "$ref": "#/components/schemas/SellerAffiliateReferralEvidence"
+          },
           "expiresAt": {
             "format": "date-time",
             "type": "string"
@@ -1986,7 +1989,8 @@
         "required": [
           "referralSessionID",
           "sellerPeerID",
-          "expiresAt"
+          "expiresAt",
+          "evidence"
         ],
         "type": "object"
       },
@@ -2246,6 +2250,97 @@
           "orderKinds",
           "actions",
           "guestSupport"
+        ],
+        "type": "object"
+      },
+      "SellerAffiliateReferralEvidence": {
+        "additionalProperties": false,
+        "properties": {
+          "affiliateLinkID": {
+            "type": "string"
+          },
+          "attributionWindowSeconds": {
+            "format": "int64",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "commissionRateBPS": {
+            "format": "int32",
+            "maximum": 10000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "domain": {
+            "enum": [
+              "mobazha:seller-affiliate-referral:v1"
+            ],
+            "type": "string"
+          },
+          "expiresAtUnix": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "issuedAtUnix": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "issuerPublicKey": {
+            "contentEncoding": "base64",
+            "type": "string"
+          },
+          "network": {
+            "enum": [
+              "mainnet",
+              "testnet"
+            ],
+            "type": "string"
+          },
+          "policyVersion": {
+            "type": "string"
+          },
+          "programID": {
+            "type": "string"
+          },
+          "promoterPayoutDestinations": {
+            "$ref": "#/components/schemas/PayoutDestinationSet"
+          },
+          "promoterPeerID": {
+            "type": "string"
+          },
+          "referralSessionID": {
+            "type": "string"
+          },
+          "sellerPeerID": {
+            "type": "string"
+          },
+          "signature": {
+            "contentEncoding": "base64",
+            "type": "string"
+          },
+          "version": {
+            "enum": [
+              "1"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "version",
+          "network",
+          "referralSessionID",
+          "programID",
+          "policyVersion",
+          "affiliateLinkID",
+          "sellerPeerID",
+          "promoterPeerID",
+          "commissionRateBPS",
+          "attributionWindowSeconds",
+          "promoterPayoutDestinations",
+          "issuedAtUnix",
+          "expiresAtUnix",
+          "signature",
+          "issuerPublicKey"
         ],
         "type": "object"
       },

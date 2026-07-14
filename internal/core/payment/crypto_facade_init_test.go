@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/mobazha/mobazha/internal/database/dbstore"
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -46,20 +45,6 @@ func (s fakeCryptoStorePolicy) RemoveModerator(context.Context, *uint64, string)
 	return nil, nil
 }
 
-type noopRates struct{}
-
-func (noopRates) GetAllRates(base models.CurrencyCode, breakCache bool) (map[models.CurrencyCode]iwallet.Amount, error) {
-	panic("unexpected")
-}
-
-func (noopRates) GetRate(base models.CurrencyCode, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error) {
-	panic("unexpected GetRate — same-currency branch should skip conversion")
-}
-
-func (noopRates) LastUpdated(models.CurrencyCode) time.Time {
-	panic("unexpected LastUpdated")
-}
-
 func TestBuildPaymentSetupParamsFromOrder_SameCurrencyUsesOrderOpenNumeric(t *testing.T) {
 	coin := iwallet.CoinType("crypto:eip155:1:native")
 	if err := coin.ValidateCanonicalPaymentCoin(); err != nil {
@@ -71,7 +56,7 @@ func TestBuildPaymentSetupParamsFromOrder_SameCurrencyUsesOrderOpenNumeric(t *te
 		Amount:      "42",
 		PricingCoin: "ETH",
 	}
-	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", "", "", noopRates{})
+	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +73,7 @@ func TestBuildPaymentSetupParamsFromOrder_SameCurrencySuppliesSettlementAuthoriz
 	order := &models.Order{ID: models.OrderID("order.btc")}
 	open := &porderpb.OrderOpen{Amount: "30976", PricingCoin: "BTC"}
 
-	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", "", "", noopRates{})
+	got, err := buildPaymentSetupParamsFromOrder(order, open, coin, "", "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +101,6 @@ func TestBuildPaymentSetupParamsFromOrder_ForwardsRefundAddress(t *testing.T) {
 		"refund-address",
 		"",
 		"",
-		noopRates{},
 	)
 	if err != nil {
 		t.Fatal(err)

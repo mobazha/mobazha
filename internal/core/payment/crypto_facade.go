@@ -10,7 +10,6 @@ import (
 
 	peer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/mobazha/mobazha/internal/core/paymentintent"
-	"github.com/mobazha/mobazha/internal/wallet"
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/core/coreiface"
 	"github.com/mobazha/mobazha/pkg/database"
@@ -52,7 +51,6 @@ type CryptoPaymentFacade struct {
 	projector            *PaymentSessionProjector
 	orderSvc             contracts.OrderService
 	setupSvc             CryptoPaymentSetupService
-	exchange             contracts.ExchangeRateService
 	storePolicy          contracts.StorePolicyService
 	sellerPolicyResolver sellerStorePolicyResolver
 	settlementStarter    standardOrderSettlementAuthorizationStarter
@@ -95,7 +93,6 @@ func NewCryptoPaymentFacade(
 	db database.Database,
 	orderSvc contracts.OrderService,
 	setupSvc CryptoPaymentSetupService,
-	exchange contracts.ExchangeRateService,
 	storePolicy contracts.StorePolicyService,
 ) *CryptoPaymentFacade {
 	return &CryptoPaymentFacade{
@@ -103,7 +100,6 @@ func NewCryptoPaymentFacade(
 		projector:   NewPaymentSessionProjector(db),
 		orderSvc:    orderSvc,
 		setupSvc:    setupSvc,
-		exchange:    exchange,
 		storePolicy: storePolicy,
 		sellerPolicyResolver: dbSellerStorePolicyResolver{
 			db: db,
@@ -156,15 +152,30 @@ func (c *CryptoPaymentFacade) CreateSession(
 	if err != nil {
 		return nil, err
 	}
+	crossCurrency := !coin.MatchesPricingCurrency(orderOpen.PricingCoin)
 	v1Eligible := c.settlementEligible != nil && c.settlementEligible(coin) &&
 		standardOrderSettlementAuthorizationV1Eligible(coin, orderOpen)
 	v2Eligible := c.quoteBoundEligible != nil && c.quoteBoundEligible(coin) &&
 		standardOrderSettlementAuthorizationV2Eligible(coin, orderOpen, req.PaymentSelectionQuoteID)
+	if crossCurrency {
+		if strings.TrimSpace(req.PaymentSelectionQuoteID) == "" || strings.TrimSpace(req.AuthorizedPaymentAmount) == "" {
+			return nil, fmt.Errorf("%w: cross-currency crypto payment requires a resolved quote", ErrDealPaymentSelectionQuoteInvalid)
+		}
+		if !v2Eligible {
+			return nil, fmt.Errorf("%w: quote-bound settlement authorization is unavailable for rail %s", ErrProvisioningNotImplemented, coin)
+		}
+		if c.settlementStarter == nil {
+			return nil, fmt.Errorf("%w: quote-bound settlement authorization starter is unavailable", ErrProvisioningNotImplemented)
+		}
+		if !standardOrderSettlementAuthorizationEconomicEligible(order) {
+			return nil, fmt.Errorf("%w: quote-bound settlement authorization does not admit the order payment costs", ErrDealPaymentSelectionQuoteInvalid)
+		}
+	}
 	if c.settlementStarter != nil && (v1Eligible || v2Eligible) {
 		if standardOrderSettlementAuthorizationEconomicEligible(order) {
 			setupParams, err := buildPaymentSetupParamsFromOrder(
 				order, orderOpen, coin, req.PayerAddress, refundAddr, moderator,
-				req.AuthorizedPaymentAmount, c.exchange,
+				req.AuthorizedPaymentAmount,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("crypto facade: build settlement authorization params: %w", err)
@@ -187,7 +198,7 @@ func (c *CryptoPaymentFacade) CreateSession(
 	}
 
 	setupParams, err := buildPaymentSetupParamsFromOrder(order, orderOpen, coin,
-		req.PayerAddress, refundAddr, moderator, req.AuthorizedPaymentAmount, c.exchange)
+		req.PayerAddress, refundAddr, moderator, req.AuthorizedPaymentAmount)
 	if err != nil {
 		return nil, fmt.Errorf("crypto facade: build escrow params: %w", err)
 	}
@@ -234,8 +245,7 @@ func standardOrderUTXOAuthorizationEligible(coin iwallet.CoinType, orderOpen *po
 }
 
 // standardOrderSettlementAuthorizationV1Eligible is an explicit protocol
-// version gate, not a product rule. Quote-bound cross-currency attempts enter
-// only after authorization v2 is wired; until then they use an admitted route.
+// version gate, not a product rule. Quote-bound cross-currency attempts use v2.
 func standardOrderSettlementAuthorizationV1Eligible(coin iwallet.CoinType, orderOpen *porderpb.OrderOpen) bool {
 	if orderOpen == nil {
 		return false
@@ -520,17 +530,11 @@ func buildPaymentSetupParamsFromOrder(
 	coin iwallet.CoinType,
 	payerAddress, refundAddress, moderator string,
 	authorizedPaymentAmount string,
-	ex contracts.ExchangeRateService,
 ) (paypb.PaymentSetupParams, error) {
 	if order == nil {
 		return paypb.PaymentSetupParams{}, errors.New("order is nil")
 	}
 	orderAmount := iwallet.NewAmount(orderOpen.Amount)
-	pricingCoin := strings.ToUpper(orderOpen.PricingCoin)
-	paymentCoinCode, err := coin.PricingCurrencyCode()
-	if err != nil {
-		return paypb.PaymentSetupParams{}, fmt.Errorf("coin type pricing code: %w", err)
-	}
 
 	var amt uint64
 	if strings.TrimSpace(authorizedPaymentAmount) != "" {
@@ -539,33 +543,11 @@ func buildPaymentSetupParamsFromOrder(
 			return paypb.PaymentSetupParams{}, errors.New("authorized payment amount is invalid")
 		}
 		amt = quoted.Uint64()
-	} else if pricingCoin != "" && !coin.MatchesPricingCurrency(pricingCoin) {
-		// Cross-currency order: pricing coin differs from payment coin.
-		// ExchangeRateService is required; its adapter returns an informative error
-		// (not a panic) when the underlying provider is nil, so errors propagate
-		// cleanly to the caller as ErrExchangeRateUnavailable-wrapped messages.
-		if ex == nil {
-			return paypb.PaymentSetupParams{}, fmt.Errorf(
-				"%w: order priced in %s but payment coin is %s",
-				ErrExchangeRateUnavailable, pricingCoin, paymentCoinCode)
-		}
-		pricingCurrency, err := models.CurrencyDefinitions.Lookup(pricingCoin)
-		if err != nil {
-			return paypb.PaymentSetupParams{}, fmt.Errorf("unknown pricing currency %q: %w", pricingCoin, err)
-		}
-		paymentCurrency, err := models.CurrencyDefinitions.Lookup(paymentCoinCode)
-		if err != nil {
-			return paypb.PaymentSetupParams{}, fmt.Errorf("unknown payment currency %q: %w", paymentCoinCode, err)
-		}
-		converted, err := wallet.ConvertCurrencyAmount(
-			&models.CurrencyValue{Amount: orderAmount, Currency: pricingCurrency},
-			paymentCurrency,
-			ex,
+	} else if !coin.MatchesPricingCurrency(orderOpen.PricingCoin) {
+		return paypb.PaymentSetupParams{}, fmt.Errorf(
+			"%w: cross-currency crypto payment requires a resolved quote amount",
+			ErrDealPaymentSelectionQuoteInvalid,
 		)
-		if err != nil {
-			return paypb.PaymentSetupParams{}, fmt.Errorf("convert payment amount: %w", err)
-		}
-		amt = converted.Uint64()
 	} else {
 		amt = orderAmount.Uint64()
 	}

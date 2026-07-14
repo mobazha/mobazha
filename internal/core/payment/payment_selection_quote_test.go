@@ -249,7 +249,7 @@ func TestBuildPaymentSetupParamsFromOrder_UsesAuthorizedQuoteAmount(t *testing.T
 	open := &porderpb.OrderOpen{PricingCoin: "USD", Amount: "4900"}
 
 	params, err := buildPaymentSetupParamsFromOrder(
-		order, open, coin, "", "", "", "19600000000000000", nil,
+		order, open, coin, "", "", "", "19600000000000000",
 	)
 	require.NoError(t, err)
 	require.Equal(t, uint64(19600000000000000), params.Amount)

@@ -469,7 +469,7 @@ func (s *recordingFailingSetupService) GeneratePaymentSetup(
 	return nil, s.err
 }
 
-func TestCryptoPaymentFacade_CreateSession_CrossCurrencyUsesAdmittedConversionRoute(t *testing.T) {
+func TestCryptoPaymentFacade_CreateSession_CrossCurrencyRequiresQuoteBoundV2(t *testing.T) {
 	db, err := repo.MockDB()
 	require.NoError(t, err)
 	defer db.Close()
@@ -491,10 +491,9 @@ func TestCryptoPaymentFacade_CreateSession_CrossCurrencyUsesAdmittedConversionRo
 		})
 	}))
 
-	wantErr := errors.New("stop after recording legacy setup")
-	setup := &recordingFailingSetupService{err: wantErr}
+	setup := &recordingFailingSetupService{err: errors.New("legacy setup must not run")}
 	rates := &paymentSelectionRates{rate: iwallet.NewAmount("250000"), updatedAt: readyAt}
-	facade := NewCryptoPaymentFacade(db, nil, setup, rates, nil)
+	facade := NewCryptoPaymentFacade(db, nil, setup, nil)
 	starterCalls := 0
 	facade.SetStandardOrderSettlementAuthorizationEligibility(func(iwallet.CoinType) bool { return true })
 	facade.SetStandardOrderSettlementAuthorizationStarter(func(
@@ -508,11 +507,18 @@ func TestCryptoPaymentFacade_CreateSession_CrossCurrencyUsesAdmittedConversionRo
 	_, err = facade.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
 		OrderID: orderID, PaymentCoin: "crypto:eip155:1:native",
 	})
-	require.ErrorIs(t, err, wantErr)
-	require.Equal(t, 0, starterCalls, "unsupported cross-currency attempts must not enter the v1 authorization ceremony")
-	require.Equal(t, 1, setup.calls)
-	require.Equal(t, 1, rates.calls)
-	require.Equal(t, uint64(19600000000000000), setup.params.Amount)
+	require.ErrorIs(t, err, ErrDealPaymentSelectionQuoteInvalid)
+	require.Equal(t, 0, starterCalls)
+	require.Equal(t, 0, setup.calls)
+	require.Equal(t, 0, rates.calls)
+
+	_, err = facade.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
+		OrderID: orderID, PaymentCoin: "crypto:eip155:1:native",
+		PaymentSelectionQuoteID: "quote-v2", AuthorizedPaymentAmount: "19600000000000000",
+	})
+	require.ErrorIs(t, err, ErrProvisioningNotImplemented)
+	require.Equal(t, 0, starterCalls)
+	require.Equal(t, 0, setup.calls)
 }
 
 func TestCryptoPaymentFacade_CreateSession_CrossCurrencyUsesQuoteBoundV2Writer(t *testing.T) {
@@ -538,7 +544,7 @@ func TestCryptoPaymentFacade_CreateSession_CrossCurrencyUsesQuoteBoundV2Writer(t
 
 	wantErr := errors.New("stop after recording v2 writer")
 	setup := &recordingFailingSetupService{err: errors.New("legacy setup must not run")}
-	facade := NewCryptoPaymentFacade(db, nil, setup, nil, nil)
+	facade := NewCryptoPaymentFacade(db, nil, setup, nil)
 	facade.SetStandardOrderSettlementAuthorizationEligibility(func(iwallet.CoinType) bool { return true })
 	facade.SetQuoteBoundSettlementAuthorizationEligibility(func(iwallet.CoinType) bool { return true })
 	var started StandardOrderSettlementAuthorizationStartRequest

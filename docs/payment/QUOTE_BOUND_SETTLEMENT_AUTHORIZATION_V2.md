@@ -7,6 +7,8 @@ Current implementation boundary (2026-07-15):
 - the v1 route gate remains same-currency only;
 - a cross-currency request with an immutable payment-selection quote enters
   v2 only when the exact rail has a funding-target projector;
+- a missing quote, unresolved atomic quote amount, unavailable exact-rail v2
+  writer, or unsupported payment-cost policy fails before draft creation;
 - buyer Core publishes the canonical funding basis in a signed
   `SETTLEMENT_FUNDING_BASIS` order message before its key offer;
 - seller Core retains the proposal, verifies the signed order and buyer
@@ -34,9 +36,9 @@ signed OrderOpen
   -> retained PaymentAttemptSettlementAuthorization v2
 ```
 
-Pricing currency and payment currency do not need to match. A rail without v2
-must be routed before draft creation to an explicitly admitted conversion path;
-it must not start v1 and return a cross-currency implementation error.
+Pricing currency and payment currency do not need to match. Cross-currency
+session provisioning has one path: quote-bound v2. It never falls through to
+the legacy exchange-rate setup path.
 
 ## Canonical model
 
@@ -96,15 +98,16 @@ Quote expiry after `seller_authorized` does not invalidate the frozen attempt
 or restart recovery. Any quote, rail, amount, policy, or order change starts a
 new attempt.
 
-## Rollout contract
+## Development contract
 
-- Keep v1 canonical bytes and readers unchanged.
 - Gate new writers independently from v1 by exact-rail funding-target
   projector capability; never infer v2 support from another rail.
-- Keep v1 readers and canonical bytes unchanged.
-- Retain the admitted conversion route until each rail passes v2 conformance.
-- Rollback disables new v2 admission but continues reading and recovering
-  already authorized v2 attempts.
+- Same-currency attempts continue to use v1 because they do not require a
+  funding basis; this is protocol separation, not old-node compatibility.
+- Cross-currency requests without the complete local v2 capability fail
+  before creating an attempt, publishing offers, or exposing a target.
+- No mixed-version peer negotiation, legacy-node fallback, or historical
+  cross-currency attempt backfill is part of the development scope.
 
 Implemented protocol cases cover signed wire round trips, immutable proposal
 inbox semantics, stale and underfunded seller-rate rejection, v1/v2 downgrade

@@ -297,8 +297,11 @@ func TestStandardOrderUTXOAuthorizationEligible_RequiresSameCurrencyNativeUTXO(t
 	if standardOrderUTXOAuthorizationEligible(ethereum, &porderpb.OrderOpen{PricingCoin: "ETH"}) {
 		t.Fatal("EVM order must remain disabled until its attempt owner projector is implemented")
 	}
-	if !standardOrderSettlementAuthorizationEligible(ethereum, &porderpb.OrderOpen{PricingCoin: "ETH"}) {
+	if !standardOrderSettlementAuthorizationV1Eligible(ethereum, &porderpb.OrderOpen{PricingCoin: "ETH"}) {
 		t.Fatal("same-currency EVM order should be eligible after its runtime capability is present")
+	}
+	if standardOrderSettlementAuthorizationV1Eligible(ethereum, &porderpb.OrderOpen{PricingCoin: "USD"}) {
+		t.Fatal("cross-currency EVM order must remain outside the authorization ceremony and use the admitted conversion route")
 	}
 }
 

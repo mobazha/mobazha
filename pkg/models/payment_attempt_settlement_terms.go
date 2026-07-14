@@ -17,9 +17,11 @@ import (
 )
 
 const (
-	PaymentAttemptSettlementTermsVersion  = 1
-	DisputeScalingSellerAwardProRataFloor = "seller_award_pro_rata_floor"
-	settlementTermsSigningDomain          = "mobazha/payment-attempt-settlement-terms/v1\x00"
+	PaymentAttemptSettlementTermsVersion           = 1
+	PaymentAttemptSettlementTermsQuoteBoundVersion = 2
+	DisputeScalingSellerAwardProRataFloor          = "seller_award_pro_rata_floor"
+	settlementTermsSigningDomainV1                 = "mobazha/payment-attempt-settlement-terms/v1\x00"
+	settlementTermsSigningDomainV2                 = "mobazha/payment-attempt-settlement-terms/v2\x00"
 )
 
 var ErrPaymentAttemptSettlementTermsConflict = errors.New("payment attempt settlement terms conflict")
@@ -33,6 +35,7 @@ type PaymentAttemptSettlementTerms struct {
 	AttemptID            string                       `json:"attemptID"`
 	AssetID              string                       `json:"assetID"`
 	FundingAmount        string                       `json:"fundingAmount"`
+	FundingBasisHash     string                       `json:"fundingBasisHash,omitempty"`
 	FundingTargetAddress string                       `json:"fundingTargetAddress"`
 	RouteBindingID       string                       `json:"routeBindingID"`
 	BuyerPeerID          string                       `json:"buyerPeerID"`
@@ -86,13 +89,18 @@ func (t PaymentAttemptSettlementTerms) CanonicalBytesAndHash() ([]byte, string, 
 }
 
 func (t PaymentAttemptSettlementTerms) Validate() error {
-	if t.Version != PaymentAttemptSettlementTermsVersion ||
+	if (t.Version != PaymentAttemptSettlementTermsVersion &&
+		t.Version != PaymentAttemptSettlementTermsQuoteBoundVersion) ||
 		strings.TrimSpace(t.OrderID) == "" || strings.TrimSpace(t.AttemptID) == "" ||
 		strings.TrimSpace(t.AssetID) == "" || strings.TrimSpace(t.FundingTargetAddress) == "" ||
 		strings.TrimSpace(t.RouteBindingID) == "" ||
 		strings.TrimSpace(t.SellerAddress) == "" ||
 		strings.TrimSpace(t.DisputePolicy) != DisputeScalingSellerAwardProRataFloor {
 		return fmt.Errorf("invalid payment attempt settlement terms identity")
+	}
+	if (t.Version == PaymentAttemptSettlementTermsVersion && strings.TrimSpace(t.FundingBasisHash) != "") ||
+		(t.Version == PaymentAttemptSettlementTermsQuoteBoundVersion && !validCanonicalSHA256Hex(strings.TrimSpace(t.FundingBasisHash))) {
+		return fmt.Errorf("invalid payment attempt funding-basis commitment")
 	}
 	buyerPeerID := strings.TrimSpace(t.BuyerPeerID)
 	sellerPeerID := strings.TrimSpace(t.SellerPeerID)
@@ -231,8 +239,12 @@ func (t PaymentAttemptSettlementTerms) SellerSigningPayload() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	payload := make([]byte, 0, len(settlementTermsSigningDomain)+len(canonical))
-	payload = append(payload, settlementTermsSigningDomain...)
+	domain := settlementTermsSigningDomainV1
+	if t.Version == PaymentAttemptSettlementTermsQuoteBoundVersion {
+		domain = settlementTermsSigningDomainV2
+	}
+	payload := make([]byte, 0, len(domain)+len(canonical))
+	payload = append(payload, domain...)
 	payload = append(payload, canonical...)
 	return payload, nil
 }

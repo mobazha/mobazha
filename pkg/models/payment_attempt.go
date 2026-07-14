@@ -53,6 +53,10 @@ type PaymentAttempt struct {
 	RequiredConfs     int    `gorm:"column:required_confirmations;not null;default:0"`
 	FundingTarget     []byte `gorm:"column:funding_target;type:text"`
 	FundingTargetHash string `gorm:"column:funding_target_hash;size:64;not null;default:'';index"`
+	// FundingBasis is the canonical quote-bound derivation of AmountValue for
+	// cross-currency authorization v2. V1 attempts leave these fields empty.
+	FundingBasis     []byte `gorm:"column:funding_basis;type:text"`
+	FundingBasisHash string `gorm:"column:funding_basis_hash;size:64;not null;default:'';index"`
 	// AuthorizationContextID is the non-secret, immutable key-locating input
 	// for attempt-scoped Settlement participant keys.
 	AuthorizationContextID  string `gorm:"column:authorization_context_id;size:64;not null;default:'';uniqueIndex:idx_payment_attempt_authorization_context,priority:2,where:authorization_context_id <> ''"`
@@ -174,6 +178,55 @@ func (a *PaymentAttempt) validateAuthorizationBundle(bundle PaymentAttemptAuthor
 
 func (PaymentAttempt) TableName() string { return "payment_attempts" }
 
+// SetFundingBasis freezes the quote-bound amount derivation on this attempt.
+// Retrying with byte-identical facts is idempotent; mutation is rejected.
+func (a *PaymentAttempt) SetFundingBasis(basis PaymentAttemptFundingBasis) error {
+	if a == nil || a.Kind != PaymentAttemptKindCryptoFundingTarget {
+		return fmt.Errorf("funding bases require a crypto payment attempt")
+	}
+	if basis.OrderID != a.OrderID || basis.AttemptID != a.AttemptID || basis.PaymentAssetID != a.Currency ||
+		(strings.TrimSpace(a.AmountValue) != "" && basis.BuyerPaymentTotal != a.AmountValue) {
+		return ErrPaymentAttemptSettlementTermsConflict
+	}
+	canonical, hash, err := basis.CanonicalBytesAndHash()
+	if err != nil {
+		return err
+	}
+	if len(a.FundingBasis) > 0 || strings.TrimSpace(a.FundingBasisHash) != "" {
+		if string(a.FundingBasis) != string(canonical) || a.FundingBasisHash != hash {
+			return ErrPaymentAttemptSettlementTermsConflict
+		}
+		return nil
+	}
+	if len(a.SettlementTerms) > 0 || strings.TrimSpace(a.SettlementTermsHash) != "" {
+		return ErrPaymentAttemptSettlementTermsConflict
+	}
+	a.FundingBasis = canonical
+	a.FundingBasisHash = hash
+	return nil
+}
+
+// GetFundingBasis decodes and verifies the immutable attempt funding basis.
+func (a *PaymentAttempt) GetFundingBasis() (*PaymentAttemptFundingBasis, error) {
+	if a == nil || len(a.FundingBasis) == 0 {
+		return nil, nil
+	}
+	var basis PaymentAttemptFundingBasis
+	if err := json.Unmarshal(a.FundingBasis, &basis); err != nil {
+		return nil, fmt.Errorf("decode payment attempt funding basis: %w", err)
+	}
+	canonical, hash, err := basis.CanonicalBytesAndHash()
+	if err != nil {
+		return nil, err
+	}
+	if string(canonical) != string(a.FundingBasis) || hash != strings.TrimSpace(a.FundingBasisHash) ||
+		basis.OrderID != a.OrderID || basis.AttemptID != a.AttemptID || basis.PaymentAssetID != a.Currency ||
+		(strings.TrimSpace(a.AmountValue) != "" && basis.BuyerPaymentTotal != a.AmountValue) {
+		return nil, ErrPaymentAttemptSettlementTermsConflict
+	}
+	return &basis, nil
+}
+
 // SetSettlementTerms freezes canonical settlement terms on an attempt. A
 // retry may supply the same terms, but changing an already-frozen hash fails.
 func (a *PaymentAttempt) SetSettlementTerms(terms PaymentAttemptSettlementTerms) error {
@@ -191,6 +244,9 @@ func (a *PaymentAttempt) SetSettlementTerms(terms PaymentAttemptSettlementTerms)
 	}
 	canonical, hash, err := terms.CanonicalBytesAndHash()
 	if err != nil {
+		return err
+	}
+	if err := a.validateSettlementTermsFundingBasis(terms); err != nil {
 		return err
 	}
 	existingHash := strings.TrimSpace(a.SettlementTermsHash)
@@ -224,7 +280,28 @@ func (a *PaymentAttempt) GetSettlementTerms() (*PaymentAttemptSettlementTerms, e
 	if terms.AttemptID != a.AttemptID || terms.OrderID != a.OrderID {
 		return nil, ErrPaymentAttemptSettlementTermsConflict
 	}
+	if err := a.validateSettlementTermsFundingBasis(terms); err != nil {
+		return nil, err
+	}
 	return &terms, nil
+}
+
+func (a *PaymentAttempt) validateSettlementTermsFundingBasis(terms PaymentAttemptSettlementTerms) error {
+	if terms.Version == PaymentAttemptSettlementTermsVersion {
+		if len(a.FundingBasis) != 0 || strings.TrimSpace(a.FundingBasisHash) != "" {
+			return ErrPaymentAttemptSettlementTermsConflict
+		}
+		return nil
+	}
+	basis, err := a.GetFundingBasis()
+	if err != nil {
+		return err
+	}
+	if basis == nil || terms.FundingBasisHash != a.FundingBasisHash ||
+		terms.AssetID != basis.PaymentAssetID || terms.FundingAmount != basis.BuyerPaymentTotal {
+		return ErrPaymentAttemptSettlementTermsConflict
+	}
+	return nil
 }
 
 // SetSellerTermsAuthorization freezes a verified seller identity signature for

@@ -57,6 +57,17 @@ func TestPaymentAttemptSettlementTerms_CanonicalHashIsStable(t *testing.T) {
 	require.Len(t, firstHash, 64)
 }
 
+func TestPaymentAttemptSettlementTerms_V1CanonicalEncodingRemainsCompatible(t *testing.T) {
+	terms := validPaymentAttemptSettlementTerms()
+	canonical, _, err := terms.CanonicalBytesAndHash()
+	require.NoError(t, err)
+	require.NotContains(t, string(canonical), "fundingBasisHash")
+
+	payload, err := terms.SellerSigningPayload()
+	require.NoError(t, err)
+	require.Equal(t, append([]byte(settlementTermsSigningDomainV1), canonical...), payload)
+}
+
 func TestPaymentAttemptSettlementTerms_ValidatesOptionalLegacyCompatibleEVMRefundAddress(t *testing.T) {
 	terms := validPaymentAttemptSettlementTerms()
 	terms.BuyerRefundAddress = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"

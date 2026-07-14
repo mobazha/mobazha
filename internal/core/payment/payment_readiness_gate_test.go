@@ -13,8 +13,11 @@ import (
 	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
+	porderpb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	pkpayment "github.com/mobazha/mobazha/pkg/payment"
+	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type rejectingProvisioningPolicy struct{ err error }
@@ -449,4 +452,65 @@ type panicSetupService struct {
 func (p panicSetupService) GeneratePaymentSetup(context.Context, pkpayment.PaymentSetupParams) (*pkpayment.PaymentSetupResult, error) {
 	p.t.Fatal("GeneratePaymentSetup must not run when payment is not ready")
 	return nil, nil
+}
+
+type recordingFailingSetupService struct {
+	calls  int
+	params pkpayment.PaymentSetupParams
+	err    error
+}
+
+func (s *recordingFailingSetupService) GeneratePaymentSetup(
+	_ context.Context,
+	params pkpayment.PaymentSetupParams,
+) (*pkpayment.PaymentSetupResult, error) {
+	s.calls++
+	s.params = params
+	return nil, s.err
+}
+
+func TestCryptoPaymentFacade_CreateSession_CrossCurrencyUsesAdmittedConversionRoute(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	const orderID = "QmCrossCurrencyConversionRoute"
+	readyAt := time.Now()
+	raw, err := (protojson.MarshalOptions{}).Marshal(&porderpb.OrderOpen{
+		PricingCoin: "USD",
+		Amount:      "4900",
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&models.Order{}); err != nil {
+			return err
+		}
+		return tx.Save(&models.Order{
+			ID: models.OrderID(orderID), MyRole: string(models.RoleBuyer), Open: true,
+			PaymentReadyAt: &readyAt, SerializedOrderOpen: raw,
+		})
+	}))
+
+	wantErr := errors.New("stop after recording legacy setup")
+	setup := &recordingFailingSetupService{err: wantErr}
+	rates := &paymentSelectionRates{rate: iwallet.NewAmount("250000"), updatedAt: readyAt}
+	facade := NewCryptoPaymentFacade(db, nil, setup, rates, nil)
+	starterCalls := 0
+	facade.SetStandardOrderSettlementAuthorizationEligibility(func(iwallet.CoinType) bool { return true })
+	facade.SetStandardOrderSettlementAuthorizationStarter(func(
+		context.Context,
+		StandardOrderSettlementAuthorizationStartRequest,
+	) error {
+		starterCalls++
+		return nil
+	})
+
+	_, err = facade.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
+		OrderID: orderID, PaymentCoin: "crypto:eip155:1:native",
+	})
+	require.ErrorIs(t, err, wantErr)
+	require.Equal(t, 0, starterCalls, "unsupported cross-currency attempts must not enter the v1 authorization ceremony")
+	require.Equal(t, 1, setup.calls)
+	require.Equal(t, 1, rates.calls)
+	require.Equal(t, uint64(19600000000000000), setup.params.Amount)
 }

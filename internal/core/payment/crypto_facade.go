@@ -145,10 +145,8 @@ func (c *CryptoPaymentFacade) CreateSession(
 	if err != nil {
 		return nil, err
 	}
-	if c.settlementStarter != nil && c.settlementEligible != nil && c.settlementEligible(coin) {
-		if !standardOrderSettlementAuthorizationEligible(coin, orderOpen) {
-			return nil, fmt.Errorf("crypto facade: cross-currency settlement authorization is not implemented")
-		}
+	if c.settlementStarter != nil && c.settlementEligible != nil && c.settlementEligible(coin) &&
+		standardOrderSettlementAuthorizationV1Eligible(coin, orderOpen) {
 		if standardOrderSettlementAuthorizationEconomicEligible(order) {
 			setupParams, err := buildPaymentSetupParamsFromOrder(
 				order, orderOpen, coin, req.PayerAddress, refundAddr, moderator,
@@ -218,10 +216,13 @@ func standardOrderSettlementAuthorizationStartRequest(
 }
 
 func standardOrderUTXOAuthorizationEligible(coin iwallet.CoinType, orderOpen *porderpb.OrderOpen) bool {
-	return standardOrderNativeUTXORail(coin) && standardOrderSettlementAuthorizationEligible(coin, orderOpen)
+	return standardOrderNativeUTXORail(coin) && standardOrderSettlementAuthorizationV1Eligible(coin, orderOpen)
 }
 
-func standardOrderSettlementAuthorizationEligible(coin iwallet.CoinType, orderOpen *porderpb.OrderOpen) bool {
+// standardOrderSettlementAuthorizationV1Eligible is an explicit protocol
+// version gate, not a product rule. Quote-bound cross-currency attempts enter
+// only after authorization v2 is wired; until then they use an admitted route.
+func standardOrderSettlementAuthorizationV1Eligible(coin iwallet.CoinType, orderOpen *porderpb.OrderOpen) bool {
 	if orderOpen == nil {
 		return false
 	}

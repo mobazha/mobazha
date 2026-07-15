@@ -39,7 +39,9 @@ import (
 	privy "github.com/mobazha/mobazha/internal/payment/embeddedwallet/privy"
 	fiat "github.com/mobazha/mobazha/internal/payment/fiat"
 	"github.com/mobazha/mobazha/internal/payment/onramp"
+	onrampcdp "github.com/mobazha/mobazha/internal/payment/onramp/cdp"
 	onrampmock "github.com/mobazha/mobazha/internal/payment/onramp/mock"
+	onrampmoonpay "github.com/mobazha/mobazha/internal/payment/onramp/moonpay"
 	"github.com/mobazha/mobazha/internal/repo"
 	nodeVersion "github.com/mobazha/mobazha/internal/version"
 	webhookinternal "github.com/mobazha/mobazha/internal/webhook"
@@ -1554,8 +1556,86 @@ func initBuyerFundingSubsystem(obNode *MobazhaNode) {
 	obNode.onrampRegistry = onramp.NewRegistry()
 	obNode.onrampFundingService = corePmt.NewOnrampFundingAppService(obNode.db, obNode.onrampRegistry)
 	registerDevMockOnrampProvider(obNode)
+	registerMoonPayOnrampProvider(obNode)
+	registerCDPOnrampProvider(obNode)
 	registerDevPrivyProvider(obNode)
 	logger.LogInfoWithID(log, obNode.nodeID, "Buyer funding subsystem initialized (embedded wallet + onramp registries, fail-closed)")
+}
+
+// registerMoonPayOnrampProvider registers the MoonPay onramp module (phase-1
+// rest-of-world rail), gated on MOBAZHA_MOONPAY_PUBLISHABLE_KEY +
+// MOBAZHA_MOONPAY_SECRET_KEY + MOBAZHA_MOONPAY_RAILS
+// ("railID=currencyCode[:FIAT|FIAT],..."). Unset env => no-op, the registry
+// stays fail-closed. MOBAZHA_MOONPAY_SANDBOX=1 targets MoonPay's sandbox
+// widget and API. Delivery goes directly to the frozen funding target; the
+// buyer's card/KYC step happens on MoonPay's hosted page.
+func registerMoonPayOnrampProvider(obNode *MobazhaNode) {
+	pk := strings.TrimSpace(os.Getenv("MOBAZHA_MOONPAY_PUBLISHABLE_KEY"))
+	sk := strings.TrimSpace(os.Getenv("MOBAZHA_MOONPAY_SECRET_KEY"))
+	rawRails := strings.TrimSpace(os.Getenv("MOBAZHA_MOONPAY_RAILS"))
+	if pk == "" || sk == "" || rawRails == "" {
+		return
+	}
+	rails, err := onrampmoonpay.ParseRails(rawRails)
+	if err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "BuyerFunding: MoonPay onramp not registered: %v", err)
+		return
+	}
+	widgetURL, apiURL := "", ""
+	if os.Getenv("MOBAZHA_MOONPAY_SANDBOX") == "1" {
+		widgetURL = "https://buy-sandbox.moonpay.com"
+		apiURL = "https://api.moonpay.com" // sandbox shares the API host; sandbox keys select the environment
+	}
+	provider, err := onrampmoonpay.New(onrampmoonpay.Config{
+		PublishableKey: pk,
+		SecretKey:      sk,
+		WidgetBaseURL:  widgetURL,
+		Rails:          rails,
+		Client:         onrampmoonpay.NewHTTPClient(sk, pk, apiURL),
+	})
+	if err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "BuyerFunding: MoonPay onramp not registered: %v", err)
+		return
+	}
+	obNode.onrampRegistry.Register(provider)
+	logger.LogInfoWithIDf(log, obNode.nodeID,
+		"BuyerFunding: MoonPay onramp provider registered for rails [%s]", rawRails)
+}
+
+// registerCDPOnrampProvider registers the Coinbase Onramp module (phase-1 US
+// rail with guest checkout), gated on MOBAZHA_CDP_ONRAMP_KEY_ID +
+// MOBAZHA_CDP_ONRAMP_KEY_SECRET + MOBAZHA_CDP_ONRAMP_RAILS
+// ("railID=ASSET:network[:FIAT|FIAT],..."). Unset env => no-op. NOTE: until
+// the CDP API-key JWT authenticator lands (pending the sandbox pass), every
+// provider call fails with a clear error — resolvable but fail-closed, so
+// configuring rails early cannot produce a broken buyer checkout.
+func registerCDPOnrampProvider(obNode *MobazhaNode) {
+	keyID := strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_KEY_ID"))
+	keySecret := strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_KEY_SECRET"))
+	rawRails := strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_RAILS"))
+	if keyID == "" || keySecret == "" || rawRails == "" {
+		return
+	}
+	rails, err := onrampcdp.ParseRails(rawRails)
+	if err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "BuyerFunding: CDP onramp not registered: %v", err)
+		return
+	}
+	// TODO(sandbox): swap UnimplementedAuthenticator for the real API-key JWT
+	// signer once dev keys exist; keyID/keySecret are read now so the config
+	// surface is final.
+	provider, err := onrampcdp.New(onrampcdp.Config{
+		RedirectURL: strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_REDIRECT_URL")),
+		Rails:       rails,
+		Client:      onrampcdp.NewHTTPClient(onrampcdp.UnimplementedAuthenticator{}, ""),
+	})
+	if err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "BuyerFunding: CDP onramp not registered: %v", err)
+		return
+	}
+	obNode.onrampRegistry.Register(provider)
+	logger.LogWarningWithIDf(log, obNode.nodeID,
+		"BuyerFunding: CDP onramp provider registered for rails [%s] — JWT authenticator pending, calls fail closed", rawRails)
 }
 
 // registerDevPrivyProvider registers the real Privy embedded-wallet provider for

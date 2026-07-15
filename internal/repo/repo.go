@@ -19,7 +19,6 @@ import (
 	"github.com/mobazha/mobazha/internal/database/dbstore"
 	"github.com/mobazha/mobazha/internal/version"
 	"github.com/mobazha/mobazha/pkg/database"
-	pkgidentity "github.com/mobazha/mobazha/pkg/identity"
 	"github.com/mobazha/mobazha/pkg/logging"
 	"github.com/mobazha/mobazha/pkg/models"
 	iwallet "github.com/mobazha/mobazha/pkg/wallet-interface"
@@ -106,11 +105,11 @@ func NewRepoWithSharedDB(nodeID string, dataDir string, sharedDB *gorm.DB, ident
 		return nil, fmt.Errorf("failed to create data directory %s: %w", dataDir, err)
 	}
 
-	publicDataNamespace, err := sharedPublicDataNamespace(nodeID, identityKey)
-	if err != nil {
-		return nil, err
-	}
-	pd := dbstore.NewDBPublicData(sharedDB, publicDataNamespace)
+	// Shared-DB SaaS nodes keep every physical row, including publishable
+	// catalog data, inside the hosted tenant partition. The store Peer remains
+	// the signed business identity and cross-deployment routing key; it is not a
+	// replacement for the SaaS database tenant.
+	pd := dbstore.NewDBPublicData(sharedDB, nodeID)
 	db, err := dbstore.NewTenantDBWithPublicData(sharedDB, nodeID, pd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tenant DB: %w", err)
@@ -162,24 +161,6 @@ func NewRepoWithSharedDB(nodeID string, dataDir string, sharedDB *gorm.DB, ident
 	}
 
 	return &Repo{dataDir: dataDir, db: db}, nil
-}
-
-// sharedPublicDataNamespace keeps private SaaS rows tenant-scoped while
-// publishing catalog/profile data under the store's stable Peer identity.
-// Standalone and shared-DB nodes therefore expose the same public namespace.
-func sharedPublicDataNamespace(nodeID string, identityKey []byte) (string, error) {
-	if len(identityKey) == 0 {
-		return nodeID, nil
-	}
-	keyPair, err := pkgidentity.KeyPairFromMarshaledPrivateKey(identityKey)
-	if err != nil {
-		return "", fmt.Errorf("derive public data namespace: %w", err)
-	}
-	peerID, err := pkgidentity.PeerIDFromPublicKey(keyPair.PubKey)
-	if err != nil {
-		return "", fmt.Errorf("derive public data namespace: %w", err)
-	}
-	return peerID.String(), nil
 }
 
 // DB returns the database implementation.

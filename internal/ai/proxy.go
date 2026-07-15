@@ -26,6 +26,18 @@ type GenerateRequest struct {
 	BrandDesc   string          `json:"brandDescription,omitempty"`
 	StoreConfig json.RawMessage `json:"storeConfig,omitempty"`
 	Instruction string          `json:"instruction,omitempty"`
+	// Products is a sample of the seller's real catalog so generated
+	// configs can reference actual listings instead of placeholders.
+	Products []StoreProductContext `json:"products,omitempty"`
+	// rewrite_text fields:
+	Text    string `json:"text,omitempty"`
+	Context string `json:"context,omitempty"`
+}
+
+// StoreProductContext is a minimal catalog entry passed to generate_store.
+type StoreProductContext struct {
+	Slug  string `json:"slug"`
+	Title string `json:"title"`
 }
 
 // GenerateResponse mirrors the frontend AiGenerateResponse.
@@ -36,6 +48,7 @@ type GenerateResponse struct {
 	Categories       []string        `json:"categories,omitempty"`
 	ShortDescription string          `json:"shortDescription,omitempty"`
 	StoreConfig      json.RawMessage `json:"storeConfig,omitempty"`
+	Text             string          `json:"text,omitempty"`
 }
 
 // Proxy handles proxying AI requests to an OpenAI-compatible or Anthropic API.
@@ -484,7 +497,7 @@ const storeBuilderSystemPrompt = `You are an expert e-commerce store designer. C
 Each section: { "id": "unique-string", "type": "...", "props": {...}, "visible": true }
 
 - hero: { "title": str, "subtitle": str?, "ctaText": str?, "height": "sm"|"md"|"lg", "textAlign": "left"|"center"|"right", "overlayOpacity": 0-1 }
-- featured-products: { "title": str, "mode": "newest"|"popular"|"manual", "count": 3|4, "columns": 2|3|4 }
+- featured-products: { "title": str, "mode": "newest"|"popular"|"manual", "productSlugs": [str] (required when mode is "manual"; only slugs from the provided catalog), "count": 3|4, "columns": 2|3|4 }
 - product-grid: { "title": str?, "showFilters": bool, "showSearch": bool, "columns": 2|3|4, "sortDefault": "newest"|"price-asc"|"price-desc"|"name" }
 - announcement-bar: { "text": str, "dismissible": bool }
 - trust-badges: { "badges": [{"icon": "escrow"|"crypto"|"selfHosted"|"p2p"|"privacy", "title": str, "description": str}], "layout": "horizontal"|"grid", "style": "minimal"|"card"|"illustrated" }
@@ -614,14 +627,48 @@ Return ONLY valid JSON, no markdown fences.`, langInstruction, req.Title, descCt
 		if req.BrandName == "" {
 			return nil, fmt.Errorf("brandName is required for generate_store")
 		}
+		catalogCtx := ""
+		if len(req.Products) > 0 {
+			maxProducts := 20
+			if len(req.Products) < maxProducts {
+				maxProducts = len(req.Products)
+			}
+			var sb strings.Builder
+			for _, p := range req.Products[:maxProducts] {
+				fmt.Fprintf(&sb, "- slug: %q, title: %q\n", p.Slug, p.Title)
+			}
+			catalogCtx = fmt.Sprintf(`
+
+The seller's actual catalog (sample):
+%s
+Use this catalog: write hero/about copy that matches what the store really sells, and for the featured-products section prefer {"mode": "manual", "productSlugs": [4-8 slugs picked from the list above]} choosing the most representative items. Never invent slugs that are not in the list.`, sb.String())
+		}
 		return []chatMessage{
 			{Role: "system", Content: storeBuilderSystemPrompt},
 			{Role: "user", Content: fmt.Sprintf(`Create a store design for this brand. %s
 
 Brand name: "%s"
-Brand description: "%s"
+Brand description: "%s"%s
 
-Return ONLY valid JSON matching the StoreConfig schema above.`, langInstruction, req.BrandName, req.BrandDesc)},
+Return ONLY valid JSON matching the StoreConfig schema above.`, langInstruction, req.BrandName, req.BrandDesc, catalogCtx)},
+		}, nil
+
+	case "rewrite_text":
+		if req.Text == "" {
+			return nil, fmt.Errorf("text is required for rewrite_text")
+		}
+		fieldCtx := req.Context
+		if fieldCtx == "" {
+			fieldCtx = "storefront copy"
+		}
+		return []chatMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: fmt.Sprintf(`Rewrite this %s to be more compelling and on-brand. Keep roughly the same length, plain text only (no HTML, no markdown). %s
+
+Current text: "%s"
+
+Return JSON: { "text": "rewritten text" }
+Return ONLY valid JSON, no markdown fences.`, fieldCtx, langInstruction, req.Text)},
 		}, nil
 
 	case "refine_store":

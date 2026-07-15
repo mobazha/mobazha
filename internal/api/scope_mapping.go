@@ -90,6 +90,8 @@ var routeScopeMap = []routeScope{
 	{"PUT /v1/settings", contracts.ScopeSettingsWrite},
 	{"POST /v1/settings", contracts.ScopeSettingsWrite},
 	{"PATCH /v1/settings", contracts.ScopeSettingsWrite},
+	// storefront draft discard (PG-203 draft/publish workflow)
+	{"DELETE /v1/settings", contracts.ScopeSettingsWrite},
 	{"GET /v1/preferences", contracts.ScopeSettingsRead},
 	{"PUT /v1/preferences", contracts.ScopeSettingsWrite},
 	{"POST /v1/preferences", contracts.ScopeSettingsWrite},

@@ -372,6 +372,7 @@ func TestNodeOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"settings-storefront-get",
 		"settings-storefront-public-get",
 		"settings-storefront-put",
+		"settings-storefront-draft-delete",
 		"shipping-locations-get",
 		"shipping-locations-id-delete",
 		"shipping-locations-id-get",

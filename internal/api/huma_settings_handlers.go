@@ -168,10 +168,34 @@ func (g *Gateway) registerNodeHumaSettingsAdminOperations(api huma.API) {
 		Summary:     "Get storefront branding (seller)",
 		Tags:        []string{"settings"},
 		Security:    nodeAuthSecurity,
-	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
-		req := nodeBridgeRequest(ctx, http.MethodGet, "/v1/settings/storefront", nil)
+	}, func(ctx context.Context, in *struct {
+		Variant string `query:"variant" enum:"draft," doc:"Read the unpublished draft slot instead of the live config"`
+	}) (*nodeDataOutput, error) {
+		rawURL := "/v1/settings/storefront"
+		if in.Variant == "draft" {
+			rawURL += "?variant=draft"
+		}
+		req := nodeBridgeRequest(ctx, http.MethodGet, rawURL, nil)
 		rr := httptest.NewRecorder()
 		g.handleGETStorefrontConfig(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "settings-storefront-draft-delete",
+		Method:      http.MethodDelete,
+		Path:        "/v1/settings/storefront/draft",
+		Summary:     "Discard storefront branding draft",
+		Tags:        []string{"settings"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodDelete, "/v1/settings/storefront/draft", nil)
+		rr := httptest.NewRecorder()
+		g.handleDELETEStorefrontDraft(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

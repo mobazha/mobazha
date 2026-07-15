@@ -19,4 +19,7 @@ const (
 	SettingsKeyNotificationChannels = "notification_channels"
 	SettingsKeyAIConfig             = "ai_config"
 	SettingsKeyStoreConfig          = "store_config"
+	// SettingsKeyStoreConfigDraft holds the seller's unpublished storefront
+	// draft; the public endpoint never reads this slot.
+	SettingsKeyStoreConfigDraft = "store_config_draft"
 )

@@ -205,7 +205,10 @@ func (n *MobazhaNode) EventBus() events.Bus {
 // StoreConfig reads the storefront branding config from the database.
 func (n *MobazhaNode) StoreConfig() (json.RawMessage, error) {
 	val, err := n.getSetting(models.SettingsKeyStoreConfig)
-	if err != nil || val == "" {
+	if err != nil {
+		return nil, err
+	}
+	if val == "" {
 		return nil, nil
 	}
 	return json.RawMessage(val), nil
@@ -214,6 +217,50 @@ func (n *MobazhaNode) StoreConfig() (json.RawMessage, error) {
 // SaveStoreConfig persists the storefront branding config.
 func (n *MobazhaNode) SaveStoreConfig(cfg json.RawMessage) error {
 	if err := n.saveSetting(models.SettingsKeyStoreConfig, string(cfg)); err != nil {
+		return err
+	}
+	if n.eventBus != nil {
+		n.eventBus.Emit(&events.StorefrontChanged{Config: cfg})
+	}
+	return nil
+}
+
+// StoreDraftConfig reads the unpublished storefront draft, if any.
+// Read errors propagate — folding them into "no draft" would let the editor
+// silently overwrite a stored draft after a transient DB failure.
+func (n *MobazhaNode) StoreDraftConfig() (json.RawMessage, error) {
+	val, err := n.getSetting(models.SettingsKeyStoreConfigDraft)
+	if err != nil {
+		return nil, err
+	}
+	if val == "" {
+		return nil, nil
+	}
+	return json.RawMessage(val), nil
+}
+
+// SaveStoreDraftConfig persists the storefront draft. Drafts never emit
+// StorefrontChanged — they must not propagate to public caches.
+func (n *MobazhaNode) SaveStoreDraftConfig(cfg json.RawMessage) error {
+	return n.saveSetting(models.SettingsKeyStoreConfigDraft, string(cfg))
+}
+
+// DeleteStoreDraftConfig discards the storefront draft.
+func (n *MobazhaNode) DeleteStoreDraftConfig() error {
+	return n.saveSetting(models.SettingsKeyStoreConfigDraft, "")
+}
+
+// PublishStoreConfig replaces the live storefront config and clears the
+// draft slot in ONE transaction, so a partial failure can never leave the
+// live config replaced with a stale draft still pending.
+func (n *MobazhaNode) PublishStoreConfig(cfg json.RawMessage) error {
+	err := n.db.Update(func(tx database.Tx) error {
+		if err := tx.Save(&models.NodeSettings{Key: models.SettingsKeyStoreConfig, Value: string(cfg)}); err != nil {
+			return err
+		}
+		return tx.Save(&models.NodeSettings{Key: models.SettingsKeyStoreConfigDraft, Value: ""})
+	})
+	if err != nil {
 		return err
 	}
 	if n.eventBus != nil {

@@ -17,6 +17,11 @@ const maxStoreConfigSize = 100 * 1024 // 100 KB
 type storeConfigProvider interface {
 	StoreConfig() (json.RawMessage, error)
 	SaveStoreConfig(json.RawMessage) error
+	StoreDraftConfig() (json.RawMessage, error)
+	SaveStoreDraftConfig(json.RawMessage) error
+	DeleteStoreDraftConfig() error
+	// PublishStoreConfig atomically replaces the live config AND clears the draft.
+	PublishStoreConfig(json.RawMessage) error
 }
 
 func getStoreConfigProvider(r *http.Request) storeConfigProvider {
@@ -27,7 +32,8 @@ func getStoreConfigProvider(r *http.Request) storeConfigProvider {
 	return nil
 }
 
-// handleGETStorefrontConfig returns the owner's store config (may include draft).
+// handleGETStorefrontConfig returns the owner's store config.
+// ?variant=draft returns the unpublished draft slot (null when absent).
 func (g *Gateway) handleGETStorefrontConfig(w http.ResponseWriter, r *http.Request) {
 	p := getStoreConfigProvider(r)
 	if p == nil {
@@ -35,7 +41,13 @@ func (g *Gateway) handleGETStorefrontConfig(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	cfg, err := p.StoreConfig()
+	var cfg json.RawMessage
+	var err error
+	if r.URL.Query().Get("variant") == "draft" {
+		cfg, err = p.StoreDraftConfig()
+	} else {
+		cfg, err = p.StoreConfig()
+	}
 	if err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to read storefront config")
 		return
@@ -47,7 +59,9 @@ func (g *Gateway) handleGETStorefrontConfig(w http.ResponseWriter, r *http.Reque
 	responsePkg.Success(w, cfg)
 }
 
-// handlePUTStorefrontConfig replaces the owner's store config.
+// handlePUTStorefrontConfig replaces the owner's store config. Routing is by
+// the config's own status field: drafts land in the draft slot and leave the
+// live config untouched; publishing writes the live slot and clears the draft.
 func (g *Gateway) handlePUTStorefrontConfig(w http.ResponseWriter, r *http.Request) {
 	p := getStoreConfigProvider(r)
 	if p == nil {
@@ -69,12 +83,47 @@ func (g *Gateway) handlePUTStorefrontConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	cfg := json.RawMessage(body)
-	if err := p.SaveStoreConfig(cfg); err != nil {
+	if storeConfigStatus(body) == "draft" {
+		if err := p.SaveStoreDraftConfig(cfg); err != nil {
+			responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to save storefront draft")
+			return
+		}
+		responsePkg.Success(w, cfg)
+		return
+	}
+
+	// Publishing supersedes any pending draft — one transaction, so we can
+	// never report failure after the live config already changed.
+	if err := p.PublishStoreConfig(cfg); err != nil {
 		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to save storefront config")
 		return
 	}
 
 	responsePkg.Success(w, cfg)
+}
+
+// handleDELETEStorefrontDraft discards the owner's storefront draft.
+func (g *Gateway) handleDELETEStorefrontDraft(w http.ResponseWriter, r *http.Request) {
+	p := getStoreConfigProvider(r)
+	if p == nil {
+		responsePkg.Error(w, http.StatusNotImplemented, responsePkg.CodeNotImplemented, "Storefront config not available")
+		return
+	}
+	if err := p.DeleteStoreDraftConfig(); err != nil {
+		responsePkg.Error(w, http.StatusInternalServerError, responsePkg.CodeInternalError, "Failed to discard storefront draft")
+		return
+	}
+	responsePkg.Success(w, nil)
+}
+
+func storeConfigStatus(data []byte) string {
+	var raw struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return ""
+	}
+	return raw.Status
 }
 
 // handleGETStorefrontConfigPublic returns the published store config for a peer (no auth).
@@ -127,6 +176,7 @@ var validSectionTypes = map[string]bool{
 	"product-grid": true, "about": true, "trust-badges": true,
 	"testimonials": true, "faq": true, "collections": true,
 	"gallery": true, "rich-text": true, "contact": true, "store-tabs": true,
+	"video": true, "countdown": true,
 }
 
 func validateStoreConfigJSON(data []byte) error {

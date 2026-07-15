@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/mobazha/mobazha/internal/database/dbstore"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/database/sqlitedialect"
 	"github.com/mobazha/mobazha/pkg/models"
@@ -56,6 +58,28 @@ func generateTestIdentityKey(t *testing.T) []byte {
 	return keys.identityKey
 }
 
+func TestSharedPublicDataNamespaceUsesPeerIdentity(t *testing.T) {
+	identityKey := generateTestIdentityKey(t)
+	namespace, err := sharedPublicDataNamespace("casdoor-user-id", identityKey)
+	if err != nil {
+		t.Fatalf("sharedPublicDataNamespace: %v", err)
+	}
+	if namespace == "casdoor-user-id" {
+		t.Fatal("public data namespace must not use the mutable account tenant ID")
+	}
+	if _, err := peer.Decode(namespace); err != nil {
+		t.Fatalf("public data namespace %q is not a Peer ID: %v", namespace, err)
+	}
+
+	fallback, err := sharedPublicDataNamespace("standalone-node", nil)
+	if err != nil || fallback != "standalone-node" {
+		t.Fatalf("identity-less fallback = %q, %v", fallback, err)
+	}
+	if _, err := sharedPublicDataNamespace("tenant", []byte("invalid")); err == nil {
+		t.Fatal("invalid identity key must fail closed")
+	}
+}
+
 func TestNewRepoWithSharedDB(t *testing.T) {
 	resetMigrateOnce()
 
@@ -74,6 +98,25 @@ func TestNewRepoWithSharedDB(t *testing.T) {
 
 	if r.DB() == nil {
 		t.Fatal("expected non-nil DB")
+	}
+	if err := sharedDB.AutoMigrate(&dbstore.PublicDataRecord{}); err != nil {
+		t.Fatalf("migrate public data test table: %v", err)
+	}
+	if err := r.DB().Update(func(tx database.Tx) error {
+		return tx.SetProfile(&models.Profile{Name: "Peer-owned public profile"})
+	}); err != nil {
+		t.Fatalf("write public profile: %v", err)
+	}
+	wantPublicNamespace, err := sharedPublicDataNamespace("tenant-A", identityKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var publicProfile dbstore.PublicDataRecord
+	if err := sharedDB.Where("data_type = ?", "profile").First(&publicProfile).Error; err != nil {
+		t.Fatalf("read public profile row: %v", err)
+	}
+	if publicProfile.TenantID != wantPublicNamespace {
+		t.Fatalf("public profile namespace = %q, want Peer %q", publicProfile.TenantID, wantPublicNamespace)
 	}
 
 	// Verify keys were saved

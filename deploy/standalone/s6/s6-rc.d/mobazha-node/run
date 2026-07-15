@@ -17,4 +17,14 @@ if [ -n "$SAAS_API_URL" ]; then
   ARGS="$ARGS --saasapiurl=$SAAS_API_URL"
 fi
 
+# Advertise the public HTTPS origin to Hosting so Peer-routed marketplace
+# requests can reach this standalone node without relying on libp2p reachability.
+if [ -n "$STORE_DOMAIN" ]; then
+  case "$STORE_DOMAIN" in
+    http://*|https://*) STANDALONE_ENDPOINT_URL="$STORE_DOMAIN" ;;
+    *) STANDALONE_ENDPOINT_URL="https://$STORE_DOMAIN" ;;
+  esac
+  ARGS="$ARGS --standaloneendpointurl=$STANDALONE_ENDPOINT_URL"
+fi
+
 exec /usr/local/bin/mobazha $ARGS

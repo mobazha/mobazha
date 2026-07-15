@@ -33,8 +33,8 @@ const (
 // on (tenant_id, attempt_id) WHERE active enforces at most one purchase in
 // flight at a time.
 type PaymentAttemptOnrampFundingSource struct {
-	TenantID      string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:idx_onramp_source_idem,priority:1"`
-	AttemptID     string `gorm:"column:attempt_id;primaryKey;size:64;uniqueIndex:idx_onramp_source_idem,priority:2"`
+	TenantID      string `gorm:"column:tenant_id;primaryKey;default:'';uniqueIndex:idx_onramp_source_idem,priority:1;uniqueIndex:idx_onramp_source_active,priority:1,where:active"`
+	AttemptID     string `gorm:"column:attempt_id;primaryKey;size:64;uniqueIndex:idx_onramp_source_idem,priority:2;uniqueIndex:idx_onramp_source_active,priority:2"`
 	OnrampOrderID string `gorm:"column:onramp_order_id;primaryKey;size:128"`
 
 	OrderID    string `gorm:"column:order_id;size:255;not null;index:idx_onramp_source_order"`
@@ -43,8 +43,14 @@ type PaymentAttemptOnrampFundingSource struct {
 	// Status mirrors contracts.OnrampStatus. Active is derived from Status by
 	// SetStatus and backs the at-most-one-active partial unique index; writers
 	// must use SetStatus rather than assigning Status directly.
+	//
+	// The index must stay scoped to (tenant_id, attempt_id): the invariant is
+	// one in-flight purchase per attempt. Scoped to (active) alone it becomes a
+	// single global row lock — the first buyer with an in-flight purchase makes
+	// every other buyer's initiate fail with a duplicate-key 500, across every
+	// tenant on the node.
 	Status string `gorm:"column:status;size:32;not null;index:idx_onramp_source_status"`
-	Active bool   `gorm:"column:active;not null;default:false;uniqueIndex:idx_onramp_source_active,priority:1,where:active"`
+	Active bool   `gorm:"column:active;not null;default:false;uniqueIndex:idx_onramp_source_active,priority:3"`
 
 	// IdempotencyKey makes initiate/resume safe: re-entry for the same attempt
 	// and key returns this record instead of creating a second onramp order.

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -255,6 +256,40 @@ func (s *OnrampFundingAppService) RefreshForOrder(ctx context.Context, orderID s
 		return nil, err
 	}
 	return s.RefreshStatus(ctx, tenantID, attemptID)
+}
+
+// ListProvidersForOrder implements contracts.OnrampFundingService: the
+// discovery surface behind the buyer-visible onramp affordance. Providers are
+// filtered through their own fail-closed Capabilities for the attempt's
+// frozen rail, so an unproven rail yields an empty list, never an error.
+func (s *OnrampFundingAppService) ListProvidersForOrder(ctx context.Context, orderID string) ([]payment.OnrampProviderOption, error) {
+	tenantID, attemptID, err := s.resolveOrderAttempt(orderID)
+	if err != nil {
+		return nil, err
+	}
+	attempt, _, err := s.loadFrozenAttempt(tenantID, orderID, attemptID)
+	if err != nil {
+		return nil, err
+	}
+	options := make([]payment.OnrampProviderOption, 0)
+	for _, id := range s.providers.Registered() {
+		provider, err := s.providers.ForProvider(id)
+		if err != nil {
+			continue // unregistered between listing and lookup: skip, fail closed
+		}
+		caps, err := provider.Capabilities(ctx, attempt.Currency)
+		if err != nil || !caps.Offerable {
+			continue
+		}
+		options = append(options, payment.OnrampProviderOption{
+			ProviderID:      id,
+			RailID:          attempt.Currency,
+			DeliverToTarget: caps.DeliverToTarget,
+			FiatCurrencies:  caps.FiatCurrencies,
+		})
+	}
+	sort.Slice(options, func(i, j int) bool { return options[i].ProviderID < options[j].ProviderID })
+	return options, nil
 }
 
 // resolveOrderAttempt resolves an order to its tenant and its current payable

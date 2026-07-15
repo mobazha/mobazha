@@ -48,6 +48,10 @@ func (f *fakeOnrampFundingService) RefreshForOrder(context.Context, string) (*pa
 	return f.view, nil
 }
 
+func (f *fakeOnrampFundingService) ListProvidersForOrder(context.Context, string) ([]payment.OnrampProviderOption, error) {
+	return []payment.OnrampProviderOption{}, nil
+}
+
 func onrampHandlerRequest(t *testing.T, svc contracts.OnrampFundingService, authed bool, body interface{}) (*http.Request, *httptest.ResponseRecorder) {
 	t.Helper()
 	var buf bytes.Buffer

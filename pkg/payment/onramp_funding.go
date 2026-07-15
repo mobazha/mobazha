@@ -125,6 +125,19 @@ func RefineFundingStateForOnramp(base FundingState, observedAmount string, sourc
 	}
 }
 
+// OnrampProviderOption is one provider a buyer may fund this order through:
+// the discovery view backing GET .../payment-session/onramp/providers, so
+// clients enumerate reviewed, capability-open providers instead of hardcoding
+// a vendor (RFC-0012 Proposal 4: no client may assume a specific vendor).
+type OnrampProviderOption struct {
+	ProviderID string `json:"providerID"`
+	RailID     string `json:"railID"`
+	// DeliverToTarget reports the provider delivers directly to the frozen
+	// funding target; false means the buyer-wallet conduit would be required.
+	DeliverToTarget bool     `json:"deliverToTarget"`
+	FiatCurrencies  []string `json:"fiatCurrencies,omitempty"`
+}
+
 // SelectOnrampFundingSource picks, from an attempt's onramp purchase history
 // (1:N — failed/reversed records are retained for reconciliation), the single
 // record the session projection surfaces:

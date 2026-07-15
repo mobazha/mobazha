@@ -1610,10 +1610,11 @@ func registerMoonPayOnrampProvider(obNode *MobazhaNode) {
 // provider call fails with a clear error — resolvable but fail-closed, so
 // configuring rails early cannot produce a broken buyer checkout.
 func registerCDPOnrampProvider(obNode *MobazhaNode) {
+	rawRails := strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_RAILS"))
+	keyFile := strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_KEY_FILE"))
 	keyID := strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_KEY_ID"))
 	keySecret := strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_KEY_SECRET"))
-	rawRails := strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_RAILS"))
-	if keyID == "" || keySecret == "" || rawRails == "" {
+	if rawRails == "" || (keyFile == "" && (keyID == "" || keySecret == "")) {
 		return
 	}
 	rails, err := onrampcdp.ParseRails(rawRails)
@@ -1621,21 +1622,30 @@ func registerCDPOnrampProvider(obNode *MobazhaNode) {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "BuyerFunding: CDP onramp not registered: %v", err)
 		return
 	}
-	// TODO(sandbox): swap UnimplementedAuthenticator for the real API-key JWT
-	// signer once dev keys exist; keyID/keySecret are read now so the config
-	// surface is final.
+	// The key file is the CDP console export ({"id","privateKey"}); pointing
+	// env at the file keeps the secret out of shell history and process lists.
+	var auth onrampcdp.Authenticator
+	if keyFile != "" {
+		auth, err = onrampcdp.LoadKeyAuthenticator(keyFile)
+	} else {
+		auth, err = onrampcdp.NewKeyAuthenticator(keyID, keySecret)
+	}
+	if err != nil {
+		logger.LogErrorWithIDf(log, obNode.nodeID, "BuyerFunding: CDP onramp not registered: %v", err)
+		return
+	}
 	provider, err := onrampcdp.New(onrampcdp.Config{
 		RedirectURL: strings.TrimSpace(os.Getenv("MOBAZHA_CDP_ONRAMP_REDIRECT_URL")),
 		Rails:       rails,
-		Client:      onrampcdp.NewHTTPClient(onrampcdp.UnimplementedAuthenticator{}, ""),
+		Client:      onrampcdp.NewHTTPClient(auth, ""),
 	})
 	if err != nil {
 		logger.LogErrorWithIDf(log, obNode.nodeID, "BuyerFunding: CDP onramp not registered: %v", err)
 		return
 	}
 	obNode.onrampRegistry.Register(provider)
-	logger.LogWarningWithIDf(log, obNode.nodeID,
-		"BuyerFunding: CDP onramp provider registered for rails [%s] — JWT authenticator pending, calls fail closed", rawRails)
+	logger.LogInfoWithIDf(log, obNode.nodeID,
+		"BuyerFunding: CDP onramp provider registered for rails [%s]", rawRails)
 }
 
 // registerDevPrivyProvider registers the real Privy embedded-wallet provider for

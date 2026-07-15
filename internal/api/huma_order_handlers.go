@@ -65,6 +65,7 @@ func (g *Gateway) registerNodeHumaOrderAdminOperations(api huma.API) {
 	// ADR-019: onramp funding source (initiate/resume + provider status refresh).
 	g.registerOrderPaymentSessionOnrampPost(api)
 	g.registerOrderPaymentSessionOnrampRefreshPost(api)
+	g.registerOrderPaymentSessionOnrampProvidersGet(api)
 	g.registerOrderRefundAddressPost(api)
 	g.registerOrderSettlementActionPost(api)
 	g.registerOrderSettlementActionStatusGet(api)

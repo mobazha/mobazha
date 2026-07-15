@@ -119,6 +119,33 @@ func (g *Gateway) handlePOSTOrderPaymentSessionOnrampRefresh(w http.ResponseWrit
 	responsePkg.Success(w, view)
 }
 
+// handleGETOrderPaymentSessionOnrampProviders lists the onramp providers
+// whose capability gate is open for the order's frozen settlement rail.
+//
+// GET /v1/orders/{orderID}/payment-session/onramp/providers
+//
+// An empty list means the affordance must not render; clients must never
+// assume a specific vendor (RFC-0012 Proposal 4).
+func (g *Gateway) handleGETOrderPaymentSessionOnrampProviders(w http.ResponseWriter, r *http.Request) {
+	orderID := chi.URLParam(r, "orderID")
+	if orderID == "" {
+		responsePkg.Error(w, http.StatusBadRequest, responsePkg.CodeBadRequest, "orderID is required")
+		return
+	}
+	svc := getNodeService(r).OnrampFunding()
+	if svc == nil {
+		responsePkg.Error(w, http.StatusServiceUnavailable, responsePkg.CodeServiceUnavail,
+			"onramp funding subsystem not available")
+		return
+	}
+	options, err := svc.ListProvidersForOrder(r.Context(), orderID)
+	if err != nil {
+		onrampFundingErrorResponse(w, err)
+		return
+	}
+	responsePkg.Success(w, options)
+}
+
 // orderIDPathParam is the standard order path parameter ({descriptiveID} per
 // docs/API_DESIGN_STANDARD.md), kept as a named constant so route templates
 // below compose from it.
@@ -176,6 +203,35 @@ func (g *Gateway) registerOrderPaymentSessionOnrampRefreshPost(api huma.API) {
 		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, nil, map[string]string{"orderID": hi.OrderID})
 		rr := httptest.NewRecorder()
 		g.handlePOSTOrderPaymentSessionOnrampRefresh(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+// registerOrderPaymentSessionOnrampProvidersGet registers
+// GET /v1/orders/{orderID}/payment-session/onramp/providers.
+func (g *Gateway) registerOrderPaymentSessionOnrampProvidersGet(api huma.API) {
+	type in struct {
+		OrderID string `path:"orderID" doc:"Order ID."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "orders-get-payment-session-onramp-providers",
+		Method:      http.MethodGet,
+		Path:        "/v1/orders/" + orderIDPathParam + "/payment-session/onramp/providers",
+		Summary:     "List onramp providers for this order",
+		Description: "Enumerates the reviewed onramp providers whose capability gate is open for the " +
+			"order's frozen settlement rail. An empty list means onramp funding must not be offered; " +
+			"clients must never assume a specific vendor.",
+		Tags:     []string{"orders", "payments"},
+		Security: nodeAuthSecurity,
+	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {
+		rawURL := "/v1/orders/" + url.PathEscape(hi.OrderID) + "/payment-session/onramp/providers"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"orderID": hi.OrderID})
+		rr := httptest.NewRecorder()
+		g.handleGETOrderPaymentSessionOnrampProviders(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

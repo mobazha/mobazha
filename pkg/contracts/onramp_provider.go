@@ -230,4 +230,8 @@ type OnrampFundingInitiation struct {
 type OnrampFundingService interface {
 	InitiateOrResumeForOrder(ctx context.Context, orderID string, req OnrampFundingInitiation) (*payment.OnrampFundingSourceView, error)
 	RefreshForOrder(ctx context.Context, orderID string) (*payment.OnrampFundingSourceView, error)
+	// ListProvidersForOrder enumerates the registered providers whose
+	// capability gate is open for the order's frozen settlement rail
+	// (RFC-0012 Proposal 6). Empty means the affordance must not render.
+	ListProvidersForOrder(ctx context.Context, orderID string) ([]payment.OnrampProviderOption, error)
 }

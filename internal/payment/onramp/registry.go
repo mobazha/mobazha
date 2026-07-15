@@ -2,9 +2,9 @@
 // Copyright (c) 2026 fengzie and the respective contributors.
 
 // Package onramp holds the reviewed onramp provider modules (RFC-0012
-// Proposal 5) and a registry that composes them. Production onramp modules
-// (Coinbase Onramp, MoonPay, ...) require vendor KYB and are gated behind the
-// offshore-entity commercial line; only the mock lives here until then.
+// Proposal 5) and a registry that composes them. Concrete providers require a
+// vendor KYB relationship, so only the mock lives here; a distribution profile
+// wires the rest through the registry (RFC-0006 trusted-module composition).
 package onramp
 
 import (

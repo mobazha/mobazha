@@ -39,19 +39,30 @@ reject_matches \
 # Open Core payment implementations are an explicit allowlist. A newly added
 # provider directory therefore fails closed without embedding private product
 # or protocol identifiers in the public repository.
+#
+# Entries are payment *categories*, never vendors: a reviewed category may hold
+# vendor child packages (fiat/stripe, embeddedwallet/privy) because a vendor
+# name is public information. What must not reach this repository is our own
+# commercial structuring — which entity signs which agreement, and when. Review
+# a new category for that before adding it here.
+#
+# Both checks share one list. Held apart, they drift, and the tree check going
+# green while history stays red reads as a flaky gate rather than a real one.
+payment_category_allowlist='^(adapters|embeddedwallet|evm|fiat|onramp|tron)$'
+
 reject_matches \
   "unreviewed in-process payment implementation directory is present" \
   "$(git ls-files 'internal/payment/*' \
       | awk -F/ 'NF >= 3 { print $3 }' \
       | sort -u \
-      | grep -E -v '^(adapters|evm|fiat|tron)$' || true)"
+      | grep -E -v "${payment_category_allowlist}" || true)"
 
 reject_matches \
   "unreviewed in-process payment implementation path remains in public history" \
   "$(git log --format= --name-only HEAD -- internal/payment \
       | awk -F/ 'NF >= 3 && $1 == "internal" && $2 == "payment" { print $3 }' \
       | sort -u \
-      | grep -E -v '^(adapters|evm|fiat|tron)$' || true)"
+      | grep -E -v "${payment_category_allowlist}" || true)"
 
 reject_matches \
   "private repository identity remains reachable in public source history" \

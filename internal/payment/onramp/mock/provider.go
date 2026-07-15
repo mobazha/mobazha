@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
 )
@@ -18,13 +19,40 @@ import (
 // ProviderID is the mock onramp module identifier.
 const ProviderID = "mock-onramp"
 
+// autoAdvanceSequence is the happy-path lifecycle the mock walks when auto-
+// advance is enabled: one step per configured interval. It deliberately stops
+// at delivered — the mock never asserts anything about the chain, and the
+// session only reaches funded on a real on-chain observation.
+var autoAdvanceSequence = []contracts.OnrampStatus{
+	contracts.OnrampStatusAwaitingPayment,
+	contracts.OnrampStatusProcessing,
+	contracts.OnrampStatusDelivering,
+	contracts.OnrampStatusDelivered,
+}
+
+// purchase is a mock purchase plus the bookkeeping auto-advance needs.
+type purchase struct {
+	rec       contracts.OnrampPurchase
+	createdAt time.Time
+	// pinned is set once SetStatus drives the purchase off the happy path (or
+	// a test drives it explicitly); auto-advance never overrides a pinned
+	// purchase, so terminal states like failed/reversed stick.
+	pinned bool
+}
+
 // Provider is an in-process OnrampProvider.
 type Provider struct {
 	mu    sync.Mutex
 	caps  map[string]contracts.OnrampCapabilities
-	byKey map[string]string                   // (attempt|idempotencyKey) -> onrampOrderID
-	byID  map[string]*contracts.OnrampPurchase // onrampOrderID -> purchase
+	byKey map[string]string    // (attempt|idempotencyKey) -> onrampOrderID
+	byID  map[string]*purchase // onrampOrderID -> purchase
 	seq   int
+
+	// autoAdvance is the per-step interval for the happy-path lifecycle. Zero
+	// (the default) disables it entirely, leaving SetStatus as the only driver
+	// — that is the behavior every existing test relies on.
+	autoAdvance time.Duration
+	now         func() time.Time
 }
 
 // Option configures the mock.
@@ -35,17 +63,58 @@ func WithRailCapabilities(caps contracts.OnrampCapabilities) Option {
 	return func(p *Provider) { p.caps[caps.RailID] = caps }
 }
 
-// New returns a mock onramp provider. All rails are fail-closed by default.
+// WithAutoAdvance makes a purchase walk awaiting_payment -> processing ->
+// delivering -> delivered on its own, one step per interval, so a local
+// end-to-end demo can be driven from a browser instead of from an in-process
+// Go harness. A non-positive interval disables it.
+func WithAutoAdvance(step time.Duration) Option {
+	return func(p *Provider) {
+		if step > 0 {
+			p.autoAdvance = step
+		}
+	}
+}
+
+// withClock injects a deterministic clock for tests.
+func withClock(now func() time.Time) Option {
+	return func(p *Provider) {
+		if now != nil {
+			p.now = now
+		}
+	}
+}
+
+// New returns a mock onramp provider. All rails are fail-closed by default and
+// auto-advance is off, so New() alone behaves exactly as a hand-driven mock.
 func New(opts ...Option) *Provider {
 	p := &Provider{
 		caps:  make(map[string]contracts.OnrampCapabilities),
 		byKey: make(map[string]string),
-		byID:  make(map[string]*contracts.OnrampPurchase),
+		byID:  make(map[string]*purchase),
+		now:   time.Now,
 	}
 	for _, opt := range opts {
 		opt(p)
 	}
 	return p
+}
+
+// advanced returns the purchase record with the auto-advance schedule applied.
+// Callers must hold p.mu. The computed status is persisted so progression is
+// monotonic and observable through SetStatus.
+func (p *Provider) advanced(item *purchase) contracts.OnrampPurchase {
+	if p.autoAdvance <= 0 || item.pinned {
+		return item.rec
+	}
+	steps := int(p.now().Sub(item.createdAt) / p.autoAdvance)
+	if steps < 0 {
+		steps = 0
+	}
+	if steps >= len(autoAdvanceSequence) {
+		steps = len(autoAdvanceSequence) - 1
+	}
+	item.rec.Status = autoAdvanceSequence[steps]
+	return item.rec
 }
 
 // OpenRail is a convenience capability declaration that offers a rail with
@@ -102,46 +171,53 @@ func (p *Provider) InitiatePurchase(_ context.Context, req contracts.OnrampPurch
 
 	key := req.AttemptID + "|" + req.IdempotencyKey
 	if id, ok := p.byKey[key]; ok {
-		return *p.byID[id], nil
+		return p.advanced(p.byID[id]), nil
 	}
 
 	p.seq++
 	orderID := fmt.Sprintf("mock-onramp-%d", p.seq)
-	purchase := &contracts.OnrampPurchase{
-		ProviderID:           ProviderID,
-		OnrampOrderID:        orderID,
-		Status:               contracts.OnrampStatusAwaitingPayment,
-		BuyerActionURL:       "https://mock-onramp.example/checkout/" + orderID,
-		DeliveryTarget:       req.DeliveryTarget,
-		DeliverToBuyerWallet: req.DeliverToBuyerWallet,
-		BuyerWalletAddress:   req.BuyerWalletAddress,
-		Disclosure:           "You are buying crypto from mock-onramp; its fees, KYC, and reversals are between you and the provider.",
+	item := &purchase{
+		rec: contracts.OnrampPurchase{
+			ProviderID:           ProviderID,
+			OnrampOrderID:        orderID,
+			Status:               contracts.OnrampStatusAwaitingPayment,
+			BuyerActionURL:       "https://mock-onramp.example/checkout/" + orderID,
+			DeliveryTarget:       req.DeliveryTarget,
+			DeliverToBuyerWallet: req.DeliverToBuyerWallet,
+			BuyerWalletAddress:   req.BuyerWalletAddress,
+			Disclosure:           "You are buying crypto from mock-onramp; its fees, KYC, and reversals are between you and the provider.",
+		},
+		createdAt: p.now(),
 	}
 	p.byKey[key] = orderID
-	p.byID[orderID] = purchase
-	return *purchase, nil
+	p.byID[orderID] = item
+	return item.rec, nil
 }
 
-// PurchaseStatus returns the current purchase.
+// PurchaseStatus returns the current purchase, applying the auto-advance
+// schedule when one is configured.
 func (p *Provider) PurchaseStatus(_ context.Context, onrampOrderID string) (contracts.OnrampPurchase, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	purchase, ok := p.byID[onrampOrderID]
+	item, ok := p.byID[onrampOrderID]
 	if !ok {
 		return contracts.OnrampPurchase{}, fmt.Errorf("onramp: unknown order %q", onrampOrderID)
 	}
-	return *purchase, nil
+	return p.advanced(item), nil
 }
 
-// SetStatus is a test hook to drive the purchase lifecycle deterministically.
+// SetStatus drives the purchase lifecycle explicitly. It is the only driver
+// when auto-advance is off, and it pins the purchase (disabling auto-advance
+// for it) when on, so a caller can still force failed/reversed.
 func (p *Provider) SetStatus(onrampOrderID string, status contracts.OnrampStatus) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	purchase, ok := p.byID[onrampOrderID]
+	item, ok := p.byID[onrampOrderID]
 	if !ok {
 		return fmt.Errorf("onramp: unknown order %q", onrampOrderID)
 	}
-	purchase.Status = status
+	item.rec.Status = status
+	item.pinned = true
 	return nil
 }
 

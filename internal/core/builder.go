@@ -1684,6 +1684,13 @@ func registerDevPrivyProvider(obNode *MobazhaNode) {
 // env var (comma-separated rail ids, e.g. "crypto:eip155:1:native"). When the
 // var is unset the onramp registry stays empty and fail-closed, so this is a
 // no-op in any real deployment and cannot ship enabled by accident.
+//
+// MOBAZHA_DEV_MOCK_ONRAMP_AUTOADVANCE (a Go duration, e.g. "10s") additionally
+// makes each purchase walk awaiting_payment -> processing -> delivering ->
+// delivered on its own. Without it the mock only moves via its in-process
+// SetStatus hook, which a browser-driven demo cannot reach. It advances the
+// *provider's* view only: the purchase reaching delivered never funds a
+// session — that still requires a real on-chain observation of the delivery.
 func registerDevMockOnrampProvider(obNode *MobazhaNode) {
 	raw := strings.TrimSpace(os.Getenv("MOBAZHA_DEV_MOCK_ONRAMP_RAILS"))
 	if raw == "" {
@@ -1699,9 +1706,20 @@ func registerDevMockOnrampProvider(obNode *MobazhaNode) {
 	if len(opts) == 0 {
 		return
 	}
+	autoAdvance := ""
+	if rawStep := strings.TrimSpace(os.Getenv("MOBAZHA_DEV_MOCK_ONRAMP_AUTOADVANCE")); rawStep != "" {
+		step, err := time.ParseDuration(rawStep)
+		if err != nil || step <= 0 {
+			logger.LogErrorWithIDf(log, obNode.nodeID,
+				"BuyerFunding: ignoring invalid MOBAZHA_DEV_MOCK_ONRAMP_AUTOADVANCE %q: %v", rawStep, err)
+		} else {
+			opts = append(opts, onrampmock.WithAutoAdvance(step))
+			autoAdvance = ", auto-advance " + step.String() + "/step"
+		}
+	}
 	obNode.onrampRegistry.Register(onrampmock.New(opts...))
 	logger.LogWarningWithIDf(log, obNode.nodeID,
-		"BuyerFunding: DEV mock onramp provider registered for rails [%s] — NOT for production", raw)
+		"BuyerFunding: DEV mock onramp provider registered for rails [%s]%s — NOT for production", raw, autoAdvance)
 }
 
 // finalizeFiatSubsystem runs after NodeOptions have been applied so hosted

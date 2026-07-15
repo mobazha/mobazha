@@ -297,7 +297,7 @@ func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage)
 	case npb.OrderMessage_PAYMENT_FINALIZED:
 		key = "payment_finalized_acked"
 	default:
-		return false, "", fmt.Errorf("unknown order message type")
+		return false, "", fmt.Errorf("unknown order message type %d (%s) for order %s", int32(orderMessage.MessageType), orderMessage.MessageType.String(), orderMessage.OrderID)
 	}
 	return false, "", tx.Update(key, true, map[string]interface{}{"id = ?": orderMessage.OrderID}, &models.Order{})
 }

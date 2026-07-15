@@ -513,7 +513,12 @@ func TestValidateSellerPaymentAttemptFundingBasis_UsesFreshSellerRateFloor(t *te
 }
 
 func TestValidateSellerPaymentAttemptFundingBasis_RejectsBindingAndRoundUpViolations(t *testing.T) {
-	now := time.Date(2026, time.July, 15, 8, 0, 0, 0, time.UTC)
+	// Must track the real clock, like the rest of this file. The validator
+	// samples time.Now() for the rate-freshness check and only honours an
+	// injected `now` that is still in the future, so a pinned date silently
+	// turns into a time bomb: every basis below expires relative to it, and
+	// the whole test starts failing once the wall clock passes that date.
+	now := time.Now().UTC()
 	open := &pb.OrderOpen{PricingCoin: "USD", Amount: "4"}
 	openBytes, err := protojson.Marshal(open)
 	require.NoError(t, err)

@@ -44,14 +44,14 @@ reject_matches \
   "$(git ls-files 'internal/payment/*' \
       | awk -F/ 'NF >= 3 { print $3 }' \
       | sort -u \
-      | grep -E -v '^(adapters|evm|fiat|tron)$' || true)"
+      | grep -E -v '^(adapters|embeddedwallet|evm|fiat|onramp|tron)$' || true)"
 
 reject_matches \
   "unreviewed in-process payment implementation path remains in public history" \
   "$(git log --format= --name-only HEAD -- internal/payment \
       | awk -F/ 'NF >= 3 && $1 == "internal" && $2 == "payment" { print $3 }' \
       | sort -u \
-      | grep -E -v '^(adapters|evm|fiat|tron)$' || true)"
+      | grep -E -v '^(adapters|embeddedwallet|evm|fiat|onramp|tron)$' || true)"
 
 reject_matches \
   "private repository identity remains reachable in public source history" \

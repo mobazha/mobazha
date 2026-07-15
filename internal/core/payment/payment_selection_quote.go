@@ -197,10 +197,17 @@ func (s *PaymentSessionServiceImpl) buildPaymentSelectionQuote(
 		}
 		if updatedAt := s.exchange.LastUpdated(models.CurrencyCode(paymentCode)); !updatedAt.IsZero() {
 			rateUpdatedAt = updatedAt.UTC()
-			if now.Sub(rateUpdatedAt) >= maxPaymentSelectionRateAge {
-				return models.PaymentSelectionQuote{}, fmt.Errorf("%w: exchange-rate snapshot is stale", ErrExchangeRateUnavailable)
-			}
 		}
+	}
+	// GetRate may synchronously refresh the provider cache. The immutable quote
+	// must be issued after that refresh; otherwise a valid source timestamp can
+	// appear to come from the future and the funding-basis lifetime fails closed.
+	issuedAt := s.currentTime()
+	if issuedAt.Before(now) {
+		issuedAt = now
+	}
+	if conversionRequired && (rateUpdatedAt.After(issuedAt) || issuedAt.Sub(rateUpdatedAt) >= maxPaymentSelectionRateAge) {
+		return models.PaymentSelectionQuote{}, fmt.Errorf("%w: exchange-rate snapshot is stale", ErrExchangeRateUnavailable)
 	}
 	if coin.IsFiatPayment() {
 		if !paymentSubtotal.IsInt64() {
@@ -214,7 +221,7 @@ func (s *PaymentSessionServiceImpl) buildPaymentSelectionQuote(
 	if ttl <= 0 {
 		ttl = defaultPaymentSelectionQuoteTTL
 	}
-	expiresAt := now.Add(ttl)
+	expiresAt := issuedAt.Add(ttl)
 	if conversionRequired {
 		rateExpiry := rateUpdatedAt.Add(maxPaymentSelectionRateAge)
 		if rateExpiry.Before(expiresAt) {
@@ -232,7 +239,7 @@ func (s *PaymentSessionServiceImpl) buildPaymentSelectionQuote(
 		ConversionRequired: conversionRequired, ExchangeRate: exchangeRate, ExchangeRateBase: paymentCode,
 		ExchangeRateQuote: pricingCode, ExchangeRateQuoteDivisibility: pricingCurrency.Divisibility,
 		RateSourceUpdatedAt: rateUpdatedAt, PaymentSubtotal: amount, ProviderOrNetworkCost: "0",
-		PlatformPaymentCost: "0", BuyerPaymentTotal: amount, ExpiresAt: expiresAt, CreatedAt: now,
+		PlatformPaymentCost: "0", BuyerPaymentTotal: amount, ExpiresAt: expiresAt, CreatedAt: issuedAt,
 	}, nil
 }
 

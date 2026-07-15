@@ -20,6 +20,7 @@ type paymentSelectionRates struct {
 	rate      iwallet.Amount
 	updatedAt time.Time
 	calls     int
+	onGetRate func()
 }
 
 func (r *paymentSelectionRates) GetAllRates(models.CurrencyCode, bool) (map[models.CurrencyCode]iwallet.Amount, error) {
@@ -28,6 +29,9 @@ func (r *paymentSelectionRates) GetAllRates(models.CurrencyCode, bool) (map[mode
 
 func (r *paymentSelectionRates) GetRate(models.CurrencyCode, models.CurrencyCode, bool) (iwallet.Amount, error) {
 	r.calls++
+	if r.onGetRate != nil {
+		r.onGetRate()
+	}
 	return r.rate, nil
 }
 
@@ -64,7 +68,12 @@ func TestCreateSelectionQuote_CrossCurrencyPersistsAndReuses(t *testing.T) {
 	rates := &paymentSelectionRates{rate: iwallet.NewAmount("250000"), updatedAt: now.Add(-30 * time.Second)}
 	svc := NewPaymentSessionService(db)
 	svc.SetExchangeRateService(rates)
-	svc.now = func() time.Time { return now }
+	clock := now
+	svc.now = func() time.Time { return clock }
+	rates.onGetRate = func() {
+		clock = now.Add(time.Second)
+		rates.updatedAt = clock
+	}
 
 	req := contracts.CreatePaymentSelectionQuoteRequest{
 		OrderID: orderID, PaymentCoin: "crypto:eip155:1:native",
@@ -89,6 +98,8 @@ func TestCreateSelectionQuote_CrossCurrencyPersistsAndReuses(t *testing.T) {
 		return tx.Read().Where("quote_id = ?", first.ID).First(&stored).Error
 	}))
 	require.Equal(t, first.BuyerPaymentTotal, stored.BuyerPaymentTotal)
+	require.Equal(t, clock, stored.RateSourceUpdatedAt)
+	require.Equal(t, clock, stored.CreatedAt, "quote issuance must follow a synchronous rate refresh")
 }
 
 func TestCreateSelectionQuote_RoundsUpAndDoesNotReuseOldDealRevision(t *testing.T) {

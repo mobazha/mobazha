@@ -50,11 +50,12 @@ type retainingSettlementOfferPublisher struct {
 }
 
 type settlementAuthorizationExchangeRate struct {
-	rate       iwallet.Amount
-	updatedAt  time.Time
-	base       models.CurrencyCode
-	to         models.CurrencyCode
-	breakCache bool
+	rate             iwallet.Amount
+	updatedAt        time.Time
+	base             models.CurrencyCode
+	to               models.CurrencyCode
+	breakCache       bool
+	refreshOnGetRate bool
 }
 
 func (r *settlementAuthorizationExchangeRate) GetAllRates(models.CurrencyCode, bool) (map[models.CurrencyCode]iwallet.Amount, error) {
@@ -63,6 +64,9 @@ func (r *settlementAuthorizationExchangeRate) GetAllRates(models.CurrencyCode, b
 
 func (r *settlementAuthorizationExchangeRate) GetRate(base, to models.CurrencyCode, breakCache bool) (iwallet.Amount, error) {
 	r.base, r.to, r.breakCache = base, to, breakCache
+	if r.refreshOnGetRate {
+		r.updatedAt = time.Now().UTC()
+	}
 	return r.rate, nil
 }
 
@@ -459,7 +463,7 @@ func mustAttemptFundingBasis(t *testing.T, attempt models.PaymentAttempt) *model
 }
 
 func TestValidateSellerPaymentAttemptFundingBasis_UsesFreshSellerRateFloor(t *testing.T) {
-	now := time.Date(2026, time.July, 15, 8, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
 	open := &pb.OrderOpen{PricingCoin: "USD", Amount: "4900"}
 	openBytes, err := protojson.Marshal(open)
 	require.NoError(t, err)
@@ -488,6 +492,10 @@ func TestValidateSellerPaymentAttemptFundingBasis_UsesFreshSellerRateFloor(t *te
 	require.Equal(t, models.CurrencyCode("ETH"), rates.base)
 	require.Equal(t, models.CurrencyCode("USD"), rates.to)
 	require.True(t, rates.breakCache, "seller acceptance must refresh its own provider snapshot")
+	rates.refreshOnGetRate = true
+	require.NoError(t, validateSellerPaymentAttemptFundingBasis(basis, order, open, "buyer-peer", rates, now),
+		"a source timestamp refreshed during GetRate must not be compared with the pre-refresh clock sample")
+	rates.refreshOnGetRate = false
 
 	// A seller rate of 2450 USD/ETH requires 0.02 ETH, so this proposal underfunds it.
 	rates.rate = iwallet.NewAmount("245000")

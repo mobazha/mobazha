@@ -106,7 +106,17 @@ func validateSellerPaymentAttemptFundingBasis(
 		return fmt.Errorf("seller exchange-rate policy returned a non-positive rate")
 	}
 	rateUpdatedAt := exchange.LastUpdated(models.CurrencyCode(basis.PaymentCurrency)).UTC()
-	if rateUpdatedAt.IsZero() || rateUpdatedAt.After(now.UTC()) || now.UTC().Sub(rateUpdatedAt) >= maxSellerSettlementRateAge {
+	// GetRate above is allowed to refresh the seller's provider cache. Compare
+	// its source timestamp with a clock sample taken after that refresh, while
+	// retaining an injected future `now` used by deterministic callers/tests.
+	rateCheckedAt := time.Now().UTC()
+	if requestedAt := now.UTC(); requestedAt.After(rateCheckedAt) {
+		rateCheckedAt = requestedAt
+	}
+	if basis.ExpiresAtUnix <= rateCheckedAt.Unix() {
+		return models.ErrPaymentAttemptSettlementTermsConflict
+	}
+	if rateUpdatedAt.IsZero() || rateUpdatedAt.After(rateCheckedAt) || rateCheckedAt.Sub(rateUpdatedAt) >= maxSellerSettlementRateAge {
 		return fmt.Errorf("seller exchange-rate policy snapshot is stale")
 	}
 	pricingAmount, ok := new(big.Int).SetString(basis.PricingAmount, 10)

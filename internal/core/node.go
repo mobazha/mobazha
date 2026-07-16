@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/mobazha/mobazha/internal/core/digital"
 	"github.com/mobazha/mobazha/internal/core/guest"
@@ -250,11 +251,71 @@ func (n *MobazhaNode) DeleteStoreDraftConfig() error {
 	return n.saveSetting(models.SettingsKeyStoreConfigDraft, "")
 }
 
+// maxStoreConfigHistory bounds the published-revision archive. Ten covers a
+// season of layout changes at ~100KB each without the settings row growing
+// unbounded.
+const maxStoreConfigHistory = 10
+
+// StoreConfigHistoryEntry is one previously-published storefront config.
+type StoreConfigHistoryEntry struct {
+	PublishedAt time.Time       `json:"publishedAt"`
+	Config      json.RawMessage `json:"config"`
+}
+
+// StoreConfigHistory returns previously-published storefront configs,
+// newest first. Empty (not nil) when nothing has been superseded yet.
+func (n *MobazhaNode) StoreConfigHistory() (json.RawMessage, error) {
+	val, err := n.getSetting(models.SettingsKeyStoreConfigHistory)
+	if err != nil {
+		return nil, err
+	}
+	if val == "" {
+		return json.RawMessage("[]"), nil
+	}
+	return json.RawMessage(val), nil
+}
+
 // PublishStoreConfig replaces the live storefront config and clears the
 // draft slot in ONE transaction, so a partial failure can never leave the
-// live config replaced with a stale draft still pending.
+// live config replaced with a stale draft still pending. The superseded
+// live config is archived into the history slot in the same transaction —
+// history exists precisely for the publishes the seller regrets, so it
+// cannot be allowed to miss one.
 func (n *MobazhaNode) PublishStoreConfig(cfg json.RawMessage) error {
 	err := n.db.Update(func(tx database.Tx) error {
+		var prev models.NodeSettings
+		result := tx.Read().Where("\"key\" = ?", models.SettingsKeyStoreConfig).Limit(1).Find(&prev)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected > 0 && prev.Value != "" {
+			var history []StoreConfigHistoryEntry
+			var histRow models.NodeSettings
+			histResult := tx.Read().Where("\"key\" = ?", models.SettingsKeyStoreConfigHistory).Limit(1).Find(&histRow)
+			if histResult.Error != nil {
+				return histResult.Error
+			}
+			if histResult.RowsAffected > 0 && histRow.Value != "" {
+				// A corrupt archive should not block publishing; start over.
+				if err := json.Unmarshal([]byte(histRow.Value), &history); err != nil {
+					history = nil
+				}
+			}
+			history = append([]StoreConfigHistoryEntry{{
+				PublishedAt: time.Now().UTC(),
+				Config:      json.RawMessage(prev.Value),
+			}}, history...)
+			if len(history) > maxStoreConfigHistory {
+				history = history[:maxStoreConfigHistory]
+			}
+			encoded, err := json.Marshal(history)
+			if err != nil {
+				return err
+			}
+			if err := tx.Save(&models.NodeSettings{Key: models.SettingsKeyStoreConfigHistory, Value: string(encoded)}); err != nil {
+				return err
+			}
+		}
 		if err := tx.Save(&models.NodeSettings{Key: models.SettingsKeyStoreConfig, Value: string(cfg)}); err != nil {
 			return err
 		}
@@ -267,6 +328,25 @@ func (n *MobazhaNode) PublishStoreConfig(cfg json.RawMessage) error {
 		n.eventBus.Emit(&events.StorefrontChanged{Config: cfg})
 	}
 	return nil
+}
+
+// StorefrontPreviewToken reads the stored draft-preview token record
+// (JSON {token, expiresAt}), or nil when none has been issued.
+func (n *MobazhaNode) StorefrontPreviewToken() (json.RawMessage, error) {
+	val, err := n.getSetting(models.SettingsKeyStorefrontPreviewToken)
+	if err != nil {
+		return nil, err
+	}
+	if val == "" {
+		return nil, nil
+	}
+	return json.RawMessage(val), nil
+}
+
+// SaveStorefrontPreviewToken stores the draft-preview token record,
+// replacing (and thereby revoking) any previous one.
+func (n *MobazhaNode) SaveStorefrontPreviewToken(record json.RawMessage) error {
+	return n.saveSetting(models.SettingsKeyStorefrontPreviewToken, string(record))
 }
 
 // getSetting reads a single key from the node_settings table.

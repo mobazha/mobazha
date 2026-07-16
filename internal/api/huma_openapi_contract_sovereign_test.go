@@ -136,6 +136,7 @@ func TestSovereignOpenAPI_OperationIDSnapshot(t *testing.T) {
 		"settings-storefront-public-get",
 		"settings-storefront-put",
 		"settings-storefront-draft-delete",
+		"settings-storefront-preview-token-post",
 		"settings-feature-put",
 		"settings-guest-checkout-get",
 		"settings-guest-checkout-put",

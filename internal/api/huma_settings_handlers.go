@@ -15,7 +15,8 @@ import (
 // (storefront branding by peerID — buyer browsing).
 func (g *Gateway) registerNodeHumaSettingsPublicOperations(api huma.API) {
 	type storefrontPeerPath struct {
-		PeerID string `path:"peerID" doc:"Store peer ID."`
+		PeerID  string `path:"peerID" doc:"Store peer ID."`
+		Preview string `query:"preview" doc:"Draft-preview share token; a valid one returns the unpublished draft."`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "settings-storefront-public-get",
@@ -25,6 +26,9 @@ func (g *Gateway) registerNodeHumaSettingsPublicOperations(api huma.API) {
 		Tags:        []string{"settings"},
 	}, func(ctx context.Context, in *storefrontPeerPath) (*nodeDataOutput, error) {
 		rawURL := "/v1/settings/storefront/" + url.PathEscape(in.PeerID)
+		if in.Preview != "" {
+			rawURL += "?preview=" + url.QueryEscape(in.Preview)
+		}
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"peerID": in.PeerID})
 		rr := httptest.NewRecorder()
 		g.handleGETStorefrontConfigPublic(rr, req)
@@ -169,15 +173,33 @@ func (g *Gateway) registerNodeHumaSettingsAdminOperations(api huma.API) {
 		Tags:        []string{"settings"},
 		Security:    nodeAuthSecurity,
 	}, func(ctx context.Context, in *struct {
-		Variant string `query:"variant" enum:"draft," doc:"Read the unpublished draft slot instead of the live config"`
+		Variant string `query:"variant" enum:"draft,history," doc:"Read the unpublished draft slot or the published-revision history instead of the live config"`
 	}) (*nodeDataOutput, error) {
 		rawURL := "/v1/settings/storefront"
-		if in.Variant == "draft" {
-			rawURL += "?variant=draft"
+		if in.Variant == "draft" || in.Variant == "history" {
+			rawURL += "?variant=" + in.Variant
 		}
 		req := nodeBridgeRequest(ctx, http.MethodGet, rawURL, nil)
 		rr := httptest.NewRecorder()
 		g.handleGETStorefrontConfig(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "settings-storefront-preview-token-post",
+		Method:      http.MethodPost,
+		Path:        "/v1/settings/storefront/preview-token",
+		Summary:     "Issue (rotate) the storefront draft-preview share token",
+		Tags:        []string{"settings"},
+		Security:    nodeAuthSecurity,
+	}, func(ctx context.Context, _ *struct{}) (*nodeDataOutput, error) {
+		req := nodeBridgeRequest(ctx, http.MethodPost, "/v1/settings/storefront/preview-token", nil)
+		rr := httptest.NewRecorder()
+		g.handlePOSTStorefrontPreviewToken(rr, req)
 		data, err := nodeBridgeSuccessData(rr)
 		if err != nil {
 			return nil, err

@@ -22,4 +22,12 @@ const (
 	// SettingsKeyStoreConfigDraft holds the seller's unpublished storefront
 	// draft; the public endpoint never reads this slot.
 	SettingsKeyStoreConfigDraft = "store_config_draft"
+	// SettingsKeyStoreConfigHistory holds the most recent previously-published
+	// storefront configs (newest first, capped) so a bad publish can be
+	// recovered without hand-reconstructing the layout.
+	SettingsKeyStoreConfigHistory = "store_config_history"
+	// SettingsKeyStorefrontPreviewToken holds the current draft-preview share
+	// token as JSON {token, expiresAt}. One token per store; issuing a new one
+	// invalidates the previous link.
+	SettingsKeyStorefrontPreviewToken = "storefront_preview_token"
 )

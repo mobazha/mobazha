@@ -604,6 +604,31 @@ func TestWalletAccountService_Capabilities_OpenGuestOnlyWithTransferRuntime(t *t
 	assert.True(t, capabilities.Guest)
 }
 
+type unhealthyWalletTransferChainOps struct{ walletTransferChainOps }
+
+func (*unhealthyWalletTransferChainOps) IsHealthy(iwallet.ChainType) bool { return false }
+
+func TestWalletAccountService_Capabilities_HidesGuestWhenChainSourceIsUnhealthy(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	masterKey := testMasterKey(t)
+	service := NewWalletAccountService(db, masterKey, testMultiwallet(t, masterKey)).(*walletAccountService)
+	service.SetChainOperations(&unhealthyWalletTransferChainOps{})
+	rail, ok := iwallet.CanonicalNativeCoinType(iwallet.ChainLitecoin)
+	require.True(t, ok)
+
+	capabilities, err := service.Capabilities(t.Context(), string(rail))
+
+	require.NoError(t, err)
+	assert.True(t, capabilities.Receive)
+	assert.True(t, capabilities.Watch)
+	assert.True(t, capabilities.Affiliate)
+	assert.False(t, capabilities.Spend)
+	assert.False(t, capabilities.AutoTransfer)
+	assert.False(t, capabilities.Guest)
+}
+
 func TestWalletAccountService_Transfer_AllSupportedUTXORails(t *testing.T) {
 	for i, chain := range []iwallet.ChainType{
 		iwallet.ChainBitcoin, iwallet.ChainBitcoinCash, iwallet.ChainLitecoin,

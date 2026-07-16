@@ -62,7 +62,8 @@ func NewWalletAccountService(
 
 // Capabilities reports only operations that are closed end-to-end. Receiving
 // is available for supported rails; Guest remains disabled until the generic
-// spend/transfer path can consume account-role balances after restart.
+// spend/transfer path can consume account-role balances after restart and the
+// rail has a healthy chain source.
 func (s *walletAccountService) Capabilities(_ context.Context, railID string) (contracts.WalletCapabilities, error) {
 	if s == nil || s.db == nil || s.masterKey == nil {
 		return contracts.WalletCapabilities{}, fmt.Errorf("wallet account service is not configured")
@@ -89,7 +90,7 @@ func (s *walletAccountService) Capabilities(_ context.Context, railID string) (c
 			return contracts.WalletCapabilities{}, fmt.Errorf("wallet receiving adapter unavailable for %s", coinInfo.Chain)
 		}
 		capabilities.Watch = true
-		if s.chainOps != nil && supportsSweep && supportsTransfer {
+		if s.chainOps != nil && s.chainOps.IsHealthy(coinInfo.Chain) && supportsSweep && supportsTransfer {
 			capabilities.Spend = true
 			capabilities.AutoTransfer = true
 			capabilities.Guest = true

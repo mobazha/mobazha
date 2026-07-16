@@ -115,7 +115,7 @@ func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req Init
 		if err != nil {
 			return nil, err
 		}
-		fiatCurrency, err := s.pinResumeFiatCurrency(existing, requestedFiatCurrency)
+		fiatCurrency, err := frozenResumeFiatCurrency(existing)
 		if err != nil {
 			return nil, err
 		}
@@ -218,43 +218,15 @@ func normalizeFiatCurrency(currency string) string {
 	return strings.ToUpper(strings.TrimSpace(currency))
 }
 
-// pinResumeFiatCurrency returns the commercial currency frozen by the first
-// initiate. The conditional update only exists for rows created before the
-// fiat_currency column was introduced; it also makes the first legacy resume
-// deterministic if two clients race with different locale defaults.
-func (s *OnrampFundingAppService) pinResumeFiatCurrency(row *models.PaymentAttemptOnrampFundingSource, requested string) (string, error) {
-	if stored := normalizeFiatCurrency(row.FiatCurrency); stored != "" {
-		return stored, nil
+// frozenResumeFiatCurrency returns the commercial currency fixed by the first
+// initiate. Missing data is an invariant violation: development databases
+// using the pre-field schema must be rebuilt instead of silently backfilled.
+func frozenResumeFiatCurrency(row *models.PaymentAttemptOnrampFundingSource) (string, error) {
+	stored := normalizeFiatCurrency(row.FiatCurrency)
+	if stored == "" {
+		return "", fmt.Errorf("resume onramp purchase: frozen fiat currency is missing")
 	}
-	var updated int64
-	err := s.db.Update(func(tx database.Tx) error {
-		var err error
-		updated, err = tx.UpdateColumns(map[string]interface{}{
-			"fiat_currency": requested,
-		}, map[string]interface{}{
-			"tenant_id = ?":       row.TenantID,
-			"attempt_id = ?":      row.AttemptID,
-			"onramp_order_id = ?": row.OnrampOrderID,
-			"fiat_currency = ?":   "",
-		}, &models.PaymentAttemptOnrampFundingSource{})
-		return err
-	})
-	if err != nil {
-		return "", fmt.Errorf("pin onramp fiat currency: %w", err)
-	}
-	if updated == 1 {
-		row.FiatCurrency = requested
-		return requested, nil
-	}
-	// Another legacy resume won the conditional update. Reload the durable row
-	// instead of allowing this request's input to overwrite that decision.
-	if durable := s.findByIdempotencyKey(row.TenantID, row.AttemptID, row.IdempotencyKey); durable != nil {
-		if stored := normalizeFiatCurrency(durable.FiatCurrency); stored != "" {
-			row.FiatCurrency = stored
-			return stored, nil
-		}
-	}
-	return "", fmt.Errorf("pin onramp fiat currency: durable record is unavailable")
+	return stored, nil
 }
 
 // RefreshStatus polls the provider for the attempt's in-flight purchase and

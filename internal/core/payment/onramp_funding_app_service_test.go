@@ -11,7 +11,6 @@ import (
 	"github.com/mobazha/mobazha/internal/payment/onramp"
 	onrampmock "github.com/mobazha/mobazha/internal/payment/onramp/mock"
 	"github.com/mobazha/mobazha/pkg/contracts"
-	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
 	"github.com/stretchr/testify/require"
@@ -91,30 +90,9 @@ func TestOnrampFundingInitiateAndResume(t *testing.T) {
 	require.Equal(t, "USD", stored.FiatCurrency)
 }
 
-func TestOnrampFundingResumePinsLegacyFiatCurrency(t *testing.T) {
-	svc, provider, attempt := newOnrampServiceFixture(t)
-	ctx := context.Background()
-
-	first, err := svc.InitiateOrResume(ctx, initiateReq(attempt))
-	require.NoError(t, err)
-	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
-		_, updateErr := tx.UpdateColumns(map[string]interface{}{"fiat_currency": ""}, map[string]interface{}{
-			"tenant_id = ?":       "",
-			"attempt_id = ?":      attempt.AttemptID,
-			"onramp_order_id = ?": first.OnrampOrderID,
-		}, &models.PaymentAttemptOnrampFundingSource{})
-		return updateErr
-	}))
-
-	resumeReq := initiateReq(attempt)
-	resumeReq.FiatCurrency = "eur"
-	_, err = svc.InitiateOrResume(ctx, resumeReq)
-	require.NoError(t, err)
-	_, lastRequest := provider.requestSnapshot()
-	require.Equal(t, "EUR", lastRequest.FiatCurrency)
-	stored := svc.findByIdempotencyKey("", attempt.AttemptID, "primary")
-	require.NotNil(t, stored)
-	require.Equal(t, "EUR", stored.FiatCurrency)
+func TestFrozenResumeFiatCurrencyRejectsMissingValue(t *testing.T) {
+	_, err := frozenResumeFiatCurrency(&models.PaymentAttemptOnrampFundingSource{})
+	require.ErrorContains(t, err, "frozen fiat currency is missing")
 }
 
 func TestOnrampFundingRefreshReturnsDirectTerminalTransition(t *testing.T) {

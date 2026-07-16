@@ -42,7 +42,7 @@ type PaymentAttemptOnrampFundingSource struct {
 	// FiatCurrency is part of the provider purchase's commercial identity.
 	// Persist it so an idempotent resume cannot silently switch currencies when
 	// a client locale or provider discovery response changes.
-	FiatCurrency string `gorm:"column:fiat_currency;size:16;not null;default:''"`
+	FiatCurrency string `gorm:"column:fiat_currency;size:16;not null"`
 
 	// Status mirrors contracts.OnrampStatus. Active is derived from Status by
 	// SetStatus and backs the at-most-one-active partial unique index; writers

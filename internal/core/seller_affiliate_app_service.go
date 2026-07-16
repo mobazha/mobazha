@@ -598,6 +598,7 @@ func affiliateSettlementFromAction(attribution *models.AffiliateAttribution, act
 		Amount:        planned.Amount,
 		Address:       planned.Address,
 		Confirmations: action.Confirmations,
+		LastError:     action.LastError,
 		UpdatedAt:     action.UpdatedAt,
 		ConfirmedAt:   action.ConfirmedAt,
 	}
@@ -624,6 +625,13 @@ func affiliateSettlementFromAction(attribution *models.AffiliateAttribution, act
 		output.Address = observed.Address
 		output.Coin = firstNonEmpty(observed.Coin, output.Coin)
 		output.TxHash = firstNonEmpty(observed.TxHash, action.TxHash)
+		return output
+	case "failed", "abandoned":
+		// A terminal action still carries the immutable planned Affiliate
+		// output. Keep it in the statement so sellers and promoters can see
+		// that automatic payout needs attention instead of silently falling
+		// back to an apparently ordinary pending commission.
+		output.State = action.State
 		return output
 	default:
 		return nil
@@ -655,9 +663,9 @@ func sameAffiliatePayoutAddress(actual, expected string) bool {
 func affiliateSettlementRank(state string) int {
 	switch state {
 	case "confirmed":
+		return 4
+	case "submitted", "failed", "abandoned":
 		return 3
-	case "submitted":
-		return 2
 	case "planned":
 		return 1
 	default:

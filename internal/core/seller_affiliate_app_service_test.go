@@ -476,9 +476,10 @@ func TestSellerAffiliateStatement_ProjectsVerifiedSettlementOutputs(t *testing.T
 	}
 	now := time.Now().UTC()
 	tests := []struct {
-		name   string
-		action models.SettlementActionSnapshot
-		want   string
+		name      string
+		action    models.SettlementActionSnapshot
+		want      string
+		wantError string
 	}{
 		{
 			name: "planned", action: models.SettlementActionSnapshot{
@@ -506,6 +507,16 @@ func TestSellerAffiliateStatement_ProjectsVerifiedSettlementOutputs(t *testing.T
 				OrderID: "affiliate-order", ActionID: "act-unverified", Action: "complete", State: "confirmed", SettlementCoin: "ETH", PlannedLines: []models.SettlementPayoutLine{planned}, UpdatedAt: now,
 			}, want: "",
 		},
+		{
+			name: "failed action remains visible with its reason", action: models.SettlementActionSnapshot{
+				OrderID: "affiliate-order", ActionID: "act-failed", Action: "confirm", State: "failed", SettlementCoin: "ETH", PlannedLines: []models.SettlementPayoutLine{planned}, LastError: "receipt output mismatch", UpdatedAt: now,
+			}, want: "failed", wantError: "receipt output mismatch",
+		},
+		{
+			name: "abandoned action remains visible with its reason", action: models.SettlementActionSnapshot{
+				OrderID: "affiliate-order", ActionID: "act-abandoned", Action: "confirm", State: "abandoned", SettlementCoin: "ETH", PlannedLines: []models.SettlementPayoutLine{planned}, LastError: "confirmation timed out", UpdatedAt: now,
+			}, want: "abandoned", wantError: "confirmation timed out",
+		},
 	}
 
 	for _, tt := range tests {
@@ -521,6 +532,7 @@ func TestSellerAffiliateStatement_ProjectsVerifiedSettlementOutputs(t *testing.T
 			require.NotNil(t, statement[0].Settlement)
 			assert.Equal(t, tt.want, statement[0].Settlement.State)
 			assert.Equal(t, "125", statement[0].Settlement.Amount)
+			assert.Equal(t, tt.wantError, statement[0].Settlement.LastError)
 		})
 	}
 }

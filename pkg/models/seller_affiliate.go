@@ -371,17 +371,18 @@ type AffiliateStatementLine struct {
 
 // AffiliateSettlementOutput is a read-only projection of the promoter output
 // in a backend settlement action. It never changes commission lifecycle state:
-// the UI derives settling/paid from State and uses CommissionLine.Status only
-// for pending/reversed business facts.
+// the UI derives settling/paid/failed from State and uses CommissionLine.Status
+// only for pending/reversed business facts.
 type AffiliateSettlementOutput struct {
 	ActionID      string     `json:"actionId"`
 	Action        string     `json:"action"`
-	State         string     `json:"state"` // planned | submitted | confirmed
+	State         string     `json:"state"` // planned | submitted | confirmed | failed | abandoned
 	TxHash        string     `json:"txHash,omitempty"`
 	Coin          string     `json:"coin"`
 	Amount        string     `json:"amount"`
 	Address       string     `json:"address"`
 	Confirmations int        `json:"confirmations,omitempty"`
+	LastError     string     `json:"lastError,omitempty"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
 	ConfirmedAt   *time.Time `json:"confirmedAt,omitempty"`
 }

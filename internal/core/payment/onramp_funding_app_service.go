@@ -89,6 +89,7 @@ func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req Init
 	if idemKey == "" {
 		idemKey = "primary"
 	}
+	requestedFiatCurrency := normalizeFiatCurrency(req.FiatCurrency)
 
 	// Frozen-terms gate: the attempt must expose a verified, immutable funding
 	// target before any purchase is initiated.
@@ -114,6 +115,10 @@ func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req Init
 		if err != nil {
 			return nil, err
 		}
+		fiatCurrency, err := s.pinResumeFiatCurrency(existing, requestedFiatCurrency)
+		if err != nil {
+			return nil, err
+		}
 		purchase, err := provider.InitiatePurchase(ctx, contracts.OnrampPurchaseRequest{
 			Buyer:                req.Buyer,
 			OrderID:              req.OrderID,
@@ -121,7 +126,7 @@ func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req Init
 			RailID:               attempt.Currency,
 			SettlementAsset:      target.AssetID,
 			SettlementAmount:     settlementAmount,
-			FiatCurrency:         req.FiatCurrency,
+			FiatCurrency:         fiatCurrency,
 			ClientIP:             req.ClientIP,
 			DeliveryTarget:       target.Address,
 			DeliverToBuyerWallet: existing.DeliverToBuyerWallet,
@@ -165,7 +170,7 @@ func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req Init
 		RailID:               attempt.Currency,
 		SettlementAsset:      target.AssetID,
 		SettlementAmount:     settlementAmount,
-		FiatCurrency:         req.FiatCurrency,
+		FiatCurrency:         requestedFiatCurrency,
 		ClientIP:             req.ClientIP,
 		DeliveryTarget:       target.Address,
 		DeliverToBuyerWallet: req.DeliverToBuyerWallet,
@@ -182,6 +187,7 @@ func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req Init
 		OnrampOrderID:        purchase.OnrampOrderID,
 		OrderID:              req.OrderID,
 		ProviderID:           purchase.ProviderID,
+		FiatCurrency:         requestedFiatCurrency,
 		IdempotencyKey:       idemKey,
 		DeliveryTarget:       purchase.DeliveryTarget,
 		DeliverToBuyerWallet: purchase.DeliverToBuyerWallet,
@@ -206,6 +212,49 @@ func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req Init
 	}
 	view := onrampSourceView(row)
 	return &view, nil
+}
+
+func normalizeFiatCurrency(currency string) string {
+	return strings.ToUpper(strings.TrimSpace(currency))
+}
+
+// pinResumeFiatCurrency returns the commercial currency frozen by the first
+// initiate. The conditional update only exists for rows created before the
+// fiat_currency column was introduced; it also makes the first legacy resume
+// deterministic if two clients race with different locale defaults.
+func (s *OnrampFundingAppService) pinResumeFiatCurrency(row *models.PaymentAttemptOnrampFundingSource, requested string) (string, error) {
+	if stored := normalizeFiatCurrency(row.FiatCurrency); stored != "" {
+		return stored, nil
+	}
+	var updated int64
+	err := s.db.Update(func(tx database.Tx) error {
+		var err error
+		updated, err = tx.UpdateColumns(map[string]interface{}{
+			"fiat_currency": requested,
+		}, map[string]interface{}{
+			"tenant_id = ?":       row.TenantID,
+			"attempt_id = ?":      row.AttemptID,
+			"onramp_order_id = ?": row.OnrampOrderID,
+			"fiat_currency = ?":   "",
+		}, &models.PaymentAttemptOnrampFundingSource{})
+		return err
+	})
+	if err != nil {
+		return "", fmt.Errorf("pin onramp fiat currency: %w", err)
+	}
+	if updated == 1 {
+		row.FiatCurrency = requested
+		return requested, nil
+	}
+	// Another legacy resume won the conditional update. Reload the durable row
+	// instead of allowing this request's input to overwrite that decision.
+	if durable := s.findByIdempotencyKey(row.TenantID, row.AttemptID, row.IdempotencyKey); durable != nil {
+		if stored := normalizeFiatCurrency(durable.FiatCurrency); stored != "" {
+			row.FiatCurrency = stored
+			return stored, nil
+		}
+	}
+	return "", fmt.Errorf("pin onramp fiat currency: durable record is unavailable")
 }
 
 // RefreshStatus polls the provider for the attempt's in-flight purchase and

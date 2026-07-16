@@ -11,6 +11,7 @@ import (
 	"github.com/mobazha/mobazha/internal/payment/onramp"
 	onrampmock "github.com/mobazha/mobazha/internal/payment/onramp/mock"
 	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/models"
 	"github.com/mobazha/mobazha/pkg/payment"
 	"github.com/stretchr/testify/require"
@@ -76,12 +77,44 @@ func TestOnrampFundingInitiateAndResume(t *testing.T) {
 	require.True(t, first.Active())
 
 	// Leave and return: same (default) idempotency key resumes the purchase.
-	again, err := svc.InitiateOrResume(ctx, initiateReq(attempt))
+	resumeReq := initiateReq(attempt)
+	resumeReq.FiatCurrency = "eur"
+	again, err := svc.InitiateOrResume(ctx, resumeReq)
 	require.NoError(t, err)
 	require.Equal(t, first.OnrampOrderID, again.OnrampOrderID, "resume must not create a second onramp order")
 	calls, lastRequest := provider.requestSnapshot()
 	require.Equal(t, 2, calls, "resume must reissue an expiring buyer action session")
 	require.Equal(t, "0.000000000000001", lastRequest.SettlementAmount, "provider amounts must be human-readable decimals")
+	require.Equal(t, "USD", lastRequest.FiatCurrency, "resume must keep the first purchase's commercial currency")
+	stored := svc.findByIdempotencyKey("", attempt.AttemptID, "primary")
+	require.NotNil(t, stored)
+	require.Equal(t, "USD", stored.FiatCurrency)
+}
+
+func TestOnrampFundingResumePinsLegacyFiatCurrency(t *testing.T) {
+	svc, provider, attempt := newOnrampServiceFixture(t)
+	ctx := context.Background()
+
+	first, err := svc.InitiateOrResume(ctx, initiateReq(attempt))
+	require.NoError(t, err)
+	require.NoError(t, svc.db.Update(func(tx database.Tx) error {
+		_, updateErr := tx.UpdateColumns(map[string]interface{}{"fiat_currency": ""}, map[string]interface{}{
+			"tenant_id = ?":       "",
+			"attempt_id = ?":      attempt.AttemptID,
+			"onramp_order_id = ?": first.OnrampOrderID,
+		}, &models.PaymentAttemptOnrampFundingSource{})
+		return updateErr
+	}))
+
+	resumeReq := initiateReq(attempt)
+	resumeReq.FiatCurrency = "eur"
+	_, err = svc.InitiateOrResume(ctx, resumeReq)
+	require.NoError(t, err)
+	_, lastRequest := provider.requestSnapshot()
+	require.Equal(t, "EUR", lastRequest.FiatCurrency)
+	stored := svc.findByIdempotencyKey("", attempt.AttemptID, "primary")
+	require.NotNil(t, stored)
+	require.Equal(t, "EUR", stored.FiatCurrency)
 }
 
 func TestOnrampFundingRefreshReturnsDirectTerminalTransition(t *testing.T) {

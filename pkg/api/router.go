@@ -51,6 +51,10 @@ type RouterConfig struct {
 	// RuntimePaymentMethodsProvider supplies platform-level payment methods for
 	// public runtime-config responses in SaaS compositions.
 	RuntimePaymentMethodsProvider func(context.Context) []edition.PaymentMethod
+	// TrustedProxyCIDRs enables forwarded client IP handling only for known
+	// reverse-proxy networks. Empty may be configured through
+	// MOBAZHA_TRUSTED_PROXY_CIDRS by the node API layer.
+	TrustedProxyCIDRs []string
 
 	// PostResolverMiddleware is applied after the resolver has populated the
 	// request context but before route handlers. Use this for scope enforcement
@@ -75,6 +79,7 @@ func NewRouter(cfg RouterConfig) (*Router, error) {
 		DistributionPolicy:            cfg.DistributionPolicy,
 		AIHTTPPolicy:                  cfg.AIHTTPPolicy,
 		RuntimePaymentMethodsProvider: cfg.RuntimePaymentMethodsProvider,
+		TrustedProxyCIDRs:             cfg.TrustedProxyCIDRs,
 		PostResolverMiddleware:        cfg.PostResolverMiddleware,
 	})
 	if err != nil {

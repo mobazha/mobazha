@@ -39,6 +39,10 @@ type PaymentAttemptOnrampFundingSource struct {
 
 	OrderID    string `gorm:"column:order_id;size:255;not null;index:idx_onramp_source_order"`
 	ProviderID string `gorm:"column:provider_id;size:64;not null"`
+	// FiatCurrency is part of the provider purchase's commercial identity.
+	// Persist it so an idempotent resume cannot silently switch currencies when
+	// a client locale or provider discovery response changes.
+	FiatCurrency string `gorm:"column:fiat_currency;size:16;not null;default:''"`
 
 	// Status mirrors contracts.OnrampStatus. Active is derived from Status by
 	// SetStatus and backs the at-most-one-active partial unique index; writers

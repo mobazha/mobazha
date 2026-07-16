@@ -26,6 +26,7 @@ type SharedRouterConfig struct {
 	DistributionPolicy            edition.Policy
 	AIHTTPPolicy                  distribution.AIHTTPPolicy
 	RuntimePaymentMethodsProvider func(context.Context) []edition.PaymentMethod
+	TrustedProxyCIDRs             []string
 
 	// PostResolverMiddleware, if set, is applied after the resolver middleware
 	// has populated the request context (NodeService + AuthIdentity) but before
@@ -39,6 +40,10 @@ type SharedRouterConfig struct {
 // middleware injects the NodeService into the request context so that
 // getNodeService(r) works without any handler changes.
 func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
+	trustedProxies, err := newTrustedProxySet(cfg.TrustedProxyCIDRs)
+	if err != nil {
+		return nil, err
+	}
 	distributionPolicy := cfg.DistributionPolicy
 	if distributionPolicy == nil {
 		distributionPolicy = edition.DefaultPolicy()
@@ -48,10 +53,11 @@ func NewSharedRouter(cfg SharedRouterConfig) (*SharedRouter, error) {
 			SkillProvider:                 cfg.SkillProvider,
 			RuntimeCapabilitiesSnapshotFn: runtimeCapabilitiesFromPaymentMethods(cfg.RuntimePaymentMethodsProvider),
 		},
-		hubs:          make(map[string]*hub),
-		hubsMtx:       sync.RWMutex{},
-		editionPolicy: distributionPolicy,
-		aiHTTPPolicy:  resolveAIHTTPPolicy(cfg.AIHTTPPolicy, distributionPolicy),
+		hubs:           make(map[string]*hub),
+		hubsMtx:        sync.RWMutex{},
+		editionPolicy:  distributionPolicy,
+		aiHTTPPolicy:   resolveAIHTTPPolicy(cfg.AIHTTPPolicy, distributionPolicy),
+		trustedProxies: trustedProxies,
 	}
 	if cfg.FeatureManager != nil {
 		g.featureManager = cfg.FeatureManager

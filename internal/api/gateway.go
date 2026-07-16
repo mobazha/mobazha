@@ -74,6 +74,10 @@ type GatewayConfig struct {
 	// AuthAuditSink receives structured authentication boundary events.
 	// Nil uses the standard structured log sink.
 	AuthAuditSink AuthAuditSink
+	// TrustedProxyCIDRs lists reverse-proxy networks allowed to supply client
+	// address headers. Empty reads MOBAZHA_TRUSTED_PROXY_CIDRS; when neither is
+	// configured, forwarded headers are ignored.
+	TrustedProxyCIDRs []string
 
 	// CasdoorCertificate is the PEM certificate from SaaS Casdoor.
 	// When set, the standalone node accepts JWT Bearer tokens in addition
@@ -158,6 +162,7 @@ type Gateway struct {
 	authLimiter       *authRateLimiter
 	editionPolicy     edition.Policy
 	aiHTTPPolicy      distribution.AIHTTPPolicy
+	trustedProxies    trustedProxySet
 	// storeCredentialRefresher performs a fresh Peer-signed platform
 	// registration. It is installed by the standalone composition after the
 	// local node identity is available; the gateway never handles the private
@@ -219,6 +224,10 @@ func (g *Gateway) refreshStoreCredential(ctx context.Context) (string, error) {
 
 // NewGateway instantiates a new gateway.
 func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (*Gateway, error) {
+	trustedProxies, err := newTrustedProxySet(config.TrustedProxyCIDRs)
+	if err != nil {
+		return nil, err
+	}
 	editionPolicy, err := edition.ResolvePolicy(config.Edition)
 	if err != nil {
 		return nil, fmt.Errorf("resolve edition policy: %w", err)
@@ -238,6 +247,7 @@ func NewGateway(nodeManager coreiface.NodeManagerIface, config *GatewayConfig) (
 			authAuditSink:     config.AuthAuditSink,
 			editionPolicy:     editionPolicy,
 			aiHTTPPolicy:      resolveAIHTTPPolicy(config.AIHTTPPolicy, editionPolicy),
+			trustedProxies:    trustedProxies,
 		}
 		topMux = http.NewServeMux()
 	)

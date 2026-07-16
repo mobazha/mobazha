@@ -81,7 +81,7 @@ func (g *Gateway) handlePOSTOrderPaymentSessionOnramp(w http.ResponseWriter, r *
 		Buyer:                contracts.BuyerRef{Subject: identity.UserID},
 		ProviderID:           body.ProviderID,
 		FiatCurrency:         body.FiatCurrency,
-		ClientIP:             remoteIP(r),
+		ClientIP:             g.clientIP(r),
 		IdempotencyKey:       body.IdempotencyKey,
 		DeliverToBuyerWallet: body.DeliverToBuyerWallet,
 		BuyerWalletAddress:   body.BuyerWalletAddress,

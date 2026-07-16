@@ -81,6 +81,7 @@ func (g *Gateway) handlePOSTOrderPaymentSessionOnramp(w http.ResponseWriter, r *
 		Buyer:                contracts.BuyerRef{Subject: identity.UserID},
 		ProviderID:           body.ProviderID,
 		FiatCurrency:         body.FiatCurrency,
+		ClientIP:             remoteIP(r),
 		IdempotencyKey:       body.IdempotencyKey,
 		DeliverToBuyerWallet: body.DeliverToBuyerWallet,
 		BuyerWalletAddress:   body.BuyerWalletAddress,
@@ -97,8 +98,8 @@ func (g *Gateway) handlePOSTOrderPaymentSessionOnramp(w http.ResponseWriter, r *
 //
 // POST /v1/orders/{orderID}/payment-session/onramp/refresh
 //
-// Returns the current selection (possibly a delivered-to-wallet record whose
-// forwarding is pending), or data:null when nothing is in flight.
+// Returns the latest durable lifecycle record (including a direct-delivery
+// terminal outcome), or data:null when no purchase has ever existed.
 func (g *Gateway) handlePOSTOrderPaymentSessionOnrampRefresh(w http.ResponseWriter, r *http.Request) {
 	orderID := chi.URLParam(r, "orderID")
 	if orderID == "" {
@@ -195,7 +196,7 @@ func (g *Gateway) registerOrderPaymentSessionOnrampRefreshPost(api huma.API) {
 		Path:        "/v1/orders/" + orderIDPathParam + "/payment-session/onramp/refresh",
 		Summary:     "Refresh onramp funding status",
 		Description: "Polls the onramp provider for the order's in-flight purchase, persists the " +
-			"transition, and returns the current onramp funding view (null when nothing is in flight).",
+			"transition, and returns its latest durable lifecycle view (null only when no purchase exists).",
 		Tags:     []string{"orders", "payments"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, hi *in) (*nodeDataOutput, error) {

@@ -25,6 +25,10 @@ func TestLiveSessionTokenProbe(t *testing.T) {
 	if keyFile == "" {
 		t.Skip("MOBAZHA_CDP_ONRAMP_KEY_FILE not set")
 	}
+	clientIP := os.Getenv("MOBAZHA_CDP_ONRAMP_CLIENT_IP")
+	if clientIP == "" {
+		t.Skip("MOBAZHA_CDP_ONRAMP_CLIENT_IP not set")
+	}
 	auth, err := LoadKeyAuthenticator(keyFile)
 	if err != nil {
 		t.Fatalf("load key: %v", err)
@@ -38,6 +42,7 @@ func TestLiveSessionTokenProbe(t *testing.T) {
 		Address:       "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
 		Networks:      []string{"base"},
 		Assets:        []string{"USDC"},
+		ClientIP:      clientIP,
 		PartnerUserID: "cdp-live-probe",
 	})
 	if err != nil {

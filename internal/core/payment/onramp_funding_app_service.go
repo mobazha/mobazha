@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 	"strings"
 	"time"
@@ -54,6 +55,7 @@ type InitiateOnrampFundingRequest struct {
 	Buyer        contracts.BuyerRef
 	ProviderID   string
 	FiatCurrency string
+	ClientIP     string
 
 	IdempotencyKey string
 
@@ -75,9 +77,10 @@ func (r InitiateOnrampFundingRequest) Validate() error {
 }
 
 // InitiateOrResume creates the attempt's onramp purchase or resumes the
-// existing one. Idempotent on (attempt, idempotency key) at both layers: the
-// durable record short-circuits before any provider call, and the provider
-// contract guarantees initiate-idempotency underneath.
+// existing one. Idempotent on (attempt, idempotency key) at both layers. An
+// awaiting-payment resume calls the same provider purchase again so adapters
+// with short-lived, single-use action URLs can issue a fresh session without
+// creating a second provider order.
 func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req InitiateOnrampFundingRequest) (*payment.OnrampFundingSourceView, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err
@@ -94,9 +97,48 @@ func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req Init
 		return nil, err
 	}
 
-	// Resume: an existing record for this idempotency key wins outright.
+	settlementAmount, err := frozenSettlementAmount(target)
+	if err != nil {
+		return nil, err
+	}
+
+	// Resume: the durable provider/order binding wins. Awaiting-payment action
+	// URLs are reissued because providers such as CDP make them short-lived and
+	// single-use; later lifecycle states are status-polled instead.
 	if existing := s.findByIdempotencyKey(req.TenantID, req.AttemptID, idemKey); existing != nil {
-		return s.refreshRecord(ctx, existing), nil
+		if existing.Status != string(contracts.OnrampStatusCreated) &&
+			existing.Status != string(contracts.OnrampStatusAwaitingPayment) {
+			return s.refreshRecord(ctx, existing), nil
+		}
+		provider, err := s.providers.ForProvider(existing.ProviderID)
+		if err != nil {
+			return nil, err
+		}
+		purchase, err := provider.InitiatePurchase(ctx, contracts.OnrampPurchaseRequest{
+			Buyer:                req.Buyer,
+			OrderID:              req.OrderID,
+			AttemptID:            req.AttemptID,
+			RailID:               attempt.Currency,
+			SettlementAsset:      target.AssetID,
+			SettlementAmount:     settlementAmount,
+			FiatCurrency:         req.FiatCurrency,
+			ClientIP:             req.ClientIP,
+			DeliveryTarget:       target.Address,
+			DeliverToBuyerWallet: existing.DeliverToBuyerWallet,
+			BuyerWalletAddress:   existing.BuyerWalletAddress,
+			IdempotencyKey:       idemKey,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if err := validateResumedPurchase(existing, purchase); err != nil {
+			return nil, err
+		}
+		if err := s.persistResumedPurchase(existing, purchase); err != nil {
+			return nil, err
+		}
+		view := onrampSourceView(existing)
+		return &view, nil
 	}
 
 	provider, err := s.providers.ForProvider(req.ProviderID)
@@ -116,16 +158,15 @@ func (s *OnrampFundingAppService) InitiateOrResume(ctx context.Context, req Init
 		return nil, fmt.Errorf("%w: provider %s cannot deliver to the funding target on %s", contracts.ErrOnrampCapabilityClosed, req.ProviderID, attempt.Currency)
 	}
 
-	// SettlementAmount passes the frozen atomic amount through; unit
-	// normalization for real provider quotes is an adapter concern.
 	purchase, err := provider.InitiatePurchase(ctx, contracts.OnrampPurchaseRequest{
 		Buyer:                req.Buyer,
 		OrderID:              req.OrderID,
 		AttemptID:            req.AttemptID,
 		RailID:               attempt.Currency,
 		SettlementAsset:      target.AssetID,
-		SettlementAmount:     target.AmountAtomic,
+		SettlementAmount:     settlementAmount,
 		FiatCurrency:         req.FiatCurrency,
+		ClientIP:             req.ClientIP,
 		DeliveryTarget:       target.Address,
 		DeliverToBuyerWallet: req.DeliverToBuyerWallet,
 		BuyerWalletAddress:   req.BuyerWalletAddress,
@@ -184,16 +225,23 @@ func (s *OnrampFundingAppService) RefreshStatus(ctx context.Context, tenantID, a
 		}
 	}
 	if active != nil {
-		if refreshed := s.refreshRecord(ctx, active); refreshed != nil {
-			// Re-read history so selection sees the persisted transition.
-			rows = s.loadHistory(tenantID, attemptID)
-		}
+		// Return the transition that was just polled even when it became
+		// terminal. Otherwise direct-to-target delivered/failed transitions
+		// collapse to null before clients can stop polling or render the result.
+		return s.refreshRecord(ctx, active), nil
 	}
 	views := make([]payment.OnrampFundingSourceView, 0, len(rows))
 	for i := range rows {
 		views = append(views, onrampSourceView(&rows[i]))
 	}
-	return payment.SelectOnrampFundingSource(views), nil
+	if selected := payment.SelectOnrampFundingSource(views); selected != nil {
+		return selected, nil
+	}
+	// Refresh is a lifecycle endpoint, not the session projection: once a
+	// purchase exists, return its latest durable terminal record so another
+	// client cannot consume the one transition and leave this caller with null.
+	latest := onrampSourceView(&rows[0])
+	return &latest, nil
 }
 
 // refreshRecord best-effort polls the provider and persists a status change.
@@ -243,9 +291,61 @@ func (s *OnrampFundingAppService) InitiateOrResumeForOrder(ctx context.Context, 
 		Buyer:                req.Buyer,
 		ProviderID:           req.ProviderID,
 		FiatCurrency:         req.FiatCurrency,
+		ClientIP:             req.ClientIP,
 		IdempotencyKey:       req.IdempotencyKey,
 		DeliverToBuyerWallet: req.DeliverToBuyerWallet,
 		BuyerWalletAddress:   req.BuyerWalletAddress,
+	})
+}
+
+// frozenSettlementAmount converts the canonical frozen atomic amount into the
+// human-readable decimal required by hosted onramp APIs.
+func frozenSettlementAmount(target *models.PaymentAttemptFundingTarget) (string, error) {
+	raw := strings.TrimSpace(target.AmountAtomic)
+	amount, ok := new(big.Int).SetString(raw, 10)
+	if !ok || amount.Sign() <= 0 {
+		return "", fmt.Errorf("onramp funding: invalid frozen atomic amount %q", target.AmountAtomic)
+	}
+	if _, ok := payment.SessionAmountDecimals(target.AssetID); !ok {
+		return "", fmt.Errorf("onramp funding: unknown settlement asset divisibility for %s", target.AssetID)
+	}
+	return payment.FormatSessionAmount(raw, target.AssetID), nil
+}
+
+func validateResumedPurchase(existing *models.PaymentAttemptOnrampFundingSource, purchase contracts.OnrampPurchase) error {
+	if purchase.ProviderID != existing.ProviderID || purchase.OnrampOrderID != existing.OnrampOrderID {
+		return fmt.Errorf("onramp funding: provider violated resume idempotency")
+	}
+	if purchase.DeliveryTarget != existing.DeliveryTarget ||
+		purchase.DeliverToBuyerWallet != existing.DeliverToBuyerWallet ||
+		purchase.BuyerWalletAddress != existing.BuyerWalletAddress {
+		return fmt.Errorf("onramp funding: provider changed the frozen delivery binding on resume")
+	}
+	return nil
+}
+
+func (s *OnrampFundingAppService) persistResumedPurchase(row *models.PaymentAttemptOnrampFundingSource, purchase contracts.OnrampPurchase) error {
+	updates := map[string]interface{}{}
+	if strings.TrimSpace(purchase.BuyerActionURL) != "" && purchase.BuyerActionURL != row.BuyerActionURL {
+		row.BuyerActionURL = purchase.BuyerActionURL
+		updates["buyer_action_url"] = row.BuyerActionURL
+	}
+	if strings.TrimSpace(purchase.Disclosure) != "" && purchase.Disclosure != row.Disclosure {
+		row.Disclosure = purchase.Disclosure
+		updates["disclosure"] = row.Disclosure
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	row.UpdatedAt = time.Now().UTC()
+	updates["updated_at"] = row.UpdatedAt
+	return s.db.Update(func(tx database.Tx) error {
+		_, err := tx.UpdateColumns(updates, map[string]interface{}{
+			"tenant_id = ?":       row.TenantID,
+			"attempt_id = ?":      row.AttemptID,
+			"onramp_order_id = ?": row.OnrampOrderID,
+		}, &models.PaymentAttemptOnrampFundingSource{})
+		return err
 	})
 }
 

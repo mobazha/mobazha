@@ -51,6 +51,7 @@ func NewHTTPClient(auth Authenticator, baseURL string) *HTTPClient {
 type sessionTokenBody struct {
 	Addresses []sessionTokenAddress `json:"addresses"`
 	Assets    []string              `json:"assets,omitempty"`
+	ClientIP  string                `json:"clientIp"`
 }
 
 type sessionTokenAddress struct {
@@ -67,6 +68,7 @@ func (c *HTTPClient) CreateSessionToken(ctx context.Context, req SessionTokenReq
 	body, err := json.Marshal(sessionTokenBody{
 		Addresses: []sessionTokenAddress{{Address: req.Address, Blockchains: req.Networks}},
 		Assets:    req.Assets,
+		ClientIP:  req.ClientIP,
 	})
 	if err != nil {
 		return "", fmt.Errorf("cdp: encode session token request: %w", err)

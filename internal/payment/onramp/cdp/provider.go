@@ -22,6 +22,8 @@ package cdp
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"strings"
@@ -80,6 +82,9 @@ type SessionTokenRequest struct {
 	Networks []string
 	// Assets restricts the purchasable assets for the session.
 	Assets []string
+	// ClientIP is required by CDP and must be the direct peer IP observed by
+	// the backend, not a browser-supplied forwarding header.
+	ClientIP string
 	// PartnerUserID correlates the session with our purchase record.
 	PartnerUserID string
 }
@@ -163,6 +168,9 @@ func (p *Provider) InitiatePurchase(ctx context.Context, req contracts.OnrampPur
 	if !ok {
 		return contracts.OnrampPurchase{}, contracts.ErrOnrampCapabilityClosed
 	}
+	if strings.TrimSpace(req.ClientIP) == "" {
+		return contracts.OnrampPurchase{}, fmt.Errorf("cdp: client IP is required")
+	}
 	address := req.DeliveryTarget
 	if req.DeliverToBuyerWallet {
 		address = req.BuyerWalletAddress
@@ -173,6 +181,7 @@ func (p *Provider) InitiatePurchase(ctx context.Context, req contracts.OnrampPur
 		Address:       address,
 		Networks:      []string{rail.Network},
 		Assets:        []string{rail.AssetSymbol},
+		ClientIP:      req.ClientIP,
 		PartnerUserID: partnerUserID,
 	})
 	if err != nil {
@@ -189,7 +198,7 @@ func (p *Provider) InitiatePurchase(ctx context.Context, req contracts.OnrampPur
 	// question 2 confirms this mode.)
 	query.Set("presetCryptoAmount", req.SettlementAmount)
 	query.Set("fiatCurrency", strings.ToUpper(req.FiatCurrency))
-	query.Set("partnerUserId", partnerUserID)
+	query.Set("partnerUserRef", partnerUserID)
 	if p.cfg.RedirectURL != "" {
 		query.Set("redirectUrl", p.cfg.RedirectURL)
 	}
@@ -236,10 +245,13 @@ func (p *Provider) PurchaseStatus(ctx context.Context, onrampOrderID string) (co
 }
 
 // PurchasePartnerUserID deterministically correlates one attempt-scoped
-// purchase with Coinbase's partnerUserId, so initiate retries and status
+// purchase with Coinbase's partnerUserRef, so initiate retries and status
 // polls agree without provider-side state.
 func PurchasePartnerUserID(attemptID, idempotencyKey string) string {
-	return "cdp-" + attemptID + "-" + idempotencyKey
+	sum := sha256.Sum256([]byte(attemptID + "\x00" + idempotencyKey))
+	// CDP caps partnerUserRef at 50 characters. Keep a readable namespace and
+	// use a fixed digest so arbitrary order/idempotency values cannot exceed it.
+	return "mbz-" + hex.EncodeToString(sum[:])[:46]
 }
 
 // mapStatus translates Onramp transaction statuses into the provider-neutral

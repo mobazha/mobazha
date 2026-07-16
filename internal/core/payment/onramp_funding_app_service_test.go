@@ -5,6 +5,7 @@ package payment
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/mobazha/mobazha/internal/payment/onramp"
@@ -15,9 +16,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type recordingOnrampProvider struct {
+	*onrampmock.Provider
+	mu            sync.Mutex
+	initiateCalls int
+	lastRequest   contracts.OnrampPurchaseRequest
+}
+
+func (p *recordingOnrampProvider) InitiatePurchase(ctx context.Context, req contracts.OnrampPurchaseRequest) (contracts.OnrampPurchase, error) {
+	p.mu.Lock()
+	p.initiateCalls++
+	p.lastRequest = req
+	p.mu.Unlock()
+	return p.Provider.InitiatePurchase(ctx, req)
+}
+
+func (p *recordingOnrampProvider) requestSnapshot() (int, contracts.OnrampPurchaseRequest) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.initiateCalls, p.lastRequest
+}
+
 // newOnrampServiceFixture wires an in-memory DB with a frozen attempt and a
 // mock onramp provider whose rail matches the attempt's currency.
-func newOnrampServiceFixture(t *testing.T) (*OnrampFundingAppService, *onrampmock.Provider, models.PaymentAttempt) {
+func newOnrampServiceFixture(t *testing.T) (*OnrampFundingAppService, *recordingOnrampProvider, models.PaymentAttempt) {
 	t.Helper()
 	db := newVerifierTestDB(t)
 	require.NoError(t, db.gormDB.AutoMigrate(&models.PaymentAttempt{}, &models.PaymentAttemptOnrampFundingSource{}))
@@ -26,7 +48,7 @@ func newOnrampServiceFixture(t *testing.T) (*OnrampFundingAppService, *onrampmoc
 	require.Equal(t, models.PaymentAttemptFundingTargetReady, attempt.State)
 	require.NoError(t, db.gormDB.Create(&attempt).Error)
 
-	provider := onrampmock.New(onrampmock.WithRailCapabilities(onrampmock.OpenRail(attempt.Currency, "USD")))
+	provider := &recordingOnrampProvider{Provider: onrampmock.New(onrampmock.WithRailCapabilities(onrampmock.OpenRail(attempt.Currency, "USD")))}
 	registry := onramp.NewRegistry()
 	registry.Register(provider)
 	return NewOnrampFundingAppService(db, registry), provider, attempt
@@ -39,11 +61,12 @@ func initiateReq(attempt models.PaymentAttempt) InitiateOnrampFundingRequest {
 		Buyer:        contracts.BuyerRef{Subject: "buyer@example.com"},
 		ProviderID:   onrampmock.ProviderID,
 		FiatCurrency: "USD",
+		ClientIP:     "192.0.2.10",
 	}
 }
 
 func TestOnrampFundingInitiateAndResume(t *testing.T) {
-	svc, _, attempt := newOnrampServiceFixture(t)
+	svc, provider, attempt := newOnrampServiceFixture(t)
 	ctx := context.Background()
 
 	first, err := svc.InitiateOrResume(ctx, initiateReq(attempt))
@@ -56,6 +79,28 @@ func TestOnrampFundingInitiateAndResume(t *testing.T) {
 	again, err := svc.InitiateOrResume(ctx, initiateReq(attempt))
 	require.NoError(t, err)
 	require.Equal(t, first.OnrampOrderID, again.OnrampOrderID, "resume must not create a second onramp order")
+	calls, lastRequest := provider.requestSnapshot()
+	require.Equal(t, 2, calls, "resume must reissue an expiring buyer action session")
+	require.Equal(t, "0.000000000000001", lastRequest.SettlementAmount, "provider amounts must be human-readable decimals")
+}
+
+func TestOnrampFundingRefreshReturnsDirectTerminalTransition(t *testing.T) {
+	svc, provider, attempt := newOnrampServiceFixture(t)
+	ctx := context.Background()
+
+	view, err := svc.InitiateOrResume(ctx, initiateReq(attempt))
+	require.NoError(t, err)
+	require.NoError(t, provider.SetStatus(view.OnrampOrderID, contracts.OnrampStatusFailed))
+
+	view, err = svc.RefreshStatus(ctx, "", attempt.AttemptID)
+	require.NoError(t, err)
+	require.NotNil(t, view, "the polled terminal transition must not collapse to null")
+	require.Equal(t, "failed", view.Status)
+
+	view, err = svc.RefreshStatus(ctx, "", attempt.AttemptID)
+	require.NoError(t, err)
+	require.NotNil(t, view, "refresh must keep returning the latest durable terminal record")
+	require.Equal(t, "failed", view.Status)
 }
 
 func TestOnrampFundingRefreshDrivesProjectionStates(t *testing.T) {

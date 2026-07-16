@@ -60,6 +60,8 @@ func onrampHandlerRequest(t *testing.T, svc contracts.OnrampFundingService, auth
 	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/orders/order-1/payment-session/onramp", &buf)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Forwarded-For", "203.0.113.99")
+	req.RemoteAddr = "192.0.2.10:4321"
 
 	var node contracts.NodeService = &mockNodeWithOnramp{mockNode: &mockNode{}, svc: svc}
 	ctx := context.WithValue(req.Context(), nodeContextKey, node)
@@ -86,6 +88,7 @@ func TestOnrampInitiateSuccessCarriesBuyerFromAuth(t *testing.T) {
 	(&Gateway{}).handlePOSTOrderPaymentSessionOnramp(rr, req)
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	require.Equal(t, "buyer-user", svc.lastReq.Buyer.Subject, "buyer identity must come from auth context")
+	require.Equal(t, "192.0.2.10", svc.lastReq.ClientIP, "client IP must come from the direct peer, not forwarding headers")
 
 	var envelope struct {
 		Data payment.OnrampFundingSourceView `json:"data"`

@@ -6,6 +6,7 @@ package cdp
 import (
 	"context"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/mobazha/mobazha/pkg/contracts"
@@ -53,6 +54,7 @@ func purchaseReq() contracts.OnrampPurchaseRequest {
 		SettlementAsset:  "crypto:eip155:8453:erc20:usdc",
 		SettlementAmount: "43.70",
 		FiatCurrency:     "usd",
+		ClientIP:         "192.0.2.10",
 		DeliveryTarget:   "0x91eB1182B96Ed52794B36B80A72dAE108f84a17c",
 		IdempotencyKey:   "primary",
 	}
@@ -78,8 +80,12 @@ func TestInitiateBindsSessionToFrozenTarget(t *testing.T) {
 	if len(client.lastRequest.Assets) != 1 || client.lastRequest.Assets[0] != "USDC" {
 		t.Fatalf("session assets = %v", client.lastRequest.Assets)
 	}
-	if client.lastRequest.PartnerUserID != "cdp-attempt-1-primary" {
-		t.Fatalf("partnerUserId = %q", client.lastRequest.PartnerUserID)
+	partnerUserRef := PurchasePartnerUserID("attempt-1", "primary")
+	if client.lastRequest.PartnerUserID != partnerUserRef {
+		t.Fatalf("partnerUserRef = %q", client.lastRequest.PartnerUserID)
+	}
+	if client.lastRequest.ClientIP != "192.0.2.10" {
+		t.Fatalf("clientIp = %q", client.lastRequest.ClientIP)
 	}
 
 	parsed, err := url.Parse(purchase.BuyerActionURL)
@@ -96,11 +102,24 @@ func TestInitiateBindsSessionToFrozenTarget(t *testing.T) {
 	if q.Get("fiatCurrency") != "USD" {
 		t.Fatalf("fiatCurrency = %q", q.Get("fiatCurrency"))
 	}
-	if purchase.OnrampOrderID != "cdp-attempt-1-primary" {
+	if q.Get("partnerUserRef") != partnerUserRef || q.Has("partnerUserId") {
+		t.Fatalf("partner user query = %v", q)
+	}
+	if purchase.OnrampOrderID != partnerUserRef {
 		t.Fatalf("OnrampOrderID = %q", purchase.OnrampOrderID)
 	}
 	if purchase.Status != contracts.OnrampStatusAwaitingPayment {
 		t.Fatalf("status = %s", purchase.Status)
+	}
+}
+
+func TestPurchasePartnerUserIDIsStableAndBounded(t *testing.T) {
+	got := PurchasePartnerUserID(strings.Repeat("attempt", 20), strings.Repeat("retry", 20))
+	if len(got) != 50 {
+		t.Fatalf("partnerUserRef length = %d, want 50", len(got))
+	}
+	if got != PurchasePartnerUserID(strings.Repeat("attempt", 20), strings.Repeat("retry", 20)) {
+		t.Fatal("partnerUserRef must be deterministic")
 	}
 }
 

@@ -247,12 +247,12 @@ func TestParseRails(t *testing.T) {
 	}
 }
 
-// The HTTP client treats a 404 as "no transactions yet", sends the secret via
-// the Authorization header, and never leaks it into the URL.
+// The HTTP client treats a 404 as "no transactions yet" and authenticates via
+// MoonPay's documented apiKey query parameter.
 func TestHTTPClientTransactionsByExternalID(t *testing.T) {
-	var gotAuth, gotPath string
+	var gotAPIKey, gotPath string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotAuth = r.Header.Get("Authorization")
+		gotAPIKey = r.URL.Query().Get("apiKey")
 		gotPath = r.URL.Path
 		switch r.URL.Path {
 		case "/v1/transactions/ext/known-id":
@@ -272,11 +272,11 @@ func TestHTTPClientTransactionsByExternalID(t *testing.T) {
 	if len(txs) != 1 || txs[0].Status != "completed" {
 		t.Fatalf("txs = %+v", txs)
 	}
-	if gotAuth != "Api-Key sk_test_secret" {
-		t.Fatalf("Authorization = %q", gotAuth)
+	if gotAPIKey != "sk_test_secret" {
+		t.Fatalf("apiKey = %q", gotAPIKey)
 	}
 	if strings.Contains(gotPath, "sk_test") {
-		t.Fatal("secret must never appear in the URL")
+		t.Fatal("secret must be a query value, not part of the path")
 	}
 
 	txs, err = client.TransactionsByExternalID(context.Background(), "never-seen")

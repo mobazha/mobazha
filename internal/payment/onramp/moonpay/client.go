@@ -44,13 +44,13 @@ func NewHTTPClient(secretKey, publishableKey, baseURL string) *HTTPClient {
 
 // TransactionsByExternalID implements Client.
 func (c *HTTPClient) TransactionsByExternalID(ctx context.Context, externalTransactionID string) ([]Transaction, error) {
-	endpoint := c.baseURL + "/v1/transactions/ext/" + url.PathEscape(externalTransactionID)
+	query := url.Values{}
+	query.Set("apiKey", c.secretKey)
+	endpoint := c.baseURL + "/v1/transactions/ext/" + url.PathEscape(externalTransactionID) + "?" + query.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("moonpay: build request: %w", err)
 	}
-	req.Header.Set("Authorization", "Api-Key "+c.secretKey)
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("moonpay: transactions by external id: %w", err)

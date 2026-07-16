@@ -137,6 +137,9 @@ type OnrampPurchaseRequest struct {
 	SettlementAsset  string
 	SettlementAmount string
 	FiatCurrency     string
+	// ClientIP is the direct HTTP peer IP observed by the node. Providers that
+	// require it for fraud controls must fail closed when it is absent.
+	ClientIP string
 
 	// DeliveryTarget is the frozen on-chain funding target. Required unless
 	// DeliverToBuyerWallet is true.
@@ -213,6 +216,9 @@ type OnrampFundingInitiation struct {
 	Buyer        BuyerRef
 	ProviderID   string
 	FiatCurrency string
+	// ClientIP is populated by the node HTTP boundary from RemoteAddr, never
+	// from client-controlled forwarding headers.
+	ClientIP string
 	// IdempotencyKey defaults to "primary": leave-and-resume returns the same
 	// purchase; a retry after a terminal failure supplies a new key.
 	IdempotencyKey string
@@ -226,7 +232,8 @@ type OnrampFundingInitiation struct {
 // onramp-funded attempts (ADR-019). Both methods are order-oriented: the
 // implementation resolves the order's current payable attempt and enforces the
 // frozen-terms gate. Returns are the same projection view the payment session
-// exposes as onrampFunding; a nil view from Refresh means nothing is in flight.
+// exposes as onrampFunding; once a purchase exists Refresh returns its latest
+// durable lifecycle record, including direct-delivery terminal outcomes.
 type OnrampFundingService interface {
 	InitiateOrResumeForOrder(ctx context.Context, orderID string, req OnrampFundingInitiation) (*payment.OnrampFundingSourceView, error)
 	RefreshForOrder(ctx context.Context, orderID string) (*payment.OnrampFundingSourceView, error)

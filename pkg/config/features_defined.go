@@ -759,3 +759,26 @@ var FeatureAiWorkspaceEnabled = registerFeature(Feature{
 	},
 	IntroducedIn: "ai-workspace-ws-0",
 })
+
+// FeatureAffiliateShortLinksEnabled — 平台短链分享面（/a/<code>）
+//
+// 门控点（均在 hosting 网关层，节点无感知）：
+//   - 建链/查链代理响应注入 shortPath（关闭时响应不含该字段，前端回退长链）
+//   - GET /platform/v1/affiliate-short-links/{code} 公开解析端点（关闭时 404，
+//     不泄漏短链是否存在）
+//
+// Kill Path：入口隐藏、/a/ 路由 404；长链（/promo/...）不受影响，继续可用。
+var FeatureAffiliateShortLinksEnabled = registerFeature(Feature{
+	Key:           "affiliateShortLinksEnabled",
+	DisplayName:   "Affiliate short links",
+	Description:   "Mints platform-level short codes (/a/<code>) for seller affiliate share links and exposes the public resolve endpoint.",
+	Category:      "platform",
+	Stability:     StabilityBeta,
+	DefaultValue:  true,
+	ClientVisible: true,
+	AllowedScopes: []Scope{
+		ScopePlatformGlobal,
+		ScopeTenant,
+	},
+	IntroducedIn: "affiliate-share-surface-a",
+})

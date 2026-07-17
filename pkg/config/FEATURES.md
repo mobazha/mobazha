@@ -598,6 +598,21 @@
 - **Dependencies**: none (Workspace chat uses `/v1/agent/chat`; status still uses `/v1/ai/status`)
 - **Kill Path**: set false (PlatformGlobal/Tenant/NodeRuntime) → sidebar falls back to the legacy AI Agents entry rendering AI Connect directly; `/admin/ai/*` section (Workspace/Models tabs) is hidden; dashboard keeps the classic Insights view
 
+### `affiliateShortLinksEnabled`
+
+- **Category**: platform
+- **Stability**: beta
+- **Default**: true
+- **Scopes**: PlatformGlobal, Tenant
+- **Client-visible**: yes
+- **Introduced in**: affiliate-share-surface-a
+- **Consumers**:
+  - hosting 网关建链/查链代理响应注入 `shortPath`（`api/affiliate_short_link_registrar.go`）
+  - hosting 公开解析端点 `GET /platform/v1/affiliate-short-links/{code}`
+  - unified 前端 `/a/[code]` 落地路由与 promoter 链接卡片短链展示
+- **Dependencies**: none（长链 `/promo/:sellerPeerID/:token` 独立于本 flag）
+- **Kill Path**: set false → 建链响应不再含 `shortPath`（前端自动回退长链展示）；解析端点对任意 code 返回 404（不泄漏存在性）；`/a/` 落地页显示不可用态；已分享的长链完全不受影响
+
 ---
 
 ## Scheduler Workers (AH-3 Sprint 4 — 待注册)
@@ -625,7 +640,7 @@
 | privacy | 1 | 1 beta |
 | payment | 4 | 3 beta, 1 experimental |
 | group | 1 | 1 beta |
-| platform | 8 | 1 stable, 1 beta, 6 experimental |
+| platform | 9 | 1 stable, 2 beta, 6 experimental |
 | multistore | 3 | 2 beta, 1 experimental |
 | storefronts | 4 | 3 beta, 1 experimental |
 | tg | 4 | 1 beta, 3 experimental |
@@ -633,4 +648,4 @@
 | saas | 2 | 2 experimental |
 | identity | 4 | 4 experimental |
 | kill | 3 | 3 stable |
-| **Total** | **38** | 5 stable, 11 beta, 22 experimental |
+| **Total** | **39** | 5 stable, 12 beta, 22 experimental |

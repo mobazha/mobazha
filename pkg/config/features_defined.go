@@ -742,14 +742,15 @@ var FeatureSupplyAvailabilityEnabled = registerFeature(Feature{
 // FeatureAiWorkspaceEnabled — seller Admin AI Workspace tab (WS-0)
 //
 // When enabled, /admin shows Insights + AI Workspace tabs with rule-based
-// opportunity cards and inline chat. Default off for gradual rollout.
+// opportunity cards and inline chat. Default on since WS-1; scopes remain
+// overridable so operators can still disable per tenant/node.
 var FeatureAiWorkspaceEnabled = registerFeature(Feature{
 	Key:           "aiWorkspaceEnabled",
 	DisplayName:   "AI Workspace",
 	Description:   "Shows the AI Workspace tab on the seller dashboard with rule-based opportunity cards and inline assistant chat.",
 	Category:      "platform",
-	Stability:     StabilityExperimental,
-	DefaultValue:  false,
+	Stability:     StabilityBeta,
+	DefaultValue:  true,
 	ClientVisible: true,
 	AllowedScopes: []Scope{
 		ScopePlatformGlobal,

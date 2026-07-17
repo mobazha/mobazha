@@ -586,15 +586,17 @@
 ### `aiWorkspaceEnabled`
 
 - **Category**: platform
-- **Stability**: experimental
-- **Default**: false
+- **Stability**: beta
+- **Default**: true
 - **Scopes**: PlatformGlobal, Tenant, NodeRuntime
 - **Client-visible**: yes
 - **Introduced in**: ai-workspace-ws-0
 - **Consumers**:
   - Seller Admin dashboard tab (Insights / AI Workspace)
   - Rule-based opportunity cards + inline WorkspaceChat
+  - Admin sidebar AI Workspace entry (`/admin/ai/*` section shell gate)
 - **Dependencies**: none (Workspace chat uses `/v1/agent/chat`; status still uses `/v1/ai/status`)
+- **Kill Path**: set false (PlatformGlobal/Tenant/NodeRuntime) → sidebar falls back to the legacy AI Agents entry rendering AI Connect directly; `/admin/ai/*` section (Workspace/Models tabs) is hidden; dashboard keeps the classic Insights view
 
 ---
 

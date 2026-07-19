@@ -296,6 +296,13 @@ func (op *OrderProcessor) ProcessACK(tx database.Tx, om *models.OutgoingMessage)
 		key = "rating_signatures_acked"
 	case npb.OrderMessage_PAYMENT_FINALIZED:
 		key = "payment_finalized_acked"
+	case npb.OrderMessage_SETTLEMENT_KEY_OFFER,
+		npb.OrderMessage_SETTLEMENT_AUTHORIZATION,
+		npb.OrderMessage_SETTLEMENT_FUNDING_BASIS:
+		// Settlement coordination is tracked in the dedicated attempt stores.
+		// These messages have no legacy Order ack column, but their ACK must
+		// still be accepted so Messenger can retire the outgoing message.
+		return false, "", nil
 	default:
 		return false, "", fmt.Errorf("unknown order message type %d (%s) for order %s", int32(orderMessage.MessageType), orderMessage.MessageType.String(), orderMessage.OrderID)
 	}

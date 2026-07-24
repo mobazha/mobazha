@@ -228,7 +228,7 @@ func TestValidatePaymentSelectionQuote_RejectsExpiryAndTampering(t *testing.T) {
 		PricingCoin: "USD", Amount: "4900", DealLinkID: "deal-123", DealRevision: 2,
 		TermsHash: strings.Repeat("b", 64), FeeQuoteID: "fq-123",
 	}
-	ref, err := models.DealTermsSnapshotRefFromOrderOpen(open)
+	binding, err := paymentSelectionBindingFromOrderOpen(open)
 	require.NoError(t, err)
 	base := models.PaymentSelectionQuote{
 		FeeQuoteID: "fq-123", DealLinkID: "deal-123", DealRevision: 2,
@@ -240,18 +240,81 @@ func TestValidatePaymentSelectionQuote_RejectsExpiryAndTampering(t *testing.T) {
 		PaymentSubtotal: "19600000000000000", ProviderOrNetworkCost: "0",
 		PlatformPaymentCost: "0", BuyerPaymentTotal: "19600000000000000", ExpiresAt: now.Add(time.Minute),
 	}
-	require.NoError(t, validatePaymentSelectionQuote(base, open, ref, base.PaymentCoin, now))
+	require.NoError(t, validatePaymentSelectionQuote(base, open, binding, base.PaymentCoin, now))
 
 	expired := base
 	expired.ExpiresAt = now
-	require.ErrorIs(t, validatePaymentSelectionQuote(expired, open, ref, expired.PaymentCoin, now), ErrDealPaymentSelectionQuoteInvalid)
+	require.ErrorIs(t, validatePaymentSelectionQuote(expired, open, binding, expired.PaymentCoin, now), ErrDealPaymentSelectionQuoteInvalid)
 
 	tampered := base
 	tampered.BuyerPaymentTotal = "1"
-	require.ErrorIs(t, validatePaymentSelectionQuote(tampered, open, ref, tampered.PaymentCoin, now), ErrDealPaymentSelectionQuoteInvalid)
+	require.ErrorIs(t, validatePaymentSelectionQuote(tampered, open, binding, tampered.PaymentCoin, now), ErrDealPaymentSelectionQuoteInvalid)
 
 	wrongAsset := base
-	require.ErrorIs(t, validatePaymentSelectionQuote(wrongAsset, open, ref, "fiat:stripe:USD", now), ErrDealPaymentSelectionQuoteInvalid)
+	require.ErrorIs(t, validatePaymentSelectionQuote(wrongAsset, open, binding, "fiat:stripe:USD", now), ErrDealPaymentSelectionQuoteInvalid)
+}
+
+func TestCreateSelectionQuote_StandardOrderCrossCurrency(t *testing.T) {
+	now := time.Date(2026, time.July, 24, 8, 0, 0, 0, time.UTC)
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	orderID := "standard-payment-selection-order"
+	open := &porderpb.OrderOpen{PricingCoin: "USD", Amount: "3999"}
+	raw, err := (protojson.MarshalOptions{}).Marshal(open)
+	require.NoError(t, err)
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		for _, model := range []interface{}{
+			&models.Order{}, &models.PaymentObservation{}, &models.SharedPaymentIntent{}, &models.PaymentSelectionQuote{},
+		} {
+			if err := tx.Migrate(model); err != nil {
+				return err
+			}
+		}
+		return tx.Create(&models.Order{
+			TenantMixin: models.TenantMixin{TenantID: database.StandaloneTenantID},
+			ID:          models.OrderID(orderID), MyRole: string(models.RoleBuyer), Open: true,
+			SerializedOrderOpen: raw,
+		})
+	}))
+
+	rates := &paymentSelectionRates{rate: iwallet.NewAmount("250000"), updatedAt: now.Add(-30 * time.Second)}
+	svc := NewPaymentSessionService(db)
+	svc.SetExchangeRateService(rates)
+	clock := now
+	svc.now = func() time.Time { return clock }
+	rates.onGetRate = func() {
+		clock = now.Add(time.Second)
+		rates.updatedAt = clock
+	}
+
+	req := contracts.CreatePaymentSelectionQuoteRequest{
+		OrderID: orderID, PaymentCoin: "crypto:eip155:1:native",
+	}
+	first, err := svc.CreateSelectionQuote(context.Background(), req)
+	require.NoError(t, err)
+	require.True(t, first.ConversionRequired)
+	require.Empty(t, first.FeeQuoteID)
+	require.Empty(t, first.DealLinkID)
+	require.Equal(t, uint64(0), first.DealRevision)
+	require.Empty(t, first.TermsHash)
+	require.Equal(t, "15996000000000000", first.BuyerPaymentTotal)
+
+	second, err := svc.CreateSelectionQuote(context.Background(), req)
+	require.NoError(t, err)
+	require.Equal(t, first.ID, second.ID)
+
+	resolved, err := svc.resolveDealPaymentSelectionQuote(context.Background(), &models.Order{
+		TenantMixin: models.TenantMixin{TenantID: database.StandaloneTenantID},
+		ID:          models.OrderID(orderID),
+	}, open, contracts.CreatePaymentSessionRequest{
+		OrderID: orderID, PaymentCoin: "crypto:eip155:1:native", PaymentSelectionQuoteID: first.ID,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resolved)
+	require.Equal(t, first.ID, resolved.QuoteID)
+	require.Equal(t, first.BuyerPaymentTotal, resolved.BuyerPaymentTotal)
 }
 
 func TestBuildPaymentSetupParamsFromOrder_UsesAuthorizedQuoteAmount(t *testing.T) {

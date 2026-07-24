@@ -13,9 +13,10 @@ import (
 )
 
 // validateDealSessionProvisioning fails closed before a provider session or
-// crypto funding target is created. Hosting remains the source of truth for
-// the fee quote; Core only verifies that the signed order carries the quote
-// reference and that no unbound currency conversion is being attempted.
+// crypto funding target is created. Deal orders must carry an immutable Hosting
+// fee-quote reference. Any order whose pricing currency differs from the
+// selected payment asset must also bind an immutable payment-selection quote
+// before conversion is admitted — including standard (non-Deal) checkout.
 func validateDealSessionProvisioning(
 	orderOpen *porderpb.OrderOpen,
 	req contracts.CreatePaymentSessionRequest,
@@ -25,10 +26,10 @@ func validateDealSessionProvisioning(
 	if err != nil {
 		return fmt.Errorf("%w: invalid signed deal reference: %v", ErrDealPaymentAmountIntegrity, err)
 	}
-	if ref == nil || strings.TrimSpace(req.PaymentCoin) == "" {
+	if strings.TrimSpace(req.PaymentCoin) == "" {
 		return nil
 	}
-	if ref.FeeQuoteID == "" {
+	if ref != nil && ref.FeeQuoteID == "" {
 		return fmt.Errorf("%w: dealLinkID=%s revision=%d", ErrDealPaymentQuoteRequired, ref.DealLinkID, ref.Revision)
 	}
 
@@ -40,11 +41,15 @@ func validateDealSessionProvisioning(
 	if err != nil {
 		return fmt.Errorf("%w: resolve payment currency: %v", ErrDealPaymentAmountIntegrity, err)
 	}
+	feeQuoteID := ""
+	if ref != nil {
+		feeQuoteID = ref.FeeQuoteID
+	}
 	if !strings.EqualFold(pricingCode, paymentCode) && selectionQuote == nil {
 		return fmt.Errorf(
 			"%w: feeQuoteID=%s pricingCurrency=%s paymentCurrency=%s",
 			ErrDealPaymentConversionQuoteRequired,
-			ref.FeeQuoteID,
+			feeQuoteID,
 			pricingCode,
 			paymentCode,
 		)
@@ -59,7 +64,7 @@ func validateDealSessionProvisioning(
 			return fmt.Errorf(
 				"%w: feeQuoteID=%s signedAmount=%s requestedFiatAmount=%d",
 				ErrDealPaymentAmountIntegrity,
-				ref.FeeQuoteID,
+				feeQuoteID,
 				orderAmount.String(),
 				req.FiatAmountCents,
 			)
@@ -93,7 +98,7 @@ func validateDealPaymentSession(
 	if err != nil {
 		return fmt.Errorf("%w: invalid signed deal reference: %v", ErrDealPaymentAmountIntegrity, err)
 	}
-	if ref == nil {
+	if ref == nil && selectionQuote == nil {
 		return nil
 	}
 	if session == nil {
@@ -113,6 +118,12 @@ func validateDealPaymentSession(
 		expectedAmount = selectionQuote.BuyerPaymentTotal
 	}
 	expected := paypb.FormatSessionAmount(expectedAmount, req.PaymentCoin)
+	feeQuoteID := ""
+	if ref != nil {
+		feeQuoteID = ref.FeeQuoteID
+	} else if selectionQuote != nil {
+		feeQuoteID = selectionQuote.FeeQuoteID
+	}
 	checks := []struct {
 		name string
 		got  string
@@ -129,7 +140,7 @@ func validateDealPaymentSession(
 			return fmt.Errorf(
 				"%w: feeQuoteID=%s field=%s got=%q want=%q",
 				ErrDealPaymentAmountIntegrity,
-				ref.FeeQuoteID,
+				feeQuoteID,
 				check.name,
 				check.got,
 				check.want,

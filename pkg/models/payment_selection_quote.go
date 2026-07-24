@@ -3,15 +3,18 @@ package models
 import "time"
 
 const (
-	// PaymentSelectionQuotePilotZeroFeeV1 freezes Deal payment selection with
+	// PaymentSelectionQuotePilotZeroFeeV1 freezes payment selection with
 	// explicit zero provider/network and platform costs until a later policy is
-	// approved. A future non-zero policy must use a new version.
+	// approved. It covers Deal and standard (non-Deal) cross-currency orders.
+	// A future non-zero policy must use a new version.
 	PaymentSelectionQuotePilotZeroFeeV1 = "deal-payment-selection-zero-fee-v1"
 )
 
 // PaymentSelectionQuote is an immutable, server-authored snapshot binding a
-// Deal order's signed pricing amount to one canonical payment asset. Quote rows
-// are never updated; expiry or policy changes create another row.
+// signed order's pricing amount to one canonical payment asset. Deal orders
+// also bind feeQuoteID / dealLinkID / revision / termsHash; standard orders
+// leave those fields empty. Quote rows are never updated; expiry or policy
+// changes create another row.
 type PaymentSelectionQuote struct {
 	TenantID                      string    `gorm:"column:tenant_id;primaryKey;default:''"`
 	QuoteID                       string    `gorm:"column:quote_id;primaryKey;size:64"`

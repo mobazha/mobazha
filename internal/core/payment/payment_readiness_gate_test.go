@@ -33,6 +33,13 @@ func (f provisioningPolicyFunc) AuthorizeSessionProvisioning(ctx context.Context
 	return f(ctx, input)
 }
 
+func mustSerializeOrderOpen(t *testing.T, open *porderpb.OrderOpen) []byte {
+	t.Helper()
+	raw, err := (protojson.MarshalOptions{}).Marshal(open)
+	require.NoError(t, err)
+	return raw
+}
+
 func TestPaymentSessionProjector_GatesBuyerFundingTarget(t *testing.T) {
 	p := NewPaymentSessionProjector(nil)
 	order := &models.Order{
@@ -336,6 +343,10 @@ func TestPaymentSessionServiceImpl_CreateSessionRunsPoliciesBeforeRailFacade(t *
 		}
 		return tx.Save(&models.Order{
 			ID: models.OrderID(orderID), MyRole: string(models.RoleBuyer), Open: true, PaymentReadyAt: &readyAt,
+			SerializedOrderOpen: mustSerializeOrderOpen(t, &porderpb.OrderOpen{
+				PricingCoin: "crypto:eip155:1:native", Amount: "1000000000000000000",
+			}),
+			OrderOpenAcked: true,
 		})
 	}))
 
@@ -411,7 +422,11 @@ func TestPaymentSessionServiceImpl_CoinSwitchAuthorizesBeforeClearingExistingTar
 	oldAddress := "0x111122223333444455556666777788889999aaaa"
 	order := &models.Order{
 		ID: models.OrderID(orderID), MyRole: string(models.RoleBuyer), Open: true,
-		PaymentReadyAt: &readyAt, PaymentAddress: oldAddress,
+		PaymentReadyAt: &readyAt, PaymentAddress: oldAddress, OrderOpenAcked: true,
+		SerializedOrderOpen: mustSerializeOrderOpen(t, &porderpb.OrderOpen{
+			// Match the coin-switch target so integrity admits same-currency reprovision.
+			PricingCoin: "crypto:eip155:56:native", Amount: "1000000000000000000",
+		}),
 	}
 	require.NoError(t, order.SetPendingManagedEscrowInfo(&models.PendingManagedEscrowInfo{
 		Coin: "crypto:eip155:1:native", Address: oldAddress,
@@ -444,6 +459,43 @@ func TestPaymentSessionServiceImpl_CoinSwitchAuthorizesBeforeClearingExistingTar
 	}))
 	require.Equal(t, oldAddress, persisted.PaymentAddress)
 	require.NotEmpty(t, persisted.PendingPaymentInfo)
+}
+
+func TestPaymentSessionServiceImpl_CreateSession_SkipsPoliciesWhenQuoteValidationFails(t *testing.T) {
+	db, err := repo.MockDB()
+	require.NoError(t, err)
+	defer db.Close()
+
+	readyAt := time.Now().UTC()
+	orderID := "QmQuoteFailsBeforePolicy"
+	require.NoError(t, db.Update(func(tx database.Tx) error {
+		if err := tx.Migrate(&models.Order{}); err != nil {
+			return err
+		}
+		return tx.Save(&models.Order{
+			ID: models.OrderID(orderID), MyRole: string(models.RoleBuyer), Open: true,
+			PaymentReadyAt: &readyAt, OrderOpenAcked: true,
+			SerializedOrderOpen: mustSerializeOrderOpen(t, &porderpb.OrderOpen{
+				PricingCoin: "USD", Amount: "4900",
+			}),
+		})
+	}))
+
+	policyCalls := 0
+	svc := NewPaymentSessionService(db)
+	svc.AddProvisioningPolicy(provisioningPolicyFunc(func(context.Context, SessionProvisioningPolicyInput) error {
+		policyCalls++
+		return nil
+	}))
+	svc.SetCryptoFacade(&CryptoPaymentFacade{
+		db: db, projector: NewPaymentSessionProjector(db), setupSvc: panicSetupService{t: t},
+	})
+
+	_, err = svc.CreateSession(context.Background(), contracts.CreatePaymentSessionRequest{
+		OrderID: orderID, PaymentCoin: "crypto:eip155:1:native",
+	})
+	require.ErrorIs(t, err, ErrDealPaymentConversionQuoteRequired)
+	require.Equal(t, 0, policyCalls, "reservation/provisioning policies must not run after quote integrity fails")
 }
 
 type panicSetupService struct {

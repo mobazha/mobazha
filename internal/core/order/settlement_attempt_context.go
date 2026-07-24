@@ -66,10 +66,11 @@ func (s *OrderAppService) frozenSettlementAttemptActionContext(
 	if err != nil || bundle == nil {
 		return nil, true, models.ErrPaymentAttemptSettlementTermsConflict
 	}
-	authorization := models.PaymentAttemptSettlementAuthorization{
-		Version: models.SettlementAuthorizationVersion,
-		Terms:   *terms, Target: *target, Authorization: *bundle,
+	fundingBasis, err := attempt.GetFundingBasis()
+	if err != nil {
+		return nil, true, err
 	}
+	authorization := models.NewPaymentAttemptSettlementAuthorization(*terms, *target, *bundle, fundingBasis)
 	if err := authorization.Validate(); err != nil {
 		return nil, true, err
 	}

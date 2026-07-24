@@ -317,10 +317,11 @@ func (s *SettlementService) applyFrozenSettlementAttemptActionParams(
 	if err != nil || bundle == nil {
 		return fmt.Errorf("%w: frozen authorization bundle is unavailable", models.ErrPaymentAttemptSettlementTermsConflict)
 	}
-	authorization := models.PaymentAttemptSettlementAuthorization{
-		Version: models.SettlementAuthorizationVersion,
-		Terms:   *terms, Target: *target, Authorization: *bundle,
+	fundingBasis, err := attempt.GetFundingBasis()
+	if err != nil {
+		return err
 	}
+	authorization := models.NewPaymentAttemptSettlementAuthorization(*terms, *target, *bundle, fundingBasis)
 	if err := authorization.Validate(); err != nil {
 		return err
 	}

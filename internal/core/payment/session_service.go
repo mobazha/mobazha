@@ -200,14 +200,13 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			if !ok || !amount.IsInt64() || amount.Sign() <= 0 {
 				return nil, fmt.Errorf("%w: quoted fiat amount is invalid", ErrDealPaymentSelectionQuoteInvalid)
 			}
+			// Never trust client fiatAmountCents for quote-bound sessions: the
+			// immutable selection quote is the only admitted amount source.
 			if req.FiatAmountCents > 0 && req.FiatAmountCents != amount.Int64() {
 				return nil, fmt.Errorf("%w: requested fiat amount does not match the quote", ErrDealPaymentAmountIntegrity)
 			}
 			req.FiatAmountCents = amount.Int64()
 		}
-	}
-	if err := validateDealSessionProvisioning(input.orderOpen, req, selectionQuote); err != nil {
-		return nil, err
 	}
 	view, err := s.projector.Project(input)
 	if err != nil {
@@ -241,6 +240,9 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			// finish provisioning in this request instead of requiring a client
 			// to detect and retry an invalid intermediate projection.
 			if updated.PaymentReadiness.Status == payment.PaymentReadinessReadyToPay && updated.FundingTarget.Address == "" {
+				if err := validateDealSessionProvisioning(input.orderOpen, req, selectionQuote); err != nil {
+					return nil, err
+				}
 				if err := s.bindPaymentSelectionQuote(input.order, selectionQuote); err != nil {
 					return nil, err
 				}
@@ -305,6 +307,12 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 		return view, nil
 	}
 
+	// Fail closed on missing conversion quotes / amount integrity before any
+	// provisioning policy that may reserve inventory or call providers.
+	if err := validateDealSessionProvisioning(input.orderOpen, req, selectionQuote); err != nil {
+		return nil, err
+	}
+
 	if req.PaymentCoin != "" {
 		policyInput := SessionProvisioningPolicyInput{
 			OrderID:                 req.OrderID,
@@ -326,6 +334,7 @@ func (s *PaymentSessionServiceImpl) CreateSession(
 			}
 		}
 	}
+
 	if err := s.bindPaymentSelectionQuote(input.order, selectionQuote); err != nil {
 		return nil, fmt.Errorf("bind payment selection quote: %w", err)
 	}

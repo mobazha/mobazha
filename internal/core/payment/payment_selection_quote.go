@@ -24,8 +24,42 @@ const (
 	maxPaymentSelectionRateAge      = 15 * time.Minute
 )
 
-// CreateSelectionQuote creates or reuses an immutable Deal payment-selection
-// quote without provisioning any external payment target.
+// paymentSelectionOrderBinding captures the immutable Deal linkage fields that
+// a payment-selection quote must match. Standard (non-Deal) orders use empty
+// values so the same quote row schema and validators work for both shapes.
+type paymentSelectionOrderBinding struct {
+	FeeQuoteID   string
+	DealLinkID   string
+	DealRevision uint64
+	TermsHash    string
+}
+
+func paymentSelectionBindingFromOrderOpen(orderOpen *porderpb.OrderOpen) (paymentSelectionOrderBinding, error) {
+	ref, err := models.DealTermsSnapshotRefFromOrderOpen(orderOpen)
+	if err != nil {
+		return paymentSelectionOrderBinding{}, err
+	}
+	if ref == nil {
+		return paymentSelectionOrderBinding{}, nil
+	}
+	if ref.FeeQuoteID == "" {
+		return paymentSelectionOrderBinding{}, fmt.Errorf(
+			"%w: a complete signed Deal fee quote reference is required",
+			ErrDealPaymentSelectionQuoteInvalid,
+		)
+	}
+	return paymentSelectionOrderBinding{
+		FeeQuoteID:   ref.FeeQuoteID,
+		DealLinkID:   ref.DealLinkID,
+		DealRevision: ref.Revision,
+		TermsHash:    ref.TermsHash,
+	}, nil
+}
+
+// CreateSelectionQuote creates or reuses an immutable payment-selection quote
+// without provisioning any external payment target. Deal orders bind fee-quote
+// linkage fields; standard orders persist empty linkage and still freeze the
+// converted buyer payment total for cross-currency rails.
 func (s *PaymentSessionServiceImpl) CreateSelectionQuote(
 	ctx context.Context,
 	req contracts.CreatePaymentSelectionQuoteRequest,
@@ -53,9 +87,9 @@ func (s *PaymentSessionServiceImpl) CreateSelectionQuote(
 	if input.order == nil || input.orderOpen == nil {
 		return nil, fmt.Errorf("%w: signed order is unavailable", ErrDealPaymentSelectionQuoteInvalid)
 	}
-	ref, err := models.DealTermsSnapshotRefFromOrderOpen(input.orderOpen)
-	if err != nil || ref == nil || ref.FeeQuoteID == "" {
-		return nil, fmt.Errorf("%w: a complete signed Deal fee quote reference is required", ErrDealPaymentSelectionQuoteInvalid)
+	binding, err := paymentSelectionBindingFromOrderOpen(input.orderOpen)
+	if err != nil {
+		return nil, err
 	}
 
 	now := s.currentTime()
@@ -74,7 +108,7 @@ func (s *PaymentSessionServiceImpl) CreateSelectionQuote(
 			})
 			if boundErr == nil {
 				validationErr := validatePaymentSelectionQuoteSnapshot(
-					bound, input.orderOpen, ref, req.PaymentCoin, now, false,
+					bound, input.orderOpen, binding, req.PaymentCoin, now, false,
 				)
 				if validationErr == nil {
 					return paymentSelectionQuoteView(bound), nil
@@ -96,12 +130,12 @@ func (s *PaymentSessionServiceImpl) CreateSelectionQuote(
 	reuseErr := s.db.View(func(tx database.Tx) error {
 		return tx.Read().Where(
 			"tenant_id = ? AND order_id = ? AND fee_quote_id = ? AND payment_coin = ? AND policy_version = ? AND expires_at > ?",
-			paymentSelectionTenantID(input.order), input.order.ID.String(), ref.FeeQuoteID, req.PaymentCoin,
+			paymentSelectionTenantID(input.order), input.order.ID.String(), binding.FeeQuoteID, req.PaymentCoin,
 			models.PaymentSelectionQuotePilotZeroFeeV1, now,
 		).Order("created_at DESC").First(&reusable).Error
 	})
 	if reuseErr == nil {
-		if err := validatePaymentSelectionQuote(reusable, input.orderOpen, ref, req.PaymentCoin, now); err == nil {
+		if err := validatePaymentSelectionQuote(reusable, input.orderOpen, binding, req.PaymentCoin, now); err == nil {
 			return paymentSelectionQuoteView(reusable), nil
 		}
 	}
@@ -109,7 +143,7 @@ func (s *PaymentSessionServiceImpl) CreateSelectionQuote(
 		return nil, fmt.Errorf("reuse payment selection quote: %w", reuseErr)
 	}
 
-	quote, err := s.buildPaymentSelectionQuote(input.order, input.orderOpen, ref, coin, now)
+	quote, err := s.buildPaymentSelectionQuote(input.order, input.orderOpen, binding, coin, now)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +155,7 @@ func (s *PaymentSessionServiceImpl) CreateSelectionQuote(
 			quote.TenantID, quote.OrderID, quote.FeeQuoteID, quote.PaymentCoin, quote.PolicyVersion, now,
 		).Order("created_at DESC").First(&existing).Error
 		if reuseErr == nil {
-			if err := validatePaymentSelectionQuote(existing, input.orderOpen, ref, req.PaymentCoin, now); err == nil {
+			if err := validatePaymentSelectionQuote(existing, input.orderOpen, binding, req.PaymentCoin, now); err == nil {
 				quote = existing
 				return nil
 			}
@@ -140,7 +174,7 @@ func (s *PaymentSessionServiceImpl) CreateSelectionQuote(
 func (s *PaymentSessionServiceImpl) buildPaymentSelectionQuote(
 	order *models.Order,
 	orderOpen *porderpb.OrderOpen,
-	ref *models.DealTermsSnapshotRef,
+	binding paymentSelectionOrderBinding,
 	coin iwallet.CoinType,
 	now time.Time,
 ) (models.PaymentSelectionQuote, error) {
@@ -232,7 +266,7 @@ func (s *PaymentSessionServiceImpl) buildPaymentSelectionQuote(
 	amount := paymentSubtotal.String()
 	return models.PaymentSelectionQuote{
 		TenantID: tenantID, QuoteID: uuid.NewString(), OrderID: order.ID.String(),
-		FeeQuoteID: ref.FeeQuoteID, DealLinkID: ref.DealLinkID, DealRevision: ref.Revision, TermsHash: ref.TermsHash,
+		FeeQuoteID: binding.FeeQuoteID, DealLinkID: binding.DealLinkID, DealRevision: binding.DealRevision, TermsHash: binding.TermsHash,
 		SchemaVersion: 1, PolicyVersion: models.PaymentSelectionQuotePilotZeroFeeV1,
 		PricingCurrency: pricingCode, PricingAmount: pricingAmount.String(), PricingDivisibility: pricingCurrency.Divisibility,
 		PaymentCoin: string(coin), PaymentCurrency: paymentCode, PaymentDivisibility: paymentCurrency.Divisibility,
@@ -249,9 +283,12 @@ func (s *PaymentSessionServiceImpl) resolveDealPaymentSelectionQuote(
 	orderOpen *porderpb.OrderOpen,
 	req contracts.CreatePaymentSessionRequest,
 ) (*models.PaymentSelectionQuote, error) {
-	ref, err := models.DealTermsSnapshotRefFromOrderOpen(orderOpen)
-	if err != nil || ref == nil || strings.TrimSpace(req.PaymentSelectionQuoteID) == "" {
+	if strings.TrimSpace(req.PaymentSelectionQuoteID) == "" {
 		return nil, nil
+	}
+	binding, err := paymentSelectionBindingFromOrderOpen(orderOpen)
+	if err != nil {
+		return nil, err
 	}
 	var quote models.PaymentSelectionQuote
 	err = s.db.View(func(tx database.Tx) error {
@@ -267,7 +304,7 @@ func (s *PaymentSessionServiceImpl) resolveDealPaymentSelectionQuote(
 		return nil, fmt.Errorf("load payment selection quote: %w", err)
 	}
 	if err := validatePaymentSelectionQuoteSnapshot(
-		quote, orderOpen, ref, req.PaymentCoin, s.currentTime(), false,
+		quote, orderOpen, binding, req.PaymentCoin, s.currentTime(), false,
 	); err != nil {
 		return nil, err
 	}
@@ -277,17 +314,17 @@ func (s *PaymentSessionServiceImpl) resolveDealPaymentSelectionQuote(
 func validatePaymentSelectionQuote(
 	quote models.PaymentSelectionQuote,
 	orderOpen *porderpb.OrderOpen,
-	ref *models.DealTermsSnapshotRef,
+	binding paymentSelectionOrderBinding,
 	paymentCoin string,
 	now time.Time,
 ) error {
-	return validatePaymentSelectionQuoteSnapshot(quote, orderOpen, ref, paymentCoin, now, true)
+	return validatePaymentSelectionQuoteSnapshot(quote, orderOpen, binding, paymentCoin, now, true)
 }
 
 func validatePaymentSelectionQuoteSnapshot(
 	quote models.PaymentSelectionQuote,
 	orderOpen *porderpb.OrderOpen,
-	ref *models.DealTermsSnapshotRef,
+	binding paymentSelectionOrderBinding,
 	paymentCoin string,
 	now time.Time,
 	requireUnexpired bool,
@@ -311,8 +348,8 @@ func validatePaymentSelectionQuoteSnapshot(
 	if requireUnexpired && !quote.ExpiresAt.After(now) {
 		return fmt.Errorf("%w: quote expired", ErrDealPaymentSelectionQuoteInvalid)
 	}
-	if quote.FeeQuoteID != ref.FeeQuoteID || quote.DealLinkID != ref.DealLinkID ||
-		quote.DealRevision != ref.Revision || quote.TermsHash != ref.TermsHash ||
+	if quote.FeeQuoteID != binding.FeeQuoteID || quote.DealLinkID != binding.DealLinkID ||
+		quote.DealRevision != binding.DealRevision || quote.TermsHash != binding.TermsHash ||
 		quote.PricingCurrency != pricingCode || quote.PricingAmount != orderOpen.GetAmount() ||
 		quote.PricingDivisibility != pricingCurrency.Divisibility || quote.PaymentCoin != paymentCoin ||
 		quote.PaymentCurrency != paymentCode || quote.PaymentDivisibility != paymentCurrency.Divisibility ||
@@ -320,7 +357,7 @@ func validatePaymentSelectionQuoteSnapshot(
 		quote.ExchangeRateBase != paymentCode || quote.ExchangeRateQuote != pricingCode ||
 		quote.ExchangeRateQuoteDivisibility != pricingCurrency.Divisibility || quote.SchemaVersion != 1 ||
 		quote.PolicyVersion != models.PaymentSelectionQuotePilotZeroFeeV1 {
-		return fmt.Errorf("%w: quote does not match the signed Deal order and selected asset", ErrDealPaymentSelectionQuoteInvalid)
+		return fmt.Errorf("%w: quote does not match the signed order and selected asset", ErrDealPaymentSelectionQuoteInvalid)
 	}
 	rate, ok := new(big.Int).SetString(quote.ExchangeRate, 10)
 	if !ok || rate.Sign() <= 0 {

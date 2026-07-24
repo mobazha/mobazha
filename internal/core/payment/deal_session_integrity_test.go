@@ -31,12 +31,38 @@ func TestValidateDealSessionProvisioning(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "non deal order remains compatible",
+			name: "standard same currency remains compatible without quote",
+			open: &porderpb.OrderOpen{PricingCoin: "ETH", Amount: "1000000000000000000"},
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin: "crypto:eip155:1:native",
+			},
+		},
+		{
+			name: "standard cross currency requires immutable conversion quote",
 			open: &porderpb.OrderOpen{PricingCoin: "USD", Amount: "4900"},
 			req: contracts.CreatePaymentSessionRequest{
 				PaymentCoin:     "crypto:eip155:1:native",
 				FiatAmountCents: 1,
 			},
+			wantErr: ErrDealPaymentConversionQuoteRequired,
+		},
+		{
+			name: "standard cross-currency fiat missing quote is rejected",
+			open: &porderpb.OrderOpen{PricingCoin: "USD", Amount: "4900"},
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin:     "fiat:stripe:EUR",
+				FiatAmountCents: 1,
+			},
+			wantErr: ErrDealPaymentConversionQuoteRequired,
+		},
+		{
+			name: "standard same-currency fiat amount must match signed order",
+			open: &porderpb.OrderOpen{PricingCoin: "USD", Amount: "4900"},
+			req: contracts.CreatePaymentSessionRequest{
+				PaymentCoin:     "fiat:stripe:USD",
+				FiatAmountCents: 1,
+			},
+			wantErr: ErrDealPaymentAmountIntegrity,
 		},
 		{
 			name: "deal requires fee quote",
@@ -180,4 +206,17 @@ func TestValidateDealSessionProvisioning_AcceptsBoundCrossCurrencyQuote(t *testi
 		PaymentProgress:  paypb.PaymentProgressView{RequiredAmount: expected},
 	}
 	require.NoError(t, validateDealPaymentSession(open, req, quote, session))
+}
+
+func TestValidateDealSessionProvisioning_AcceptsStandardCrossCurrencyFiatQuote(t *testing.T) {
+	open := &porderpb.OrderOpen{PricingCoin: "USD", Amount: "4900"}
+	req := contracts.CreatePaymentSessionRequest{
+		PaymentCoin: "fiat:stripe:EUR", PaymentSelectionQuoteID: "psq-standard",
+		// Client-supplied amount must be ignored once a quote is bound.
+		FiatAmountCents: 1,
+	}
+	quote := &models.PaymentSelectionQuote{
+		QuoteID: "psq-standard", PaymentCoin: req.PaymentCoin, BuyerPaymentTotal: "4500",
+	}
+	require.NoError(t, validateDealSessionProvisioning(open, req, quote))
 }

@@ -25,6 +25,23 @@ type PaymentAttemptSettlementAuthorization struct {
 	Authorization PaymentAttemptAuthorizationBundle `json:"authorization"`
 }
 
+// NewPaymentAttemptSettlementAuthorization selects the v1 or quote-bound v2
+// authorization envelope from whether an immutable funding basis is present.
+func NewPaymentAttemptSettlementAuthorization(
+	terms PaymentAttemptSettlementTerms,
+	target PaymentAttemptFundingTarget,
+	bundle PaymentAttemptAuthorizationBundle,
+	fundingBasis *PaymentAttemptFundingBasis,
+) PaymentAttemptSettlementAuthorization {
+	version := uint32(SettlementAuthorizationVersion)
+	if fundingBasis != nil {
+		version = PaymentAttemptSettlementAuthorizationQuoteBoundVersion
+	}
+	return PaymentAttemptSettlementAuthorization{
+		Version: version, FundingBasis: fundingBasis, Terms: terms, Target: target, Authorization: bundle,
+	}
+}
+
 // CanonicalBytesAndHash validates and canonically encodes the complete public
 // settlement authorization snapshot.
 func (a PaymentAttemptSettlementAuthorization) CanonicalBytesAndHash() ([]byte, string, error) {

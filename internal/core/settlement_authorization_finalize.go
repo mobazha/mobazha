@@ -717,11 +717,5 @@ func settlementAuthorizationForAttempt(
 	bundle models.PaymentAttemptAuthorizationBundle,
 	fundingBasis *models.PaymentAttemptFundingBasis,
 ) models.PaymentAttemptSettlementAuthorization {
-	version := uint32(models.SettlementAuthorizationVersion)
-	if fundingBasis != nil {
-		version = models.PaymentAttemptSettlementAuthorizationQuoteBoundVersion
-	}
-	return models.PaymentAttemptSettlementAuthorization{
-		Version: version, FundingBasis: fundingBasis, Terms: terms, Target: target, Authorization: bundle,
-	}
+	return models.NewPaymentAttemptSettlementAuthorization(terms, target, bundle, fundingBasis)
 }

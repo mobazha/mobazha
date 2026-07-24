@@ -279,8 +279,12 @@ func TestPaymentAttemptSettlementAuthorization_RejectsSellerMutationOfModeratorF
 		quoteBoundTerms.Version = PaymentAttemptSettlementTermsQuoteBoundVersion
 		quoteBoundTerms.FundingBasisHash = basisHash
 		authorization := buildAuthorization(t, quoteBoundTerms)
-		authorization.Version = PaymentAttemptSettlementAuthorizationQuoteBoundVersion
-		authorization.FundingBasis = &basis
+		require.ErrorIs(t, authorization.Validate(), ErrPaymentAttemptSettlementTermsConflict,
+			"v1 envelope must reject quote-bound v2 terms")
+		authorization = NewPaymentAttemptSettlementAuthorization(
+			quoteBoundTerms, target, authorization.Authorization, &basis,
+		)
+		require.Equal(t, uint32(PaymentAttemptSettlementAuthorizationQuoteBoundVersion), authorization.Version)
 		require.NoError(t, authorization.Validate())
 
 		tamperedBasis := basis

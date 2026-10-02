@@ -140,6 +140,8 @@ func (s *ShippingAppService) UpdateProfile(ctx context.Context, profile *models.
 	}
 
 	locationGroupsChanged := existing.LocationGroupsJSON != profile.LocationGroupsJSON
+	// The API sends a partial profile; keep server-managed fields intact.
+	profile.CreatedAt = existing.CreatedAt
 	profile.Version = existing.Version + 1
 
 	if profile.IsDefault && !existing.IsDefault {

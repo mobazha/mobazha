@@ -134,17 +134,14 @@ func (g *Gateway) handleUpdateShippingProfile(w http.ResponseWriter, r *http.Req
 	}
 
 	profileID := chi.URLParam(r, "profileID")
-	var body struct {
-		models.ShippingProfileEntity
-		Version int `json:"version"`
-	}
+	var body models.ShippingProfileEntity
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
 		return
 	}
 
-	body.ShippingProfileEntity.ID = profileID
-	if err := svc.UpdateProfile(r.Context(), &body.ShippingProfileEntity, body.Version); err != nil {
+	body.ID = profileID
+	if err := svc.UpdateProfile(r.Context(), &body, body.Version); err != nil {
 		shippingErrorResponse(w, err, "update profile")
 		return
 	}

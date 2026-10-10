@@ -635,11 +635,20 @@ func (g *Gateway) NodeSelectionMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nodeID := r.Header.Get("X-Mobazha-Node")
 		if nodeID == "" {
-			// If no node is specified, use the first available node
+			// Prefer the default node. Iterating the client map instead picks an
+			// arbitrary node per request - Go randomises map iteration - so two
+			// identical requests could be served by different stores.
 			g.mu.RLock()
-			for id := range g.nodeManager.GetNodes() {
-				nodeID = id
-				break
+			if def := g.nodeManager.GetDefaultNode(); def != nil {
+				if info := def.IdentityInfo(); info != nil {
+					nodeID = info.GetNodeID()
+				}
+			}
+			if nodeID == "" {
+				for id := range g.nodeManager.GetNodes() {
+					nodeID = id
+					break
+				}
 			}
 			g.mu.RUnlock()
 		}

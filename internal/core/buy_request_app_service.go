@@ -92,6 +92,11 @@ func (s *BuyRequestAppService) Create(ctx context.Context, buyerPeerID string, i
 		return nil, err
 	}
 
+	images, err := normalizeBuyRequestImages(in.Images)
+	if err != nil {
+		return nil, err
+	}
+
 	active, err := s.store.CountActiveByBuyer(ctx, buyerPeerID)
 	if err != nil {
 		return nil, fmt.Errorf("count active buy requests: %w", err)
@@ -118,10 +123,42 @@ func (s *BuyRequestAppService) Create(ctx context.Context, buyerPeerID string, i
 		Status:             models.BuyRequestStatusOpen,
 		ExpiresAt:          expiresAt,
 	}
+	if err := request.SetImages(images); err != nil {
+		return nil, fmt.Errorf("encode buy request images: %w", err)
+	}
 	if err := s.store.CreateRequest(ctx, request); err != nil {
 		return nil, err
 	}
 	return request, nil
+}
+
+// normalizeBuyRequestImages trims each hash set and drops entries that carry no
+// hash at all: an empty entry says nothing, and rejecting it would force every
+// client to special-case "no image". The count cap is a hard error instead of a
+// silent truncation, because dropping pictures a seller deliberately attached
+// would be worse than refusing the request.
+func normalizeBuyRequestImages(in []models.ImageHashes) ([]models.ImageHashes, error) {
+	out := make([]models.ImageHashes, 0, len(in))
+	for _, img := range in {
+		trimmed := models.ImageHashes{
+			Tiny:     strings.TrimSpace(img.Tiny),
+			Small:    strings.TrimSpace(img.Small),
+			Medium:   strings.TrimSpace(img.Medium),
+			Large:    strings.TrimSpace(img.Large),
+			Original: strings.TrimSpace(img.Original),
+			Filename: strings.TrimSpace(img.Filename),
+		}
+		if trimmed.Tiny == "" && trimmed.Small == "" && trimmed.Medium == "" &&
+			trimmed.Large == "" && trimmed.Original == "" {
+			continue
+		}
+		out = append(out, trimmed)
+	}
+	if len(out) > models.MaxBuyRequestImages {
+		return nil, fmt.Errorf("%w: at most %d images are allowed",
+			database.ErrBuyRequestInvalid, models.MaxBuyRequestImages)
+	}
+	return out, nil
 }
 
 // List returns the public board. Requests whose deadline has passed are closed

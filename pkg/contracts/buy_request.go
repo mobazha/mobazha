@@ -32,6 +32,7 @@ type CreateBuyRequestInput struct {
 	Description        string
 	Condition          string
 	ExpiresAt          time.Time
+	Images             []models.ImageHashes
 }
 
 // CreateBuyRequestOfferInput is the validated shape of a seller offer.

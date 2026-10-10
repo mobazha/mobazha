@@ -115,6 +115,7 @@ func (s *GormBuyRequestStore) GetRequest(_ context.Context, slug string) (*model
 		}
 		return nil, err
 	}
+	hydrateBuyRequestImages([]*models.BuyRequest{&r})
 	return &r, nil
 }
 
@@ -135,6 +136,7 @@ func (s *GormBuyRequestStore) ListRequests(_ context.Context, f pkgcontracts.Buy
 	if err != nil {
 		return nil, 0, err
 	}
+	hydrateBuyRequestImages(out)
 	if err := s.attachOfferCounts(out); err != nil {
 		return nil, 0, err
 	}
@@ -161,10 +163,28 @@ func (s *GormBuyRequestStore) ListRequestsByBuyer(_ context.Context, buyerPeerID
 	if err != nil {
 		return nil, 0, err
 	}
+	hydrateBuyRequestImages(out)
 	if err := s.attachOfferCounts(out); err != nil {
 		return nil, 0, err
 	}
 	return out, total, nil
+}
+
+// hydrateBuyRequestImages decodes the stored image JSON into the typed field so
+// every caller sees the same shape. A row whose JSON cannot be read reports no
+// images rather than failing the whole read — one bad row must not take the
+// board down with it.
+func hydrateBuyRequestImages(requests []*models.BuyRequest) {
+	for _, r := range requests {
+		if r == nil || r.ImagesJSON == "" {
+			continue
+		}
+		images, err := r.GetImages()
+		if err != nil {
+			continue
+		}
+		r.Images = images
+	}
 }
 
 func (s *GormBuyRequestStore) UpdateRequest(_ context.Context, r *models.BuyRequest) error {

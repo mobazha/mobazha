@@ -102,6 +102,9 @@ type buyRequest struct {
 	OfferCount         int              `json:"offerCount"`
 	ExpiresAt          string           `json:"expiresAt"`
 	CreatedAt          string           `json:"createdAt"`
+	// Images reuses the media service's hash set, so a client can hand the
+	// upload response straight back without reshaping it.
+	Images []models.ImageHashes `json:"images,omitempty"`
 }
 
 type buyRequestOffer struct {
@@ -306,6 +309,7 @@ func toBuyRequestDTO(m *models.BuyRequest) *buyRequest {
 		OfferCount:         m.OfferCount,
 		ExpiresAt:          m.ExpiresAt.UTC().Format(time.RFC3339),
 		CreatedAt:          m.CreatedAt.UTC().Format(time.RFC3339),
+		Images:             m.Images,
 	}
 	if strings.TrimSpace(m.BudgetMinAmount) != "" {
 		min := buyRequestAmount{Amount: m.BudgetMinAmount, Currency: m.BudgetMaxCurrency}
@@ -364,6 +368,8 @@ type createBuyRequestBody struct {
 	// "keep this up for N days" form the UI uses.
 	ExpiresAt     string `json:"expiresAt"`
 	ExpiresInDays int    `json:"expiresInDays"`
+	// Images is the hash set returned by POST /v1/media/product-images.
+	Images []models.ImageHashes `json:"images"`
 }
 
 type createBuyRequestOfferBody struct {
@@ -477,6 +483,7 @@ func (g *Gateway) handleCreateBuyRequest(w http.ResponseWriter, r *http.Request)
 		Description:        body.Description,
 		Condition:          body.Condition,
 		ExpiresAt:          expiresAt,
+		Images:             body.Images,
 	}
 	if body.BudgetMax != nil {
 		in.BudgetMaxAmount = body.BudgetMax.Amount

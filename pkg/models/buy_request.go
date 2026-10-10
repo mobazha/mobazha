@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // BuyRequestStatus is the lifecycle of a buy request (the "wanted" board).
 //
@@ -75,9 +78,48 @@ type BuyRequest struct {
 
 	// OfferCount is computed per read; it is not a column.
 	OfferCount int `json:"offerCount" gorm:"-"`
+
+	// ImagesJSON holds the uploaded image hash sets as a JSON array. Images is
+	// the typed view; go through SetImages/GetImages rather than touching the
+	// column directly, so the two never disagree.
+	ImagesJSON string        `json:"-" gorm:"column:images;type:text;not null;default:'[]'"`
+	Images     []ImageHashes `json:"images,omitempty" gorm:"-"`
 }
 
 func (BuyRequest) TableName() string { return "buy_requests" }
+
+// MaxBuyRequestImages bounds how many pictures a request may carry: enough to
+// show an item from a few angles, few enough that the board stays readable.
+const MaxBuyRequestImages = 8
+
+// GetImages deserializes the stored image hash sets.
+func (r *BuyRequest) GetImages() ([]ImageHashes, error) {
+	if r.ImagesJSON == "" || r.ImagesJSON == "[]" {
+		return nil, nil
+	}
+	var images []ImageHashes
+	if err := json.Unmarshal([]byte(r.ImagesJSON), &images); err != nil {
+		return nil, err
+	}
+	return images, nil
+}
+
+// SetImages serializes the image hash sets for storage and keeps the typed
+// field in step, so a caller that just wrote an entity can read it back.
+func (r *BuyRequest) SetImages(images []ImageHashes) error {
+	if len(images) == 0 {
+		r.ImagesJSON = "[]"
+		r.Images = nil
+		return nil
+	}
+	payload, err := json.Marshal(images)
+	if err != nil {
+		return err
+	}
+	r.ImagesJSON = string(payload)
+	r.Images = images
+	return nil
+}
 
 // BuyRequestOffer is a seller's structured answer to a buy request. Every offer
 // is escrow-backed: acceptsEscrow is always true and is not stored as a column.

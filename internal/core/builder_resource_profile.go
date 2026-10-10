@@ -254,6 +254,7 @@ func (n *MobazhaNode) initResourceProfileServices(cfg *repo.Config) {
 	})
 	initDiscountSubsystem(n)
 	initCollectionSubsystem(n)
+	initBuyRequestSubsystem(n)
 	initStorePolicySubsystem(n)
 	initSellerAffiliateSubsystem(n)
 	initShippingSubsystem(n)

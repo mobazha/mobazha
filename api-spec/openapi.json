@@ -212,6 +212,9 @@
             "format": "date-time",
             "type": "string"
           },
+          "lastError": {
+            "type": "string"
+          },
           "state": {
             "type": "string"
           },
@@ -5274,6 +5277,455 @@
         "summary": "Block storefront peer IDs",
         "tags": [
           "moderation"
+        ]
+      }
+    },
+    "/v1/buy-requests": {
+      "get": {
+        "description": "The public wanted board: what buyers are looking for right now, with an offer count per request.",
+        "operationId": "buy-requests-list",
+        "parameters": [
+          {
+            "description": "Filter by category slug.",
+            "explode": false,
+            "in": "query",
+            "name": "categorySlug",
+            "schema": {
+              "description": "Filter by category slug.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only requests that accept this currency.",
+            "explode": false,
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "description": "Only requests that accept this currency.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO 3166-1 alpha-2 destination the goods must reach.",
+            "explode": false,
+            "in": "query",
+            "name": "deliverTo",
+            "schema": {
+              "description": "ISO 3166-1 alpha-2 destination the goods must reach.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by status; defaults to open.",
+            "explode": false,
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "description": "Filter by status; defaults to open.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "1-based page number.",
+            "explode": false,
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "description": "1-based page number.",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page (max 100).",
+            "explode": false,
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "description": "Items per page (max 100).",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Browse open buy requests",
+        "tags": [
+          "buy-requests"
+        ]
+      },
+      "post": {
+        "description": "A buyer states what they need and what they will pay at most. Pass expiresInDays for the common \"keep this up for N days\" case, or expiresAt with an RFC3339 timestamp for an exact deadline.",
+        "operationId": "buy-requests-create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Publish a buy request",
+        "tags": [
+          "buy-requests"
+        ]
+      }
+    },
+    "/v1/buy-requests/mine": {
+      "get": {
+        "operationId": "buy-requests-list-mine",
+        "parameters": [
+          {
+            "description": "1-based page number.",
+            "explode": false,
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "description": "1-based page number.",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page (max 100).",
+            "explode": false,
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "description": "Items per page (max 100).",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "List buy requests published by this node",
+        "tags": [
+          "buy-requests"
+        ]
+      }
+    },
+    "/v1/buy-requests/{slug}": {
+      "delete": {
+        "description": "Only the buyer may close a request, and only while it is still open.",
+        "operationId": "buy-requests-cancel",
+        "parameters": [
+          {
+            "description": "Buy request slug.",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "description": "Buy request slug.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Close a buy request",
+        "tags": [
+          "buy-requests"
+        ]
+      },
+      "get": {
+        "description": "Offers are public on purpose: a wanted board only works when sellers can see the going rate.",
+        "operationId": "buy-requests-get",
+        "parameters": [
+          {
+            "description": "Buy request slug.",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "description": "Buy request slug.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Get a buy request with its offers",
+        "tags": [
+          "buy-requests"
+        ]
+      }
+    },
+    "/v1/buy-requests/{slug}/accept": {
+      "post": {
+        "description": "Locks the request onto the accepted offer, rejects the others and returns an escrow order draft that the normal checkout flow consumes. Payment never happens outside escrow.",
+        "operationId": "buy-requests-accept-offer",
+        "parameters": [
+          {
+            "description": "Buy request slug.",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "description": "Buy request slug.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Accept an offer",
+        "tags": [
+          "buy-requests"
+        ]
+      }
+    },
+    "/v1/buy-requests/{slug}/offers": {
+      "post": {
+        "description": "A seller answers with a price, a quantity and a lead time. Offers are binding, so a seller may only offer once per request, and the currency must be one the buyer accepts.",
+        "operationId": "buy-requests-create-offer",
+        "parameters": [
+          {
+            "description": "Buy request slug.",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "description": "Buy request slug.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Offer on a buy request",
+        "tags": [
+          "buy-requests"
         ]
       }
     },
@@ -17127,9 +17579,68 @@
         ]
       }
     },
+    "/v1/orders/{orderID}/payment-session/onramp/providers": {
+      "get": {
+        "description": "Enumerates the reviewed onramp providers whose capability gate is open for the order's frozen settlement rail. An empty list means onramp funding must not be offered; clients must never assume a specific vendor.",
+        "operationId": "orders-get-payment-session-onramp-providers",
+        "parameters": [
+          {
+            "description": "Order ID.",
+            "in": "path",
+            "name": "orderID",
+            "required": true,
+            "schema": {
+              "description": "Order ID.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "List onramp providers for this order",
+        "tags": [
+          "orders",
+          "payments"
+        ]
+      }
+    },
     "/v1/orders/{orderID}/payment-session/onramp/refresh": {
       "post": {
-        "description": "Polls the onramp provider for the order's in-flight purchase, persists the transition, and returns the current onramp funding view (null when nothing is in flight).",
+        "description": "Polls the onramp provider for the order's in-flight purchase, persists the transition, and returns its latest durable lifecycle view (null only when no purchase exists).",
         "operationId": "orders-post-payment-session-onramp-refresh",
         "parameters": [
           {
@@ -20730,6 +21241,23 @@
     "/v1/settings/storefront": {
       "get": {
         "operationId": "settings-storefront-get",
+        "parameters": [
+          {
+            "description": "Read the unpublished draft slot or the published-revision history instead of the live config",
+            "explode": false,
+            "in": "query",
+            "name": "variant",
+            "schema": {
+              "description": "Read the unpublished draft slot or the published-revision history instead of the live config",
+              "enum": [
+                "draft",
+                "history",
+                ""
+              ],
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -20823,6 +21351,96 @@
         ]
       }
     },
+    "/v1/settings/storefront/draft": {
+      "delete": {
+        "operationId": "settings-storefront-draft-delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Discard storefront branding draft",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/v1/settings/storefront/preview-token": {
+      "post": {
+        "operationId": "settings-storefront-preview-token-post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Issue (rotate) the storefront draft-preview share token",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/v1/settings/storefront/{peerID}": {
       "get": {
         "operationId": "settings-storefront-public-get",
@@ -20834,6 +21452,16 @@
             "required": true,
             "schema": {
               "description": "Store peer ID.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Draft-preview share token; a valid one returns the unpublished draft.",
+            "explode": false,
+            "in": "query",
+            "name": "preview",
+            "schema": {
+              "description": "Draft-preview share token; a valid one returns the unpublished draft.",
               "type": "string"
             }
           }

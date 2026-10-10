@@ -99,6 +99,7 @@ func (g *Gateway) registerHumaAPI(r chi.Router) (huma.API, error) {
 	// Public storefront routes — always registered, even in PublicOnly mode.
 	g.registerNodeHumaSmokeRoutes(api)
 	g.registerNodeHumaListingPublicOperations(api)
+	g.registerNodeHumaBuyRequestPublicOperations(api)
 	g.registerNodeHumaMediaPublicOperations(api)
 	g.registerNodeHumaProfilePublicOperations(api)
 	g.registerNodeHumaDiscountPublicOperations(api)
@@ -126,6 +127,7 @@ func (g *Gateway) registerHumaAPI(r chi.Router) (huma.API, error) {
 	if !g.config.PublicOnly {
 		// Admin parts of mixed domains (public parts already registered above).
 		g.registerNodeHumaListingAdminOperations(api)
+		g.registerNodeHumaBuyRequestAdminOperations(api)
 		g.registerNodeHumaMediaAdminOperations(api)
 		g.registerNodeHumaProfileAdminOperations(api)
 		g.registerNodeHumaDiscountAdminOperations(api)

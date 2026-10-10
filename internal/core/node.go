@@ -86,6 +86,7 @@ type appServices struct {
 	wishlistService            *WishlistAppService
 	discountService            *DiscountAppService
 	collectionService          *CollectionAppService
+	buyRequestService          *BuyRequestAppService
 	storePolicyService         *StorePolicyAppService
 	sellerAffiliateService     *SellerAffiliateAppService
 	fiatRegistry               contracts.FiatProviderRegistry

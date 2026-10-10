@@ -133,7 +133,15 @@ func (s *BuyRequestAppService) List(ctx context.Context, f contracts.BuyRequestF
 	if err != nil {
 		return nil, 0, err
 	}
-	s.closeExpired(ctx, requests)
+	if s.closeExpired(ctx, requests) > 0 {
+		// Rows just left the board. Re-read so the page and the total agree —
+		// otherwise a caller can see total=1 with an empty list and conclude
+		// its pagination is broken.
+		requests, total, err = s.store.ListRequests(ctx, f)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
 	return requests, total, nil
 }
 
@@ -146,6 +154,8 @@ func (s *BuyRequestAppService) ListMine(ctx context.Context, buyerPeerID string,
 	if err != nil {
 		return nil, 0, err
 	}
+	// Deliberately no re-read here: "my requests" is unfiltered, so the buyer
+	// should still see the row, just with its updated status.
 	s.closeExpired(ctx, requests)
 	return requests, total, nil
 }
@@ -308,11 +318,12 @@ func (s *BuyRequestAppService) AcceptOffer(ctx context.Context, buyerPeerID, slu
 	return request, offer, nil
 }
 
-// closeExpired flips open requests past their deadline to cancelled. It is a
-// lazy sweep on read: the board has no scheduler, and a request that nobody
-// reads does not need its state fixed.
-func (s *BuyRequestAppService) closeExpired(ctx context.Context, requests []*models.BuyRequest) {
+// closeExpired flips open requests past their deadline to cancelled and reports
+// how many it closed. It is a lazy sweep on read: the board has no scheduler,
+// and a request nobody reads does not need its state fixed.
+func (s *BuyRequestAppService) closeExpired(ctx context.Context, requests []*models.BuyRequest) int {
 	now := s.now().UTC()
+	closed := 0
 	for _, r := range requests {
 		if r == nil || r.Status != models.BuyRequestStatusOpen {
 			continue
@@ -325,7 +336,9 @@ func (s *BuyRequestAppService) closeExpired(ctx context.Context, requests []*mod
 			// Best effort: a failed sweep must not break the read.
 			continue
 		}
+		closed++
 	}
+	return closed
 }
 
 func parseCondition(raw string) (models.BuyRequestCondition, error) {

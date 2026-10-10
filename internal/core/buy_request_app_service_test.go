@@ -207,16 +207,22 @@ func TestBuyRequestExpiredRequestsLeaveTheBoard(t *testing.T) {
 
 	board, total, err := svc.List(ctx, contracts.BuyRequestFilter{})
 	require.NoError(t, err)
-	assert.EqualValues(t, 1, total, "total counts the row before the sweep")
-	require.Len(t, board, 1)
-	assert.Equal(t, models.BuyRequestStatusCancelled, board[0].Status)
+	assert.EqualValues(t, 0, total, "an expired request leaves the board")
+	assert.Empty(t, board, "the page and the total must agree after the sweep")
+
+	// The buyer still sees it, closed rather than gone.
+	detail, _, err := svc.Get(ctx, request.Slug)
+	require.NoError(t, err)
+	assert.Equal(t, models.BuyRequestStatusCancelled, detail.Status)
 
 	_, err = svc.SubmitOffer(ctx, testSellerPeer, request.Slug, defaultOfferInput())
 	require.ErrorIs(t, err, database.ErrBuyRequestExpired)
 
-	fresh, _, err := svc.List(ctx, contracts.BuyRequestFilter{Status: string(models.BuyRequestStatusOpen)})
+	mine, mineTotal, err := svc.ListMine(ctx, testBuyerPeer, 1, 20)
 	require.NoError(t, err)
-	assert.Empty(t, fresh, "a closed request is not advertised as open")
+	assert.EqualValues(t, 1, mineTotal)
+	require.Len(t, mine, 1)
+	assert.Equal(t, models.BuyRequestStatusCancelled, mine[0].Status)
 }
 
 func TestBuyRequestCancelRequiresOwner(t *testing.T) {

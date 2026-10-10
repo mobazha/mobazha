@@ -103,3 +103,29 @@ type BuyRequestOffer struct {
 }
 
 func (BuyRequestOffer) TableName() string { return "buy_request_offers" }
+
+// MaxBuyRequestCommentLength bounds a single comment body. Long enough for a
+// real explanation, short enough that the board stays readable.
+const MaxBuyRequestCommentLength = 2000
+
+// BuyRequestComment is a message on a buy request.
+//
+// Threading is intentionally one level deep: a comment either starts a thread
+// (ParentCommentID is empty) or answers one that does. Allowing replies to
+// replies produces indentation towers that the board has no room to render, so
+// the app service rejects them.
+type BuyRequestComment struct {
+	ID           string `json:"id" gorm:"primaryKey;type:text"`
+	TenantID     string `json:"-" gorm:"column:tenant_id;type:text;not null;default:'_default';index"`
+	RequestSlug  string `json:"requestSlug" gorm:"column:request_slug;type:text;not null;index"`
+	AuthorPeerID string `json:"authorPeerID" gorm:"column:author_peer_id;type:text;not null;index"`
+	// ParentCommentID is empty for a top-level comment.
+	ParentCommentID string `json:"parentCommentID,omitempty" gorm:"column:parent_comment_id;type:text;index"`
+	Body            string `json:"body" gorm:"type:text;not null"`
+
+	CreatedAt time.Time  `json:"createdAt" gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt time.Time  `json:"updatedAt" gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt *time.Time `json:"deletedAt,omitempty" gorm:"column:deleted_at;index"`
+}
+
+func (BuyRequestComment) TableName() string { return "buy_request_comments" }

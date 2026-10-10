@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
@@ -316,6 +317,77 @@ func (s *BuyRequestAppService) AcceptOffer(ctx context.Context, buyerPeerID, slu
 		return nil, nil, err
 	}
 	return request, offer, nil
+}
+
+// closeExpired flips open requests past their deadline to cancelled and reports
+// ListComments returns a request's comment thread. The request must exist, but
+// comments stay readable after it closes — the thread is the record of how a
+// deal was discussed.
+func (s *BuyRequestAppService) ListComments(ctx context.Context, slugStr string) ([]*models.BuyRequestComment, error) {
+	if _, err := s.store.GetRequest(ctx, slugStr); err != nil {
+		return nil, err
+	}
+	return s.store.ListComments(ctx, slugStr)
+}
+
+// CreateComment posts to a request's thread. Threading is one level deep: a
+// comment either starts a thread or answers one that did.
+func (s *BuyRequestAppService) CreateComment(ctx context.Context, authorPeerID, slugStr string, in contracts.CreateBuyRequestCommentInput) (*models.BuyRequestComment, error) {
+	authorPeerID = strings.TrimSpace(authorPeerID)
+	if authorPeerID == "" {
+		return nil, fmt.Errorf("%w: author identity is required", database.ErrBuyRequestInvalid)
+	}
+
+	body := strings.TrimSpace(in.Body)
+	if body == "" {
+		return nil, fmt.Errorf("%w: comment body is required", database.ErrBuyRequestInvalid)
+	}
+	if utf8.RuneCountInString(body) > models.MaxBuyRequestCommentLength {
+		return nil, fmt.Errorf("%w: comment must be at most %d characters",
+			database.ErrBuyRequestInvalid, models.MaxBuyRequestCommentLength)
+	}
+
+	request, err := s.store.GetRequest(ctx, slugStr)
+	if err != nil {
+		return nil, err
+	}
+	// An open request past its deadline is expired even if the lazy sweep has
+	// not run yet, so report that before falling through to the status check.
+	if request.Status == models.BuyRequestStatusOpen && !request.ExpiresAt.After(s.now().UTC()) {
+		return nil, database.ErrBuyRequestExpired
+	}
+	// Once the buyer has walked away the thread becomes a record, so it stops
+	// accepting new messages. A locked request is mid-deal and stays open for
+	// the two parties to keep talking.
+	if request.Status != models.BuyRequestStatusOpen && request.Status != models.BuyRequestStatusLocked {
+		return nil, fmt.Errorf("%w: status is %s", database.ErrBuyRequestClosed, request.Status)
+	}
+
+	parentID := strings.TrimSpace(in.ParentCommentID)
+	if parentID != "" {
+		parent, err := s.store.GetComment(ctx, parentID)
+		if err != nil {
+			return nil, err
+		}
+		if parent.RequestSlug != request.Slug {
+			return nil, database.ErrBuyRequestCommentNotFound
+		}
+		if parent.ParentCommentID != "" {
+			return nil, database.ErrBuyRequestReplyToReply
+		}
+	}
+
+	comment := &models.BuyRequestComment{
+		ID:              uuid.New().String(),
+		RequestSlug:     request.Slug,
+		AuthorPeerID:    authorPeerID,
+		ParentCommentID: parentID,
+		Body:            body,
+	}
+	if err := s.store.CreateComment(ctx, comment); err != nil {
+		return nil, err
+	}
+	return comment, nil
 }
 
 // closeExpired flips open requests past their deadline to cancelled and reports

@@ -5663,6 +5663,114 @@
         ]
       }
     },
+    "/v1/buy-requests/{slug}/comments": {
+      "get": {
+        "description": "Returns one level of threads, oldest first. Comments stay readable after the request closes.",
+        "operationId": "buy-requests-comments-list",
+        "parameters": [
+          {
+            "description": "Buy request slug.",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "description": "Buy request slug.",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List a buy request's comments",
+        "tags": [
+          "buy-requests"
+        ]
+      },
+      "post": {
+        "description": "Posts to the thread. Pass parentCommentID to answer an existing comment; threads are one level deep, so a reply may not itself be replied to. A completed or cancelled request is read-only.",
+        "operationId": "buy-requests-comments-create",
+        "parameters": [
+          {
+            "description": "Buy request slug.",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "description": "Buy request slug.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Comment on a buy request",
+        "tags": [
+          "buy-requests"
+        ]
+      }
+    },
     "/v1/buy-requests/{slug}/offers": {
       "post": {
         "description": "A seller answers with a price, a quantity and a lead time. Offers are binding, so a seller may only offer once per request, and the currency must be one the buyer accepts.",

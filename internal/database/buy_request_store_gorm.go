@@ -27,6 +27,8 @@ var (
 	ErrBuyRequestLimitReached     = errors.New("too many open buy requests")
 	ErrBuyRequestNotOwner         = errors.New("only the buyer can perform this action")
 	ErrBuyRequestSlugTaken        = errors.New("buy request slug already exists")
+	ErrBuyRequestCommentNotFound  = errors.New("buy request comment not found")
+	ErrBuyRequestReplyToReply     = errors.New("a reply may not itself be replied to")
 )
 
 type GormBuyRequestStore struct {
@@ -45,7 +47,10 @@ func MigrateBuyRequestModels(db pkgdb.Database) error {
 		if err := tx.Migrate(&models.BuyRequest{}); err != nil {
 			return err
 		}
-		return tx.Migrate(&models.BuyRequestOffer{})
+		if err := tx.Migrate(&models.BuyRequestOffer{}); err != nil {
+			return err
+		}
+		return tx.Migrate(&models.BuyRequestComment{})
 	})
 }
 
@@ -325,4 +330,51 @@ func normalizePage(page, pageSize int) (int, int) {
 		pageSize = 100
 	}
 	return page, pageSize
+}
+
+func (s *GormBuyRequestStore) CreateComment(_ context.Context, c *models.BuyRequestComment) error {
+	now := time.Now()
+	c.CreatedAt = now
+	c.UpdatedAt = now
+	return s.db.Update(func(tx pkgdb.Tx) error {
+		return tx.Save(c)
+	})
+}
+
+func (s *GormBuyRequestStore) GetComment(_ context.Context, id string) (*models.BuyRequestComment, error) {
+	var c models.BuyRequestComment
+	err := s.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().Where("id = ? AND deleted_at IS NULL", id).First(&c).Error
+	})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrBuyRequestCommentNotFound
+		}
+		return nil, err
+	}
+	return &c, nil
+}
+
+// ListComments returns a request's comments oldest-first, which is the order a
+// conversation reads in. The API groups replies under their parent.
+func (s *GormBuyRequestStore) ListComments(_ context.Context, requestSlug string) ([]*models.BuyRequestComment, error) {
+	var out []*models.BuyRequestComment
+	err := s.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().Where("request_slug = ? AND deleted_at IS NULL", requestSlug).
+			Order("created_at ASC").Find(&out).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *GormBuyRequestStore) CountComments(_ context.Context, requestSlug string) (int64, error) {
+	var total int64
+	err := s.db.View(func(tx pkgdb.Tx) error {
+		return tx.Read().Model(&models.BuyRequestComment{}).
+			Where("request_slug = ? AND deleted_at IS NULL", requestSlug).
+			Count(&total).Error
+	})
+	return total, err
 }

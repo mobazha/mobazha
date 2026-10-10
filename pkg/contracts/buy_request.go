@@ -44,6 +44,13 @@ type CreateBuyRequestOfferInput struct {
 	Note              string
 }
 
+// CreateBuyRequestCommentInput is the validated shape of a board comment.
+// ParentCommentID is empty when the comment starts a new thread.
+type CreateBuyRequestCommentInput struct {
+	Body            string
+	ParentCommentID string
+}
+
 // BuyRequestStore abstracts buy request persistence for both standalone and
 // SaaS modes. Implementations handle tenant scoping internally via database.Tx.
 type BuyRequestStore interface {
@@ -61,6 +68,11 @@ type BuyRequestStore interface {
 	HasOfferFromSeller(ctx context.Context, requestSlug, sellerPeerID string) (bool, error)
 	RejectPendingOffers(ctx context.Context, requestSlug, exceptOfferID string) error
 	CountOffersForRequests(ctx context.Context, slugs []string) (map[string]int64, error)
+
+	CreateComment(ctx context.Context, c *models.BuyRequestComment) error
+	GetComment(ctx context.Context, id string) (*models.BuyRequestComment, error)
+	ListComments(ctx context.Context, requestSlug string) ([]*models.BuyRequestComment, error)
+	CountComments(ctx context.Context, requestSlug string) (int64, error)
 }
 
 // BuyRequestService is the business-level interface for the wanted board,
@@ -74,6 +86,8 @@ type BuyRequestService interface {
 	Cancel(ctx context.Context, buyerPeerID, slug string) (*models.BuyRequest, error)
 	SubmitOffer(ctx context.Context, sellerPeerID, slug string, in CreateBuyRequestOfferInput) (*models.BuyRequestOffer, error)
 	AcceptOffer(ctx context.Context, buyerPeerID, slug, offerID string) (*models.BuyRequest, *models.BuyRequestOffer, error)
+	ListComments(ctx context.Context, slug string) ([]*models.BuyRequestComment, error)
+	CreateComment(ctx context.Context, authorPeerID, slug string, in CreateBuyRequestCommentInput) (*models.BuyRequestComment, error)
 }
 
 // BuyRequestProvider exposes the per-node wanted board subsystem. Handlers

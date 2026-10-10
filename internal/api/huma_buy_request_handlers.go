@@ -18,6 +18,7 @@ import (
 func (g *Gateway) registerNodeHumaBuyRequestPublicOperations(api huma.API) {
 	g.registerBuyRequestList(api)
 	g.registerBuyRequestGet(api)
+	g.registerBuyRequestCommentsList(api)
 }
 
 // registerNodeHumaBuyRequestAdminOperations registers the authenticated
@@ -28,6 +29,61 @@ func (g *Gateway) registerNodeHumaBuyRequestAdminOperations(api huma.API) {
 	g.registerBuyRequestCancel(api)
 	g.registerBuyRequestCreateOffer(api)
 	g.registerBuyRequestAcceptOffer(api)
+	g.registerBuyRequestCommentCreate(api)
+}
+
+func (g *Gateway) registerBuyRequestCommentsList(api huma.API) {
+	type buyRequestCommentsInput struct {
+		Slug string `path:"slug" doc:"Buy request slug."`
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "buy-requests-comments-list",
+		Method:      http.MethodGet,
+		Path:        "/v1/buy-requests/{slug}/comments",
+		Summary:     "List a buy request's comments",
+		Description: "Returns one level of threads, oldest first. Comments stay readable " +
+			"after the request closes.",
+		Tags: []string{"buy-requests"},
+	}, func(ctx context.Context, in *buyRequestCommentsInput) (*nodeDataOutput, error) {
+		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug) + "/comments"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"slug": in.Slug})
+		rr := httptest.NewRecorder()
+		g.handleListBuyRequestComments(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
+func (g *Gateway) registerBuyRequestCommentCreate(api huma.API) {
+	type buyRequestCommentBodyInput struct {
+		Slug string `path:"slug" doc:"Buy request slug."`
+		Body json.RawMessage
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "buy-requests-comments-create",
+		Method:      http.MethodPost,
+		Path:        "/v1/buy-requests/{slug}/comments",
+		Summary:     "Comment on a buy request",
+		Description: "Posts to the thread. Pass parentCommentID to answer an existing comment; " +
+			"threads are one level deep, so a reply may not itself be replied to. " +
+			"A completed or cancelled request is read-only.",
+		Tags:     []string{"buy-requests"},
+		Security: nodeAuthSecurity,
+	}, func(ctx context.Context, in *buyRequestCommentBodyInput) (*nodeDataOutput, error) {
+		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug) + "/comments"
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"slug": in.Slug})
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handleCreateBuyRequestComment(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
 }
 
 func (g *Gateway) registerBuyRequestList(api huma.API) {

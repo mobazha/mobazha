@@ -47,7 +47,8 @@ func actingBuyRequestPeerID(r *http.Request) string {
 func buyRequestErrorResponse(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, database.ErrBuyRequestNotFound),
-		errors.Is(err, database.ErrBuyRequestOfferNotFound):
+		errors.Is(err, database.ErrBuyRequestOfferNotFound),
+		errors.Is(err, database.ErrBuyRequestCommentNotFound):
 		response.Error(w, http.StatusNotFound, response.CodeNotFound, err.Error())
 	case errors.Is(err, database.ErrBuyRequestInvalid):
 		response.Error(w, http.StatusBadRequest, response.CodeValidation, err.Error())
@@ -58,7 +59,8 @@ func buyRequestErrorResponse(w http.ResponseWriter, err error) {
 		errors.Is(err, database.ErrBuyRequestCurrencyRejected),
 		errors.Is(err, database.ErrBuyRequestNotOwner),
 		errors.Is(err, database.ErrBuyRequestLimitReached),
-		errors.Is(err, database.ErrBuyRequestSlugTaken):
+		errors.Is(err, database.ErrBuyRequestSlugTaken),
+		errors.Is(err, database.ErrBuyRequestReplyToReply):
 		response.Error(w, http.StatusConflict, response.CodeConflict, err.Error())
 	default:
 		response.Error(w, http.StatusInternalServerError, response.CodeInternalError, "Internal server error")
@@ -167,6 +169,116 @@ type buyRequestOrderDraft struct {
 type acceptBuyRequestOffer struct {
 	Request    *buyRequest          `json:"request"`
 	OrderDraft buyRequestOrderDraft `json:"orderDraft"`
+}
+
+// buyRequestComment is one message in a request's thread. Replies are nested so
+// a client renders a thread without rebuilding the tree itself.
+type buyRequestComment struct {
+	ID          string          `json:"id"`
+	RequestSlug string          `json:"requestSlug"`
+	AuthorID    buyRequestParty `json:"authorID"`
+	// Empty for a top-level comment.
+	ParentCommentID string               `json:"parentCommentID,omitempty"`
+	Body            string               `json:"body"`
+	CreatedAt       string               `json:"createdAt"`
+	Replies         []*buyRequestComment `json:"replies,omitempty"`
+}
+
+type buyRequestCommentThread struct {
+	Comments []*buyRequestComment `json:"comments"`
+	Total    int                  `json:"total"`
+}
+
+type createBuyRequestCommentBody struct {
+	Body            string `json:"body"`
+	ParentCommentID string `json:"parentCommentID"`
+}
+
+func toBuyRequestCommentDTO(m *models.BuyRequestComment) *buyRequestComment {
+	if m == nil {
+		return nil
+	}
+	return &buyRequestComment{
+		ID:              m.ID,
+		RequestSlug:     m.RequestSlug,
+		AuthorID:        toBuyRequestParty(m.AuthorPeerID),
+		ParentCommentID: m.ParentCommentID,
+		Body:            m.Body,
+		CreatedAt:       m.CreatedAt.UTC().Format(time.RFC3339),
+	}
+}
+
+// groupBuyRequestComments turns the flat, oldest-first list the store returns
+// into one level of threads. A reply whose parent is missing is surfaced as a
+// top-level comment rather than dropped — silently losing a message is worse
+// than a slightly odd indentation.
+func groupBuyRequestComments(flat []*models.BuyRequestComment) []*buyRequestComment {
+	roots := make([]*buyRequestComment, 0, len(flat))
+	byID := make(map[string]*buyRequestComment, len(flat))
+
+	for _, m := range flat {
+		dto := toBuyRequestCommentDTO(m)
+		byID[dto.ID] = dto
+		if dto.ParentCommentID == "" {
+			roots = append(roots, dto)
+		}
+	}
+	for _, m := range flat {
+		dto := byID[m.ID]
+		if dto.ParentCommentID == "" {
+			continue
+		}
+		parent, ok := byID[dto.ParentCommentID]
+		if !ok {
+			roots = append(roots, dto)
+			continue
+		}
+		parent.Replies = append(parent.Replies, dto)
+	}
+	return roots
+}
+
+func (g *Gateway) handleListBuyRequestComments(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getBuyRequestService(r)
+	if !ok {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Buy requests not available")
+		return
+	}
+
+	comments, err := svc.ListComments(r.Context(), chi.URLParam(r, "slug"))
+	if err != nil {
+		buyRequestErrorResponse(w, err)
+		return
+	}
+	response.Success(w, buyRequestCommentThread{
+		Comments: groupBuyRequestComments(comments),
+		Total:    len(comments),
+	})
+}
+
+func (g *Gateway) handleCreateBuyRequestComment(w http.ResponseWriter, r *http.Request) {
+	svc, ok := getBuyRequestService(r)
+	if !ok {
+		response.Error(w, http.StatusNotImplemented, response.CodeNotImplemented, "Buy requests not available")
+		return
+	}
+
+	var body createBuyRequestCommentBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
+		return
+	}
+
+	comment, err := svc.CreateComment(r.Context(), actingBuyRequestPeerID(r), chi.URLParam(r, "slug"),
+		contracts.CreateBuyRequestCommentInput{
+			Body:            body.Body,
+			ParentCommentID: body.ParentCommentID,
+		})
+	if err != nil {
+		buyRequestErrorResponse(w, err)
+		return
+	}
+	response.Created(w, toBuyRequestCommentDTO(comment))
 }
 
 func toBuyRequestParty(peerID string) buyRequestParty {

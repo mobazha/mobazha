@@ -53,6 +53,10 @@ func init() {
 		{Category: "social", Name: "social.moderator_add", Persistent: true, Sample: new(ModeratorAdd)},
 		{Category: "social", Name: "social.moderator_remove", Persistent: true, Sample: new(ModeratorRemove)},
 
+		// ── Wanted board (persistent + WebSocket) ──
+		{Category: "buyrequest", Name: "buyrequest.offer_received", Persistent: true, Sample: new(BuyRequestOfferReceived)},
+		{Category: "buyrequest", Name: "buyrequest.offer_decided", Persistent: true, Sample: new(BuyRequestOfferDecided)},
+
 		// ── Wallet events (WebSocket only) ──
 		{Category: "wallet", Name: "wallet.block_received", Sample: new(BlockReceived)},
 		{Category: "wallet", Name: "wallet.tx_received", Sample: new(TransactionReceived)},
@@ -98,6 +102,8 @@ func init() {
 		{Category: "netdb", Name: "netdb.profile_changed", Sample: new(ProfileChanged)},
 		{Category: "netdb", Name: "netdb.listing_changed", Sample: new(ListingChanged)},
 		{Category: "netdb", Name: "netdb.listing_deleted", Sample: new(ListingDeleted)},
+		{Category: "netdb", Name: "netdb.buy_request_changed", Sample: new(BuyRequestChanged)},
+		{Category: "netdb", Name: "netdb.buy_request_deleted", Sample: new(BuyRequestDeleted)},
 		{Category: "netdb", Name: "netdb.listings_reindexed", Sample: new(ListingsReindexed)},
 		{Category: "netdb", Name: "netdb.following_changed", Sample: new(FollowingChanged)},
 		{Category: "netdb", Name: "netdb.followers_changed", Sample: new(FollowersChanged)},

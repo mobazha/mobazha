@@ -10,6 +10,7 @@ import (
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/orders"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -18,6 +19,10 @@ const reconcileInterval = 10 * time.Minute
 
 const netdbDirtyPrefix = "netdb_dirty_"
 
+// buyRequestIndexPageSize bounds one page while re-publishing a node's own open
+// requests. The board itself pages, so the sync pages the same way.
+const buyRequestIndexPageSize = 100
+
 // netDBWriter abstracts the write methods of netdb.NetDB used by this service,
 // enabling unit tests without an HTTP test server.
 type netDBWriter interface {
@@ -25,6 +30,8 @@ type netDBWriter interface {
 	SetOwnListing(sl *pb.SignedListing) error
 	SetOwnListingIndex(index models.ListingIndex) error
 	DeleteOwnListing(listingID string) error
+	SetOwnBuyRequest(record *pb.BuyerRequest) error
+	DeleteOwnBuyRequest(requestID string, revision uint32) error
 	SetOwnFollowing(following models.Following) error
 	SetOwnFollowers(followers models.Followers) error
 	SetOwnStoreMetadata(metadataType string, data json.RawMessage) error
@@ -43,6 +50,7 @@ type NetDBSyncService struct {
 	nodeID   string
 
 	listingService    *ListingAppService
+	buyRequestService *BuyRequestAppService
 	ratingsService    *RatingsAppService
 	collectionService *CollectionAppService
 	discountService   *DiscountAppService
@@ -58,6 +66,7 @@ type NetDBSyncServiceConfig struct {
 	NodeID   string
 
 	ListingService    *ListingAppService
+	BuyRequestService *BuyRequestAppService
 	RatingsService    *RatingsAppService
 	CollectionService *CollectionAppService
 	DiscountService   *DiscountAppService
@@ -71,6 +80,7 @@ func NewNetDBSyncService(cfg NetDBSyncServiceConfig) *NetDBSyncService {
 		eventBus:          cfg.EventBus,
 		nodeID:            cfg.NodeID,
 		listingService:    cfg.ListingService,
+		buyRequestService: cfg.BuyRequestService,
 		ratingsService:    cfg.RatingsService,
 		collectionService: cfg.CollectionService,
 		discountService:   cfg.DiscountService,
@@ -93,6 +103,11 @@ func (s *NetDBSyncService) Start() {
 		&events.ListingChanged{},
 		&events.ListingDeleted{},
 		&events.ListingsReindexed{},
+		&events.BuyRequestChanged{},
+		&events.BuyRequestDeleted{},
+		// A new offer does not change the request itself, but the board shows
+		// its offer count, so the record is refreshed.
+		&events.BuyRequestOfferReceived{},
 		&events.FollowingChanged{},
 		&events.FollowersChanged{},
 		&events.CollectionsChanged{},
@@ -152,6 +167,8 @@ func (s *NetDBSyncService) Reconcile() {
 			s.pushProfile()
 		case "listing_index":
 			s.pushAllListings()
+		case "buy_requests":
+			s.pushAllBuyRequests()
 		case "following":
 			s.pushFollowing()
 		case "followers":
@@ -187,6 +204,12 @@ func (s *NetDBSyncService) dispatch(evt interface{}) {
 	case *events.ListingsReindexed:
 		s.pushAllListings()
 		s.pushProfile()
+	case *events.BuyRequestChanged:
+		s.syncBuyRequest(e.Slug)
+	case *events.BuyRequestOfferReceived:
+		s.syncBuyRequest(e.Slug)
+	case *events.BuyRequestDeleted:
+		s.syncBuyRequest(e.Slug)
 	case *events.FollowingChanged:
 		s.pushFollowing()
 		s.pushProfile()
@@ -279,6 +302,67 @@ func (s *NetDBSyncService) pushAllListings() {
 			}
 		}
 	}
+}
+
+// syncBuyRequest makes the index agree with this node about one request: a
+// request that is still open is published, anything else is withdrawn. Edits
+// and closings both end up here, so the board a reader sees cannot keep a copy
+// its owner has already replaced or taken down.
+func (s *NetDBSyncService) syncBuyRequest(requestID string) {
+	if s.buyRequestService == nil || requestID == "" {
+		return
+	}
+	record, err := s.buyRequestService.Record(context.Background(), requestID)
+	if err != nil {
+		logger.LogDebugWithIDf(log, s.nodeID, "NetDBSync: Record(%s): %v", requestID, err)
+		// The record could not be read, so the index cannot be brought in line
+		// now; the reconcile pass retries it on the next run.
+		s.markDirty("buy_requests")
+		return
+	}
+	if !orders.IsBuyerRequestListed(record, time.Now()) {
+		if err := s.netDB.DeleteOwnBuyRequest(record.GetRequestID(), record.GetRevision()); err != nil {
+			s.markDirty("buy_requests")
+			logger.LogDebugWithIDf(log, s.nodeID, "NetDBSync: DeleteOwnBuyRequest(%s): %v",
+				record.GetRequestID(), err)
+		}
+		return
+	}
+	if err := s.netDB.SetOwnBuyRequest(record); err != nil {
+		s.markDirty("buy_requests")
+		logger.LogDebugWithIDf(log, s.nodeID, "NetDBSync: SetOwnBuyRequest(%s): %v",
+			record.GetRequestID(), err)
+	}
+}
+
+// pushAllBuyRequests re-publishes every open request. It is the reconcile path:
+// after time offline, or after a push that failed, the board catches up. The
+// dirty flag survives the attempt so a failure is retried on the next pass.
+func (s *NetDBSyncService) pushAllBuyRequests() {
+	if s.buyRequestService == nil {
+		return
+	}
+	for page := 1; ; page++ {
+		requests, _, err := s.buyRequestService.List(context.Background(), contracts.BuyRequestFilter{
+			Status:   string(models.BuyRequestStatusOpen),
+			Page:     page,
+			PageSize: buyRequestIndexPageSize,
+		})
+		if err != nil {
+			logger.LogDebugWithIDf(log, s.nodeID, "NetDBSync: list open buy requests: %v", err)
+			return
+		}
+		for _, request := range requests {
+			if request == nil {
+				continue
+			}
+			s.syncBuyRequest(request.Slug)
+		}
+		if len(requests) < buyRequestIndexPageSize {
+			break
+		}
+	}
+	s.clearDirty("buy_requests")
 }
 
 func (s *NetDBSyncService) pushFollowing() {
@@ -462,7 +546,7 @@ func (s *NetDBSyncService) clearDirty(key string) {
 }
 
 func (s *NetDBSyncService) allDirtyKeys() []string {
-	knownKeys := []string{"profile", "listing_index", "following", "followers", "collections", "discounts", "store_policy", "storefront", "ratings"}
+	knownKeys := []string{"profile", "listing_index", "buy_requests", "following", "followers", "collections", "discounts", "store_policy", "storefront", "ratings"}
 	var dirty []string
 	for _, k := range knownKeys {
 		val, err := s.readSetting(netdbDirtyPrefix + k)

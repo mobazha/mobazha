@@ -183,6 +183,46 @@
       "path": "/v1/blocklist/{peerID}"
     },
     {
+      "method": "GET",
+      "path": "/v1/buy-requests"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/buy-requests"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/buy-requests/mine"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/buy-requests/{slug}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/buy-requests/{slug}"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/buy-requests/{slug}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/buy-requests/{slug}/accept"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/buy-requests/{slug}/comments"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/buy-requests/{slug}/comments"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/buy-requests/{slug}/offers"
+    },
+    {
       "method": "DELETE",
       "path": "/v1/carts"
     },
@@ -349,6 +389,30 @@
     {
       "method": "POST",
       "path": "/v1/chat/verification/{txnId}/start-sas"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/collateral/accounts"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/collateral/accounts"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/collateral/accounts/{collateralID}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/collateral/accounts/{collateralID}/funding-target"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/collateral/accounts/{collateralID}/funding/reconcile"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/collateral/capabilities"
     },
     {
       "method": "GET",
@@ -940,6 +1004,18 @@
     },
     {
       "method": "POST",
+      "path": "/v1/orders/{orderID}/payment-session/onramp"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/orders/{orderID}/payment-session/onramp/providers"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/orders/{orderID}/payment-session/onramp/refresh"
+    },
+    {
+      "method": "POST",
       "path": "/v1/orders/{orderID}/payment/cancel-partial"
     },
     {
@@ -1060,6 +1136,26 @@
     },
     {
       "method": "GET",
+      "path": "/v1/public/seller-affiliate-links/{token}"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/public/seller-affiliate-links/{token}/sessions"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/public/seller-affiliate/program"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/public/seller-affiliate/programs/{programID}/links"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/public/seller-affiliate/statements/promoter"
+    },
+    {
+      "method": "GET",
       "path": "/v1/purchases"
     },
     {
@@ -1101,6 +1197,38 @@
     {
       "method": "GET",
       "path": "/v1/schemas/{schema}"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/seller-affiliate/capabilities"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/seller-affiliate/links"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/seller-affiliate/links/{linkID}/reissue"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/seller-affiliate/links/{linkID}/revoke"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/seller-affiliate/program"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/seller-affiliate/program"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/seller-affiliate/promoter-enrollments"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/seller-affiliate/statements/seller"
     },
     {
       "method": "GET",
@@ -1156,11 +1284,23 @@
     },
     {
       "method": "GET",
+      "path": "/v1/settings/pgp-key/vault"
+    },
+    {
+      "method": "GET",
       "path": "/v1/settings/storefront"
     },
     {
       "method": "PUT",
       "path": "/v1/settings/storefront"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/settings/storefront/draft"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/settings/storefront/preview-token"
     },
     {
       "method": "GET",
@@ -1279,6 +1419,10 @@
       "path": "/v1/system/claim-store"
     },
     {
+      "method": "DELETE",
+      "path": "/v1/system/connect-platform"
+    },
+    {
       "method": "POST",
       "path": "/v1/system/connect-platform"
     },
@@ -1351,6 +1495,10 @@
       "path": "/v1/system/publish"
     },
     {
+      "method": "POST",
+      "path": "/v1/system/refresh-platform-credential"
+    },
+    {
       "method": "GET",
       "path": "/v1/system/setup"
     },
@@ -1373,6 +1521,10 @@
     {
       "method": "POST",
       "path": "/v1/system/update-trigger"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/translate"
     },
     {
       "method": "GET",

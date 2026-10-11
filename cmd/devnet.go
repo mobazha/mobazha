@@ -40,14 +40,14 @@ func (x *DevNet) Execute(args []string) error {
 
 	vendorCfg := newConfig("vendor", "/ip4/127.0.0.1/tcp/4007", "/ip4/127.0.0.1/tcp/4004")
 	vendorCfg.BoostrapAddrs = []string{fmt.Sprintf("%s/p2p/%s", buyerCfg.SwarmAddrs[0], buyer.Identity())}
-	vendor, err := core.NewNode(context.Background(), vendorCfg, repo.DefaultNodeID)
+	vendor, err := core.NewNode(context.Background(), vendorCfg, "vendor")
 	if err != nil {
 		return err
 	}
 
 	moderatorCfg := newConfig("moderator", "/ip4/127.0.0.1/tcp/4008", "/ip4/127.0.0.1/tcp/4005")
 	moderatorCfg.BoostrapAddrs = []string{fmt.Sprintf("%s/p2p/%s", buyerCfg.SwarmAddrs[0], buyer.Identity())}
-	moderator, err := core.NewNode(context.Background(), moderatorCfg, repo.DefaultNodeID)
+	moderator, err := core.NewNode(context.Background(), moderatorCfg, "moderator")
 	if err != nil {
 		return err
 	}
@@ -108,6 +108,9 @@ func (x *DevNet) Execute(args []string) error {
 		return err
 	}
 	if err := setupModerator(moderator); err != nil {
+		return err
+	}
+	if err := ensureDevnetShippingProfile(vendor, "vendor"); err != nil {
 		return err
 	}
 	if err := setupVendor(vendor); err != nil {

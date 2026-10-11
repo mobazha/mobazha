@@ -228,6 +228,9 @@ func notificationDedupFields(category string) []string {
 		return []string{"OrderID"}
 	case "dispute":
 		return []string{"OrderID", "CaseID"}
+	case "buyrequest":
+		// One event per offer, so a redelivered message cannot notify twice.
+		return []string{"OfferID"}
 	default:
 		return nil
 	}

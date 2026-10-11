@@ -23,6 +23,11 @@ message Message {
         ADDRESS_RESPONSE         = 10;
         COLLATERAL_CREDENTIAL_REQUEST  = 11;
         COLLATERAL_CREDENTIAL_RESPONSE = 12;
+        // BUY_REQUEST relays one wanted-board operation between two nodes. The
+        // board itself lives on the node that owns the request, so nothing is
+        // duplicated: a seller's node sends the operation to the owner and the
+        // owner answers. See BuyRequestMessage.
+        BUY_REQUEST              = 13;
     }
 }
 
@@ -75,6 +80,49 @@ message AfterSaleDisputeOpen {
 
 message OrderList {
     repeated OrderMessage messages = 1;
+}
+
+// BuyRequestMessage carries one wanted-board operation between two nodes.
+//
+// A buy request is owned by exactly one node: the one the buyer published it
+// on. A seller on another node therefore relays what it wants done instead of
+// keeping a second copy of the board. `payload` is the JSON that the owner's
+// HTTP API serves for the operation, so a request keeps exactly one wire shape
+// no matter which node answers a reader.
+message BuyRequestMessage {
+    Op op               = 1;
+    string slug         = 2;
+    // requestID correlates an ask with the answer it expects.
+    string requestID    = 3;
+    bytes payload       = 4;
+    // errorCode is one of the codes in pkg/contracts/buy_request_wire.go. It is
+    // empty when the operation succeeded.
+    string errorCode    = 5;
+    string errorMessage = 6;
+
+    enum Op {
+        // REQUEST_ASK asks the owner to send back the request and its offers.
+        REQUEST_ASK    = 0;
+        // REQUEST_SEND is the owner's answer to REQUEST_ASK.
+        REQUEST_SEND   = 1;
+        // COMMENTS_ASK asks the owner for a request's comment thread.
+        COMMENTS_ASK   = 2;
+        // COMMENTS_SEND is the owner's answer to COMMENTS_ASK.
+        COMMENTS_SEND  = 3;
+        // OFFER submits a seller's offer to the owner.
+        OFFER          = 4;
+        // OFFER_RESULT is the owner's answer to OFFER.
+        OFFER_RESULT   = 5;
+        // COMMENT posts to a request's thread.
+        COMMENT        = 6;
+        // COMMENT_RESULT is the owner's answer to COMMENT.
+        COMMENT_RESULT = 7;
+        // OFFER_ACCEPTED tells the winning seller that the buyer picked it.
+        OFFER_ACCEPTED = 8;
+        // OFFER_REJECTED tells the other sellers that the deal is gone, so
+        // their boards stop showing a pending offer.
+        OFFER_REJECTED = 9;
+    }
 }
 
 message AddressRequestMessage {

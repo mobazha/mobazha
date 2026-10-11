@@ -69,6 +69,8 @@ func BuildOpenAPISpec() []byte {
 	// Public operations.
 	g.registerNodeHumaSmokeRoutes(api)
 	g.registerNodeHumaListingPublicOperations(api)
+	g.registerNodeHumaBuyRequestPublicOperations(api)
+	g.registerNodeHumaTranslationOperations(api)
 	g.registerNodeHumaMediaPublicOperations(api)
 	g.registerNodeHumaProfilePublicOperations(api)
 	g.registerNodeHumaDiscountPublicOperations(api)
@@ -85,6 +87,7 @@ func BuildOpenAPISpec() []byte {
 	g.registerNodeHumaSellerAffiliatePublicOperations(api)
 	// Admin operations.
 	g.registerNodeHumaListingAdminOperations(api)
+	g.registerNodeHumaBuyRequestAdminOperations(api)
 	g.registerNodeHumaMediaAdminOperations(api)
 	g.registerNodeHumaProfileAdminOperations(api)
 	g.registerNodeHumaDiscountAdminOperations(api)

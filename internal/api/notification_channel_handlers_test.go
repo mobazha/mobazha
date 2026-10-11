@@ -17,6 +17,7 @@ func TestExtractEventCategories(t *testing.T) {
 		"publish": true, "cart": true,
 		"collection": true, "shipping": true, "internal": true,
 		"netdb": true,
+		"buyrequest": true,
 	}
 	for _, cat := range cats {
 		if !expected[cat] {

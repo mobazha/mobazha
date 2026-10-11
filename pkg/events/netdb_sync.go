@@ -21,6 +21,19 @@ type ListingDeleted struct {
 	Cid string
 }
 
+// BuyRequestChanged signals that a wanted-board request was published or that
+// something the board shows changed (a new offer raises its offer count).
+// NetDBSyncService re-reads it and pushes it to the search service.
+type BuyRequestChanged struct {
+	Slug string
+}
+
+// BuyRequestDeleted signals that a request left the open board — cancelled,
+// locked onto an accepted offer, or expired — so the search service can drop it.
+type BuyRequestDeleted struct {
+	Slug string
+}
+
 // ListingsReindexed signals that multiple listings were bulk-updated
 // and the full index + all listings should be re-pushed.
 type ListingsReindexed struct{}

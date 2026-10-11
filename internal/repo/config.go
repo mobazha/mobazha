@@ -123,6 +123,17 @@ type Config struct {
 	DHTClientOnly          bool     `long:"dhtclientonly" description:"Disable participating in serving data in the DHT. This should be used if your node is undialable."`
 	NetConfigEndpoint      string   `long:"netconfigendpoint" description:"Override the default net config endpoint with the provided value"`
 	NetDBEndpoint          string   `long:"netdbendpoint" description:"Override the default NetDB endpoint for search index sync"`
+	// Translation engine for on-demand content translation (product titles,
+	// descriptions and wanted requests). "none" is the default: a node only
+	// sends a seller's words to a third party when its owner says so.
+	TranslationEngine        string `long:"translationengine" description:"Translation engine: none (default), google-free, openai-compatible or libretranslate"`
+	TranslationEndpoint      string `long:"translationendpoint" description:"Translation engine endpoint; empty uses the engine's own default"`
+	TranslationAPIKey        string `long:"translationapikey" description:"API key for the translation engine, when it needs one"`
+	TranslationModel         string `long:"translationmodel" description:"Model name for an openai-compatible translation endpoint"`
+	TranslationMonthlyBudget int64  `long:"translationmonthlybudget" description:"Characters this node may send to an engine per month; 0 means unlimited"`
+	// TranslationGlossary is a JSON array of {"source","target"} terms that must
+	// survive translation — brand and model names, mostly.
+	TranslationGlossary string `long:"translationglossary" description:"JSON array of {source,target} terms that must not be translated"`
 	RelayAPIURL            string   `long:"relayapiurl" description:"Platform base URL for relay HTTP API (append /platform/v1/relay/execute). Required for standalone managed EVM checkout; SaaS uses hosting relay when HostService is wired."`
 	RelayAPIBearer         string   `long:"relayapibearer" description:"Bearer JWT for platform relay HTTP API; if empty, MOBAZHA_PLATFORM_RELAY_TOKEN is used for the managed relay path"`
 

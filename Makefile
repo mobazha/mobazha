@@ -33,6 +33,11 @@ android_framework: ## Build Android Framework for mobile
 ## Protobuf compilation
 ##
 
+# pkg/net/mbzpb/msg.pb.go was generated with protoc 28.3 and protoc-gen-go
+# v1.34.2. Generating it with a newer protoc-gen-go rewrites the whole file
+# (the generated style changed after v1.34.x), so keep these versions when you
+# only mean to add a message or an enum value.
+
 protos:
 	# 生成 net/mbzpb 消息定义
 	cd pkg/net/mbzpb && PATH=$(PATH):$(GOPATH)/bin protoc --go_out=./ *.proto

@@ -372,6 +372,7 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 		initDiscountSubsystem(obNode)
 		initCollectionSubsystem(obNode)
 		initBuyRequestSubsystem(obNode)
+		initTranslationSubsystem(obNode, cfg)
 		initStorePolicySubsystem(obNode)
 		initSellerAffiliateSubsystem(obNode)
 		initFiatSubsystem(obNode)
@@ -642,6 +643,7 @@ func newNode(ctx context.Context, cfg *repo.Config, nodeID string, options []Nod
 	initDiscountSubsystem(obNode)
 	initCollectionSubsystem(obNode)
 	initBuyRequestSubsystem(obNode)
+	initTranslationSubsystem(obNode, cfg)
 	initStorePolicySubsystem(obNode)
 	initSellerAffiliateSubsystem(obNode)
 	initFiatSubsystem(obNode)
@@ -1004,6 +1006,37 @@ func (n *MobazhaNode) registerHandlers() {
 	n.networkService.RegisterHandler(pb.Message_DISPUTE, func(from peer.ID, message *pb.Message) error {
 		return n.orderService.HandleDisputeMessage(from, message, n.isDuplicate, n.sendAckMessage)
 	})
+	n.networkService.RegisterHandler(pb.Message_BUY_REQUEST, func(from peer.ID, message *pb.Message) error {
+		return n.handleBuyRequestMessage(from, message)
+	})
+}
+
+// handleBuyRequestMessage is the handler for wanted-board traffic. It mirrors
+// the order handler: the message is processed once, then acknowledged so the
+// sender stops retrying. The acting identity is the peer the message arrived
+// from, never anything the payload claims about itself.
+func (n *MobazhaNode) handleBuyRequestMessage(from peer.ID, message *pb.Message) error {
+	if n.buyRequestRelay == nil {
+		return errors.New("buy request relay not initialized")
+	}
+	if n.isDuplicate(message) {
+		n.sendAckMessage(message.MessageID, from)
+		return nil
+	}
+	if message.MessageType != pb.Message_BUY_REQUEST {
+		return errors.New("message is not type BUY_REQUEST")
+	}
+	wire := new(pb.BuyRequestMessage)
+	if err := message.Payload.UnmarshalTo(wire); err != nil {
+		return err
+	}
+	// A refused operation is answered with its reason rather than an error, so
+	// it is still acknowledged: retrying a refusal only repeats it.
+	if err := n.buyRequestRelay.handleMessage(n.nodeCtx, from, wire); err != nil {
+		return err
+	}
+	n.sendAckMessage(message.MessageID, from)
+	return nil
 }
 
 func (n *MobazhaNode) listenNetworkEvents() {

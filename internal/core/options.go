@@ -234,6 +234,7 @@ func (n *MobazhaNode) applyOptions(opts []NodeOption) {
 	n.initShoppingCartService()
 	n.initWishlistService()
 	n.initFollowService()
+	n.initBuyRequestRelay()
 	n.initPostsService()
 	n.initAnalyticsService()
 	n.initNetDBSyncService()
@@ -966,11 +967,16 @@ func (n *MobazhaNode) initNetDBSyncService() {
 		EventBus:          n.eventBus,
 		NodeID:            n.nodeID,
 		ListingService:    n.listingService,
+		BuyRequestService: n.buyRequestService,
 		RatingsService:    n.ratingsService,
 		CollectionService: n.collectionService,
 		DiscountService:   n.discountService,
 		StorePolicy:       n.storePolicyService,
 	})
+	// The index is told about this node's open board on every start: a node that
+	// published requests before it had a search service (or while it was
+	// unreachable) is discoverable again from the next reconcile.
+	n.netDBSyncService.markDirty("buy_requests")
 }
 
 // initGuestOrderService creates Guest Checkout services. Wallet-domain

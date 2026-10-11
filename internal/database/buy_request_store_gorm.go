@@ -29,6 +29,13 @@ var (
 	ErrBuyRequestSlugTaken        = errors.New("buy request slug already exists")
 	ErrBuyRequestCommentNotFound  = errors.New("buy request comment not found")
 	ErrBuyRequestReplyToReply     = errors.New("a reply may not itself be replied to")
+	// ErrBuyRequestOwnerUnreachable means the node that owns a request did not
+	// answer a relayed operation. It says nothing about the request itself, so
+	// it is reported apart from a refusal.
+	ErrBuyRequestOwnerUnreachable = errors.New("the node that owns this buy request did not answer")
+	// ErrBuyRequestInternal covers a failure the owner could not describe in
+	// board terms, so a caller cannot mistake it for a refusal.
+	ErrBuyRequestInternal = errors.New("the node that owns this buy request failed to handle it")
 )
 
 type GormBuyRequestStore struct {
@@ -75,11 +82,13 @@ func applyBuyRequestFilters(q *gorm.DB, f pkgcontracts.BuyRequestFilter) *gorm.D
 	if f.Status != "" {
 		q = q.Where("status = ?", f.Status)
 	}
-	if f.CategorySlug != "" {
-		q = q.Where("category_slug = ?", f.CategorySlug)
+	// The board's filter names follow the record contract (productType, shipTo);
+	// the columns keep the names they were created with.
+	if f.ProductType != "" {
+		q = q.Where("category_slug = ?", f.ProductType)
 	}
-	if f.DeliverTo != "" {
-		q = q.Where("deliver_to = ?", strings.ToUpper(f.DeliverTo))
+	if f.ShipTo != "" {
+		q = q.Where("deliver_to = ?", strings.ToUpper(f.ShipTo))
 	}
 	if f.Currency != "" {
 		q = q.Where("accepted_currencies LIKE ?", "%,"+strings.ToUpper(f.Currency)+",%")
@@ -197,10 +206,27 @@ func (s *GormBuyRequestStore) UpdateRequest(_ context.Context, r *models.BuyRequ
 			}
 			return err
 		}
+		// An edit rewrites the record; a status change (cancel, expiry sweep,
+		// accepting an offer) only touches the lifecycle fields. The revision is
+		// whatever the caller decided, never lower than what is stored: an older
+		// copy must not be able to overwrite a newer one.
+		if r.Revision > existing.Revision {
+			existing.Revision = r.Revision
+			existing.Title = r.Title
+			existing.CategorySlug = r.CategorySlug
+			existing.Description = r.Description
+			existing.Quantity = r.Quantity
+			existing.BudgetMaxAmount = r.BudgetMaxAmount
+			existing.BudgetMaxCurrency = r.BudgetMaxCurrency
+			existing.AcceptedCurrencies = r.AcceptedCurrencies
+			existing.DeliverTo = r.DeliverTo
+			existing.ImagesJSON = r.ImagesJSON
+		}
 		existing.Status = r.Status
 		existing.AcceptedOfferID = r.AcceptedOfferID
 		existing.ExpiresAt = r.ExpiresAt
 		existing.UpdatedAt = r.UpdatedAt
+		r.Revision = existing.Revision
 		return tx.Save(&existing)
 	})
 }

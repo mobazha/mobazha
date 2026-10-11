@@ -50,6 +50,12 @@ type BuyRequest struct {
 	Slug        string `json:"slug" gorm:"type:text;not null;uniqueIndex"`
 	BuyerPeerID string `json:"buyerPeerID" gorm:"column:buyer_peer_id;type:text;not null;index"`
 
+	// Revision starts at 1 and increases with every edit. The identifier above is
+	// what a reader addresses; the revision is what the index uses to refuse an
+	// older copy, so a modified request can never be overwritten by the one it
+	// replaced.
+	Revision int `json:"revision" gorm:"type:integer;not null;default:1"`
+
 	Title        string `json:"title" gorm:"type:text;not null"`
 	CategorySlug string `json:"categorySlug" gorm:"column:category_slug;type:text;index"`
 	Description  string `json:"description,omitempty" gorm:"type:text"`

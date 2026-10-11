@@ -9,9 +9,12 @@ import (
 	"time"
 
 	"github.com/mobazha/mobazha/internal/repo"
+	internaldb "github.com/mobazha/mobazha/internal/database"
+	"github.com/mobazha/mobazha/pkg/contracts"
 	"github.com/mobazha/mobazha/pkg/database"
 	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/orders"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +27,11 @@ type mockNetDBWriter struct {
 	calls         map[string]int
 	metadataTypes []string
 	metadataData  []json.RawMessage
+	// buyRequests and withdrawals keep what the sync service asked to publish
+	// and withdraw, so a test can read the record itself and not just count the
+	// calls it took to send it.
+	buyRequests []*pb.BuyerRequest
+	withdrawals []string
 	err           error // if set, all methods return this error
 }
 
@@ -56,6 +64,18 @@ func (m *mockNetDBWriter) SetOwnListingIndex(_ models.ListingIndex) error {
 	return m.record("SetOwnListingIndex")
 }
 func (m *mockNetDBWriter) DeleteOwnListing(_ string) error { return m.record("DeleteOwnListing") }
+func (m *mockNetDBWriter) SetOwnBuyRequest(record *pb.BuyerRequest) error {
+	m.mu.Lock()
+	m.buyRequests = append(m.buyRequests, record)
+	m.mu.Unlock()
+	return m.record("SetOwnBuyRequest")
+}
+func (m *mockNetDBWriter) DeleteOwnBuyRequest(requestID string, _ uint32) error {
+	m.mu.Lock()
+	m.withdrawals = append(m.withdrawals, requestID)
+	m.mu.Unlock()
+	return m.record("DeleteOwnBuyRequest")
+}
 func (m *mockNetDBWriter) SetOwnFollowing(_ models.Following) error {
 	return m.record("SetOwnFollowing")
 }
@@ -308,4 +328,74 @@ func TestNetDBSync_StartStop(t *testing.T) {
 
 	svc.Stop()
 	assert.GreaterOrEqual(t, writer.count("SetOwnProfile"), 1)
+}
+
+// TestNetDBSync_BuyRequestReachesTheIndex walks what a buyer's node actually
+// does when a request is published or closed: the board changes, the sync
+// service reads the record back and either publishes it or withdraws it. The
+// record it sends has to be one the index will accept, which is why the test
+// validates it the way the index does rather than only counting calls.
+func TestNetDBSync_BuyRequestReachesTheIndex(t *testing.T) {
+	db := newTestDB(t)
+	require.NoError(t, internaldb.MigrateBuyRequestModels(db))
+
+	writer := newMockNetDBWriter()
+	board := NewBuyRequestAppService(internaldb.NewGormBuyRequestStore(db))
+	svc := NewNetDBSyncService(NetDBSyncServiceConfig{
+		NetDB:             writer,
+		DB:                db,
+		NodeID:            "test-sync",
+		BuyRequestService: board,
+	})
+
+	buyerPeerID := testBuyerPeer
+	created, err := board.Create(context.Background(), buyerPeerID, defaultCreateInput())
+	require.NoError(t, err)
+
+	svc.dispatch(&events.BuyRequestChanged{Slug: created.Slug})
+	require.Equal(t, 1, writer.count("SetOwnBuyRequest"), "an open request belongs on the board")
+
+	published := writer.buyRequests[0]
+	require.NoError(t, orders.ValidateBuyerRequest(published, time.Now()),
+		"the record the node publishes must satisfy the index's rules")
+	assert.Equal(t, created.Slug, published.GetRequestID())
+	assert.Equal(t, buyerPeerID, published.GetPeerID())
+	assert.Equal(t, uint32(1), published.GetRevision())
+	assert.Equal(t, "electronics", published.GetProductType())
+	assert.Equal(t, "DE", published.GetShipTo())
+	assert.Equal(t, orders.BuyerRequestStatusOpen, published.GetStatus())
+
+	// An edit moves the record's revision forward, which is what lets the index
+	// refuse the copy the edit replaced.
+	edited, err := board.Update(context.Background(), buyerPeerID, created.Slug,
+		contracts.UpdateBuyRequestInput{
+			Title:          "Vintage Technics turntable (revised)",
+			ProductType:    "electronics",
+			Quantity:       3,
+			BudgetAmount:   "600",
+			BudgetCurrency: "USDT",
+			ShipTo:         "DE",
+			ExpiresAt:      time.Now().UTC().Add(72 * time.Hour),
+		})
+	require.NoError(t, err)
+	assert.Equal(t, 2, edited.Revision)
+
+	svc.dispatch(&events.BuyRequestChanged{Slug: created.Slug})
+	require.Equal(t, 2, writer.count("SetOwnBuyRequest"))
+	assert.Equal(t, uint32(2), writer.buyRequests[1].GetRevision())
+	assert.Equal(t, "Vintage Technics turntable (revised)", writer.buyRequests[1].GetTitle())
+
+	// Closing a request takes it off the board instead of republishing it.
+	_, err = board.Cancel(context.Background(), buyerPeerID, created.Slug)
+	require.NoError(t, err)
+
+	svc.dispatch(&events.BuyRequestChanged{Slug: created.Slug})
+	assert.Equal(t, 2, writer.count("SetOwnBuyRequest"), "a closed request must not be published")
+	require.Equal(t, 1, writer.count("DeleteOwnBuyRequest"))
+	assert.Equal(t, created.Slug, writer.withdrawals[0])
+
+	// The delete event is the same work under a different name, so a closing
+	// that arrives as a deletion still reaches the index.
+	svc.dispatch(&events.BuyRequestDeleted{Slug: created.Slug})
+	assert.Equal(t, 2, writer.count("DeleteOwnBuyRequest"))
 }

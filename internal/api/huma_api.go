@@ -100,6 +100,7 @@ func (g *Gateway) registerHumaAPI(r chi.Router) (huma.API, error) {
 	g.registerNodeHumaSmokeRoutes(api)
 	g.registerNodeHumaListingPublicOperations(api)
 	g.registerNodeHumaBuyRequestPublicOperations(api)
+	g.registerNodeHumaTranslationOperations(api)
 	g.registerNodeHumaMediaPublicOperations(api)
 	g.registerNodeHumaProfilePublicOperations(api)
 	g.registerNodeHumaDiscountPublicOperations(api)

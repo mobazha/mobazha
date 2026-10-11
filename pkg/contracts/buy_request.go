@@ -9,28 +9,44 @@ import (
 
 // BuyRequestFilter narrows a buy request listing. Empty fields are ignored.
 type BuyRequestFilter struct {
-	CategorySlug string
-	Currency     string
-	DeliverTo    string
-	Status       string
-	Page         int
-	PageSize     int
+	ProductType string
+	Currency    string
+	ShipTo      string
+	Status      string
+	Page        int
+	PageSize    int
 }
 
 // CreateBuyRequestInput is the validated shape of a new buy request. The API
 // layer decodes JSON into this; the app service applies the business rules.
 type CreateBuyRequestInput struct {
-	Title              string
-	CategorySlug       string
-	Quantity           int
-	Unit               string
-	BudgetMaxAmount    string
-	BudgetMaxCurrency  string
-	BudgetMinAmount    string
+	Title string
+	// ProductType reuses the listing taxonomy, so a seller can filter the board
+	// by the products they already publish.
+	ProductType string
+	Quantity    int
+	// BudgetAmount is a positive integer in the currency's smallest unit, the
+	// same way a listing price is carried.
+	BudgetAmount       string
+	BudgetCurrency     string
 	AcceptedCurrencies []string
-	DeliverTo          string
+	ShipTo             string
 	Description        string
-	Condition          string
+	ExpiresAt          time.Time
+	Images             []models.ImageHashes
+}
+
+// UpdateBuyRequestInput is an edit. The same rules apply, and the owning Node
+// bumps the record's revision so the index keeps the newest copy.
+type UpdateBuyRequestInput struct {
+	Title              string
+	ProductType        string
+	Quantity           int
+	BudgetAmount       string
+	BudgetCurrency     string
+	AcceptedCurrencies []string
+	ShipTo             string
+	Description        string
 	ExpiresAt          time.Time
 	Images             []models.ImageHashes
 }
@@ -81,6 +97,9 @@ type BuyRequestStore interface {
 // always passed in explicitly so the service stays free of HTTP concerns.
 type BuyRequestService interface {
 	Create(ctx context.Context, buyerPeerID string, in CreateBuyRequestInput) (*models.BuyRequest, error)
+	// Update edits a request its buyer owns and bumps the record's revision, so
+	// the index can refuse an older copy.
+	Update(ctx context.Context, buyerPeerID, requestID string, in UpdateBuyRequestInput) (*models.BuyRequest, error)
 	List(ctx context.Context, f BuyRequestFilter) ([]*models.BuyRequest, int64, error)
 	ListMine(ctx context.Context, buyerPeerID string, page, pageSize int) ([]*models.BuyRequest, int64, error)
 	Get(ctx context.Context, slug string) (*models.BuyRequest, []*models.BuyRequestOffer, error)

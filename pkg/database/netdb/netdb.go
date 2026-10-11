@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/mobazha/mobazha/internal/logger"
 	"github.com/mobazha/mobazha/pkg/logging"
 	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/orders"
 	pb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
 	"github.com/mobazha/mobazha/pkg/request"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -349,6 +352,71 @@ func (ndb *NetDB) DeleteOwnListing(listingID string) error {
 
 	_, err = ndb.restyClient.R().SetBody(nounce).Delete(fmt.Sprintf("%s/listings/%s", ndb.endpoint, listingID))
 	return err
+}
+
+// SetOwnBuyRequest publishes one wanted-board request to the search service.
+//
+// A request is owned by this node, which is its only writer, so the search
+// service is told what to index rather than asked to crawl. The service receives
+// the record exactly as it was signed, so it verifies the signature over the
+// bytes it indexes rather than re-encoding them and hoping two encoders agree.
+func (ndb *NetDB) SetOwnBuyRequest(record *pb.BuyerRequest) error {
+	if record == nil {
+		return errors.New("no buy request record to publish")
+	}
+	logger.LogInfoWithIDf(log, ndb.ownPeerID, "Set own buy request, requestID: %s, revision: %d",
+		record.GetRequestID(), record.GetRevision())
+
+	serialized, signature, err := orders.SignBuyerRequest(ndb.nodePrivateKey, record)
+	if err != nil {
+		return err
+	}
+
+	wire := BuyRequest{
+		PeerID:            ndb.ownPeerID,
+		SerializedRequest: serialized,
+		Signature:         signature,
+	}
+
+	resp, err := ndb.restyClient.R().SetBody(wire).Post(fmt.Sprintf("%s/buyer-requests", ndb.endpoint))
+	if err != nil {
+		return err
+	}
+	if resp.IsError() {
+		// A rejected push means the board never learned about the request, so
+		// report it instead of letting the sync assume it succeeded.
+		return fmt.Errorf("publish buy request %s: search service answered %s: %s",
+			record.GetRequestID(), resp.Status(), resp.String())
+	}
+	return nil
+}
+
+// DeleteOwnBuyRequest withdraws a request from the search service once it is no
+// longer open. The identifier names the record and the revision says which copy
+// the owner is taking back, which is what the withdrawal signature covers.
+func (ndb *NetDB) DeleteOwnBuyRequest(requestID string, revision uint32) error {
+	signature, err := ndb.nodePrivateKey.Sign(
+		orders.BuyerRequestWithdrawPayload(ndb.ownPeerID, requestID, revision))
+	if err != nil {
+		return err
+	}
+
+	body := BuyRequestWithdrawal{
+		PeerID:    ndb.ownPeerID,
+		Revision:  revision,
+		Signature: signature,
+	}
+
+	resp, err := ndb.restyClient.R().SetBody(body).Delete(fmt.Sprintf("%s/buyer-requests/%s",
+		ndb.endpoint, url.PathEscape(requestID)))
+	if err != nil {
+		return err
+	}
+	if resp.IsError() {
+		return fmt.Errorf("withdraw buy request %s: search service answered %s: %s",
+			requestID, resp.Status(), resp.String())
+	}
+	return nil
 }
 
 // GetListingIndex returns the listing index.

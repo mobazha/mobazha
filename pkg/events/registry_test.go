@@ -140,6 +140,8 @@ func TestPersistentConsistency(t *testing.T) {
 		"order.auto_completed":          true,
 		"order.auto_cancelled":          true,
 		"order.protection_reminder":     true,
+		"buyrequest.offer_received":     true,
+		"buyrequest.offer_decided":      true,
 	}
 	for _, m := range registry {
 		if want, ok := persistentNames[m.Name]; ok {

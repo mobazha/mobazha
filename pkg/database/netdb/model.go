@@ -56,6 +56,24 @@ type Listing struct {
 	Sig []byte `gorm:"-" json:"Sig"`
 }
 
+// BuyRequest is one wanted-board request published to the search service.
+// SerializedRequest is the record exactly as it was signed, so the service
+// verifies the signature over the bytes it indexes instead of re-encoding them.
+type BuyRequest struct {
+	PeerID            string `json:"peerID"`
+	SerializedRequest []byte `json:"serializedRequest"`
+	Signature         []byte `json:"signature"`
+}
+
+// BuyRequestWithdrawal takes one request off the board. The signature covers
+// the domain tag, the owner, the identifier and the revision, so a withdrawal
+// cannot be replayed as a publication or the other way round.
+type BuyRequestWithdrawal struct {
+	PeerID    string `json:"peerID"`
+	Revision  uint32 `json:"revision"`
+	Signature []byte `json:"signature"`
+}
+
 type RatingIndex struct {
 	PeerID string `gorm:"primaryKey"`
 

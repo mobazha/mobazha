@@ -8,9 +8,24 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 )
+
+// buyRequestPeerQuery forwards the peer that owns a request to the raw handler
+// (see buyRequestOwnerQueryParam). A request lives on one node; naming that node
+// is what lets a reader elsewhere reach it.
+func buyRequestPeerQuery(peerID string) string {
+	peerID = strings.TrimSpace(peerID)
+	if peerID == "" {
+		return ""
+	}
+	return "?" + url.Values{buyRequestOwnerQueryParam: []string{peerID}}.Encode()
+}
+
+const buyRequestPeerDoc = "Peer ID of the node that owns the request. Set it when this node does not " +
+	"own the request itself: the call is then relayed to that node over the p2p channel."
 
 // registerNodeHumaBuyRequestPublicOperations registers the wanted board
 // endpoints that anyone may browse: the open board and a single request with
@@ -26,6 +41,7 @@ func (g *Gateway) registerNodeHumaBuyRequestPublicOperations(api huma.API) {
 func (g *Gateway) registerNodeHumaBuyRequestAdminOperations(api huma.API) {
 	g.registerBuyRequestListMine(api)
 	g.registerBuyRequestCreate(api)
+	g.registerBuyRequestUpdate(api)
 	g.registerBuyRequestCancel(api)
 	g.registerBuyRequestCreateOffer(api)
 	g.registerBuyRequestAcceptOffer(api)
@@ -35,6 +51,7 @@ func (g *Gateway) registerNodeHumaBuyRequestAdminOperations(api huma.API) {
 func (g *Gateway) registerBuyRequestCommentsList(api huma.API) {
 	type buyRequestCommentsInput struct {
 		Slug string `path:"slug" doc:"Buy request slug."`
+		Peer string `query:"peer" required:"false" doc:"Peer ID of the node that owns the request."`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "buy-requests-comments-list",
@@ -45,7 +62,7 @@ func (g *Gateway) registerBuyRequestCommentsList(api huma.API) {
 			"after the request closes.",
 		Tags: []string{"buy-requests"},
 	}, func(ctx context.Context, in *buyRequestCommentsInput) (*nodeDataOutput, error) {
-		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug) + "/comments"
+		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug) + "/comments" + buyRequestPeerQuery(in.Peer)
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"slug": in.Slug})
 		rr := httptest.NewRecorder()
 		g.handleListBuyRequestComments(rr, req)
@@ -60,6 +77,7 @@ func (g *Gateway) registerBuyRequestCommentsList(api huma.API) {
 func (g *Gateway) registerBuyRequestCommentCreate(api huma.API) {
 	type buyRequestCommentBodyInput struct {
 		Slug string `path:"slug" doc:"Buy request slug."`
+		Peer string `query:"peer" required:"false" doc:"Peer ID of the node that owns the request."`
 		Body json.RawMessage
 	}
 	huma.Register(api, huma.Operation{
@@ -73,7 +91,7 @@ func (g *Gateway) registerBuyRequestCommentCreate(api huma.API) {
 		Tags:     []string{"buy-requests"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, in *buyRequestCommentBodyInput) (*nodeDataOutput, error) {
-		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug) + "/comments"
+		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug) + "/comments" + buyRequestPeerQuery(in.Peer)
 		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"slug": in.Slug})
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
@@ -140,6 +158,7 @@ func (g *Gateway) registerBuyRequestList(api huma.API) {
 func (g *Gateway) registerBuyRequestGet(api huma.API) {
 	type buyRequestGetInput struct {
 		Slug string `path:"slug" doc:"Buy request slug."`
+		Peer string `query:"peer" required:"false" doc:"Peer ID of the node that owns the request."`
 	}
 	huma.Register(api, huma.Operation{
 		OperationID: "buy-requests-get",
@@ -149,7 +168,7 @@ func (g *Gateway) registerBuyRequestGet(api huma.API) {
 		Description: "Offers are public on purpose: a wanted board only works when sellers can see the going rate.",
 		Tags:        []string{"buy-requests"},
 	}, func(ctx context.Context, in *buyRequestGetInput) (*nodeDataOutput, error) {
-		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug)
+		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug) + buyRequestPeerQuery(in.Peer)
 		req := nodeBridgeRequestWithVars(ctx, http.MethodGet, rawURL, nil, map[string]string{"slug": in.Slug})
 		rr := httptest.NewRecorder()
 		g.handleGetBuyRequest(rr, req)
@@ -223,6 +242,36 @@ func (g *Gateway) registerBuyRequestCreate(api huma.API) {
 	})
 }
 
+func (g *Gateway) registerBuyRequestUpdate(api huma.API) {
+	type buyRequestUpdateInput struct {
+		Slug string `path:"slug" doc:"Buy request slug."`
+		Body json.RawMessage
+	}
+	huma.Register(api, huma.Operation{
+		OperationID: "buy-requests-update",
+		Method:      http.MethodPut,
+		Path:        "/v1/buy-requests/{slug}",
+		Summary:     "Edit a buy request",
+		Description: "Only the buyer may edit a request, and only while it is still open. " +
+			"The same body as publishing, and the edit moves the record's revision forward " +
+			"so the search index keeps the newest copy.",
+		Tags:     []string{"buy-requests"},
+		Security: nodeAuthSecurity,
+	}, func(ctx context.Context, in *buyRequestUpdateInput) (*nodeDataOutput, error) {
+		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug)
+		req := nodeBridgeRequestWithVars(ctx, http.MethodPut, rawURL, bytes.NewReader(in.Body),
+			map[string]string{"slug": in.Slug})
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		g.handleUpdateBuyRequest(rr, req)
+		data, err := nodeBridgeSuccessData(rr)
+		if err != nil {
+			return nil, err
+		}
+		return &nodeDataOutput{Body: data}, nil
+	})
+}
+
 func (g *Gateway) registerBuyRequestCancel(api huma.API) {
 	type buyRequestCancelInput struct {
 		Slug string `path:"slug" doc:"Buy request slug."`
@@ -251,6 +300,7 @@ func (g *Gateway) registerBuyRequestCancel(api huma.API) {
 func (g *Gateway) registerBuyRequestCreateOffer(api huma.API) {
 	type buyRequestOfferBodyInput struct {
 		Slug string `path:"slug" doc:"Buy request slug."`
+		Peer string `query:"peer" required:"false" doc:"Peer ID of the node that owns the request."`
 		Body json.RawMessage
 	}
 	huma.Register(api, huma.Operation{
@@ -264,7 +314,7 @@ func (g *Gateway) registerBuyRequestCreateOffer(api huma.API) {
 		Tags:     []string{"buy-requests"},
 		Security: nodeAuthSecurity,
 	}, func(ctx context.Context, in *buyRequestOfferBodyInput) (*nodeDataOutput, error) {
-		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug) + "/offers"
+		rawURL := "/v1/buy-requests/" + url.PathEscape(in.Slug) + "/offers" + buyRequestPeerQuery(in.Peer)
 		req := nodeBridgeRequestWithVars(ctx, http.MethodPost, rawURL, bytes.NewReader(in.Body), map[string]string{"slug": in.Slug})
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()

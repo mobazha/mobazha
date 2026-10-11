@@ -27,12 +27,12 @@ func newBuyRequestService(t *testing.T) *BuyRequestAppService {
 func defaultCreateInput() contracts.CreateBuyRequestInput {
 	return contracts.CreateBuyRequestInput{
 		Title:              "Vintage Technics turntable",
-		CategorySlug:       "electronics",
+		ProductType:        "electronics",
 		Quantity:           2,
-		BudgetMaxAmount:    "450",
-		BudgetMaxCurrency:  "USDT",
+		BudgetAmount:       "450",
+		BudgetCurrency:     "USDT",
 		AcceptedCurrencies: []string{"USDT", "USD"},
-		DeliverTo:          "de",
+		ShipTo:             "de",
 		ExpiresAt:          time.Now().UTC().Add(72 * time.Hour),
 	}
 }

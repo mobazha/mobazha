@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -12,13 +13,17 @@ import (
 	"github.com/gosimple/slug"
 	"github.com/mobazha/mobazha/internal/database"
 	"github.com/mobazha/mobazha/pkg/contracts"
+	"github.com/mobazha/mobazha/pkg/events"
 	"github.com/mobazha/mobazha/pkg/models"
+	"github.com/mobazha/mobazha/pkg/orders"
+	opb "github.com/mobazha/mobazha/pkg/orders/mbzpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// maxOpenBuyRequestsPerBuyer stops one buyer from flooding the board. The
-// number is deliberately generous: it is an anti-abuse ceiling, not a product
-// limit the UI has to explain.
-const maxOpenBuyRequestsPerBuyer = 20
+// maxOpenBuyRequestsPerBuyer stops one buyer from flooding the board. The ceiling
+// is pinned by the record contract so a node and the index agree on what a board
+// may hold: it is an anti-abuse limit, not a product limit the UI has to explain.
+const maxOpenBuyRequestsPerBuyer = orders.BuyerRequestMaxOpenPerPeer
 
 // BuyRequestAppService owns the wanted board rules.
 //
@@ -30,10 +35,122 @@ const maxOpenBuyRequestsPerBuyer = 20
 type BuyRequestAppService struct {
 	store contracts.BuyRequestStore
 	now   func() time.Time
+	// notifier carries the buyer's decision back to sellers on other nodes. It
+	// is nil on a node without a p2p transport, where every seller is local and
+	// already sees the decision on this board.
+	notifier buyRequestNotifier
+	// eventBus announces board changes so the search service can re-index a
+	// request. It is nil in tests and on a node without a bus.
+	eventBus events.Bus
 }
 
 func NewBuyRequestAppService(store contracts.BuyRequestStore) *BuyRequestAppService {
 	return &BuyRequestAppService{store: store, now: time.Now}
+}
+
+// SetNotifier wires the transport that tells remote sellers what the buyer
+// decided. It is set once, after the node's messenger exists.
+func (s *BuyRequestAppService) SetNotifier(notifier buyRequestNotifier) {
+	if s == nil {
+		return
+	}
+	s.notifier = notifier
+}
+
+// SetEventBus wires the bus that carries board changes to the search-service
+// sync. It is set once, when the node is assembled.
+func (s *BuyRequestAppService) SetEventBus(bus events.Bus) {
+	if s == nil {
+		return
+	}
+	s.eventBus = bus
+}
+
+// announce tells the search-service sync that this request changed. A change is
+// worth publishing only while the request is open: the board only lists open
+// requests, and anything else is withdrawn instead.
+func (s *BuyRequestAppService) announce(slug string, open bool) {
+	if s.eventBus == nil || slug == "" {
+		return
+	}
+	if open {
+		s.eventBus.Emit(&events.BuyRequestChanged{Slug: slug})
+		return
+	}
+	s.eventBus.Emit(&events.BuyRequestDeleted{Slug: slug})
+}
+
+// Record renders one of this node's requests as the signed public record.
+//
+// It is the single mapping from storage onto the wire, so the node, the index,
+// and the web client all describe a request the same way. Only the node that owns
+// a request can produce it, which is what keeps the board's single-writer rule
+// intact.
+func (s *BuyRequestAppService) Record(ctx context.Context, requestID string) (*opb.BuyerRequest, error) {
+	request, err := s.store.GetRequest(ctx, requestID)
+	if err != nil {
+		return nil, err
+	}
+	record := &opb.BuyerRequest{
+		RequestID: request.Slug,
+		Revision:  uint32(max(request.Revision, 1)),
+		PeerID:    request.BuyerPeerID,
+		Title:     request.Title,
+		Quantity:  uint32(request.Quantity),
+		Budget: &opb.CurrencyValue{
+			Currency: &opb.Currency{
+				Code:         request.BudgetMaxCurrency,
+				Divisibility: uint32(budgetDivisibility(request.BudgetMaxCurrency)),
+			},
+			Amount: request.BudgetMaxAmount,
+		},
+		AcceptedCurrencies: contracts.SplitBuyRequestCurrencies(request.AcceptedCurrencies),
+		ShipTo:             request.DeliverTo,
+		ProductType:        request.CategorySlug,
+		Description:        request.Description,
+		Status:             recordStatus(request.Status),
+		CreatedAt:          timestamppb.New(request.CreatedAt.UTC()),
+		ExpiresAt:          timestamppb.New(request.ExpiresAt.UTC()),
+	}
+	for _, image := range request.Images {
+		record.Images = append(record.Images, &opb.Image{
+			Filename: image.Filename,
+			Original: image.Original,
+			Large:    image.Large,
+			Medium:   image.Medium,
+			Small:    image.Small,
+			Tiny:     image.Tiny,
+		})
+	}
+	return record, nil
+}
+
+// recordStatus folds the board's internal states onto the two values a reader
+// sees: a request that is no longer collecting answers is closed.
+func recordStatus(status models.BuyRequestStatus) string {
+	if status == models.BuyRequestStatusOpen {
+		return orders.BuyerRequestStatusOpen
+	}
+	return orders.BuyerRequestStatusClosed
+}
+
+// budgetDivisibility reads a currency's divisibility from the registry, which is
+// what makes a budget amount a number in the smallest unit rather than a decimal.
+func budgetDivisibility(code string) uint32 {
+	if definition, err := models.CurrencyDefinitions.Lookup(code); err == nil && definition != nil {
+		if definition.Divisibility > 18 {
+			// The record's divisibility is a promise about how many decimal
+			// places the amount carries, and the index refuses anything past
+			// eighteen. A currency that claims more is described with the
+			// maximum instead of failing the push.
+			return 18
+		}
+		return uint32(definition.Divisibility)
+	}
+	// The registry does not know this code — a token identifier rather than a
+	// currency, usually. The record still has to state a divisibility, and eight
+	// decimal places is what a currency like that has.
+	return 8
 }
 
 // Store exposes the underlying persistence for callers that need it (tests,
@@ -46,53 +163,18 @@ func (s *BuyRequestAppService) Create(ctx context.Context, buyerPeerID string, i
 		return nil, fmt.Errorf("%w: buyer identity is required", database.ErrBuyRequestInvalid)
 	}
 
-	title := strings.TrimSpace(in.Title)
-	if title == "" {
-		return nil, fmt.Errorf("%w: title is required", database.ErrBuyRequestInvalid)
-	}
-	if in.Quantity < 1 {
-		return nil, fmt.Errorf("%w: quantity must be at least 1", database.ErrBuyRequestInvalid)
-	}
-
-	maxAmount := strings.TrimSpace(in.BudgetMaxAmount)
-	if maxAmount == "" {
-		return nil, fmt.Errorf("%w: budgetMax.amount is required", database.ErrBuyRequestInvalid)
-	}
-	if amount, err := strconv.ParseFloat(maxAmount, 64); err != nil || amount <= 0 {
-		return nil, fmt.Errorf("%w: budgetMax.amount must be a positive number", database.ErrBuyRequestInvalid)
-	}
-
-	maxCurrency := normalizeCode(in.BudgetMaxCurrency)
-	if maxCurrency == "" {
-		return nil, fmt.Errorf("%w: budgetMax.currency is required", database.ErrBuyRequestInvalid)
-	}
-
-	currencies := normalizeCurrencies(in.AcceptedCurrencies)
-	if len(currencies) == 0 {
-		// A buyer who states a budget but no accepted currency obviously means
-		// the budget currency, so default to it instead of rejecting.
-		currencies = []string{maxCurrency}
-	}
-
-	deliverTo := normalizeCode(in.DeliverTo)
-	if deliverTo == "" {
-		return nil, fmt.Errorf("%w: deliverTo is required", database.ErrBuyRequestInvalid)
-	}
-
-	if in.ExpiresAt.IsZero() {
-		return nil, fmt.Errorf("%w: expiresAt is required", database.ErrBuyRequestInvalid)
-	}
-	expiresAt := in.ExpiresAt.UTC()
-	if !expiresAt.After(s.now().UTC()) {
-		return nil, fmt.Errorf("%w: expiresAt must be in the future", database.ErrBuyRequestInvalid)
-	}
-
-	condition, err := parseCondition(in.Condition)
-	if err != nil {
-		return nil, err
-	}
-
-	images, err := normalizeBuyRequestImages(in.Images)
+	validated, err := validateRequest(recordFields{
+		title:              in.Title,
+		productType:        in.ProductType,
+		quantity:           in.Quantity,
+		budgetAmount:       in.BudgetAmount,
+		budgetCurrency:     in.BudgetCurrency,
+		acceptedCurrencies: in.AcceptedCurrencies,
+		shipTo:             in.ShipTo,
+		description:        in.Description,
+		expiresAt:          in.ExpiresAt,
+		images:             in.Images,
+	}, s.now())
 	if err != nil {
 		return nil, err
 	}
@@ -107,29 +189,193 @@ func (s *BuyRequestAppService) Create(ctx context.Context, buyerPeerID string, i
 
 	request := &models.BuyRequest{
 		ID:                 uuid.New().String(),
-		Slug:               buildBuyRequestSlug(title),
+		Slug:               buildBuyRequestSlug(validated.title),
+		Revision:           1,
 		BuyerPeerID:        buyerPeerID,
-		Title:              title,
-		CategorySlug:       strings.TrimSpace(in.CategorySlug),
-		Description:        strings.TrimSpace(in.Description),
-		Quantity:           in.Quantity,
-		Unit:               strings.TrimSpace(in.Unit),
-		BudgetMaxAmount:    maxAmount,
-		BudgetMaxCurrency:  maxCurrency,
-		BudgetMinAmount:    strings.TrimSpace(in.BudgetMinAmount),
-		AcceptedCurrencies: database.NormalizeAcceptedCurrencies(currencies),
-		DeliverTo:          deliverTo,
-		Condition:          condition,
+		Title:              validated.title,
+		CategorySlug:       validated.productType,
+		Description:        validated.description,
+		Quantity:           validated.quantity,
+		BudgetMaxAmount:    validated.budgetAmount,
+		BudgetMaxCurrency:  validated.budgetCurrency,
+		AcceptedCurrencies: database.NormalizeAcceptedCurrencies(validated.currencies),
+		DeliverTo:          validated.shipTo,
 		Status:             models.BuyRequestStatusOpen,
-		ExpiresAt:          expiresAt,
+		ExpiresAt:          validated.expiresAt,
 	}
-	if err := request.SetImages(images); err != nil {
+	if err := request.SetImages(validated.images); err != nil {
 		return nil, fmt.Errorf("encode buy request images: %w", err)
 	}
 	if err := s.store.CreateRequest(ctx, request); err != nil {
 		return nil, err
 	}
+	s.announce(request.Slug, true)
 	return request, nil
+}
+
+// Update edits a request the buyer owns. The revision grows by one on every
+// edit, which is what lets the index refuse an older copy: a reader must never
+// see a request that its owner already replaced.
+func (s *BuyRequestAppService) Update(ctx context.Context, buyerPeerID, requestID string, in contracts.UpdateBuyRequestInput) (*models.BuyRequest, error) {
+	buyerPeerID = strings.TrimSpace(buyerPeerID)
+	request, err := s.store.GetRequest(ctx, requestID)
+	if err != nil {
+		return nil, err
+	}
+	if request.BuyerPeerID != buyerPeerID {
+		return nil, database.ErrBuyRequestNotOwner
+	}
+	if request.Status != models.BuyRequestStatusOpen {
+		return nil, fmt.Errorf("%w: status is %s", database.ErrBuyRequestClosed, request.Status)
+	}
+
+	validated, err := validateRequest(recordFields{
+		title:              in.Title,
+		productType:        in.ProductType,
+		quantity:           in.Quantity,
+		budgetAmount:       in.BudgetAmount,
+		budgetCurrency:     in.BudgetCurrency,
+		acceptedCurrencies: in.AcceptedCurrencies,
+		shipTo:             in.ShipTo,
+		description:        in.Description,
+		expiresAt:          in.ExpiresAt,
+		images:             in.Images,
+	}, s.now())
+	if err != nil {
+		return nil, err
+	}
+
+	request.Revision++
+	request.Title = validated.title
+	request.CategorySlug = validated.productType
+	request.Description = validated.description
+	request.Quantity = validated.quantity
+	request.BudgetMaxAmount = validated.budgetAmount
+	request.BudgetMaxCurrency = validated.budgetCurrency
+	request.AcceptedCurrencies = database.NormalizeAcceptedCurrencies(validated.currencies)
+	request.DeliverTo = validated.shipTo
+	request.ExpiresAt = validated.expiresAt
+	if err := request.SetImages(validated.images); err != nil {
+		return nil, fmt.Errorf("encode buy request images: %w", err)
+	}
+	if err := s.store.UpdateRequest(ctx, request); err != nil {
+		return nil, err
+	}
+	s.announce(request.Slug, true)
+	return request, nil
+}
+
+// recordFields is one set of raw record fields, before validation. Create and
+// Update both go through validateRequest so an edit cannot be looser than a
+// publication.
+type recordFields struct {
+	title              string
+	productType        string
+	description        string
+	budgetAmount       string
+	budgetCurrency     string
+	acceptedCurrencies []string
+	shipTo             string
+	quantity           int
+	expiresAt          time.Time
+	images             []models.ImageHashes
+}
+
+// validatedFields is a record that satisfies every rule the contract states.
+type validatedFields struct {
+	title          string
+	productType    string
+	description    string
+	budgetAmount   string
+	budgetCurrency string
+	currencies     []string
+	shipTo         string
+	quantity       int
+	expiresAt      time.Time
+	images         []models.ImageHashes
+}
+
+// validateRequest enforces the record contract's rules. The index enforces the
+// same ones again, because it cannot trust a publisher; doing it here as well
+// means a buyer sees the problem instead of a refused push.
+func validateRequest(in recordFields, now time.Time) (validatedFields, error) {
+	out := validatedFields{}
+
+	out.title = strings.TrimSpace(in.title)
+	if out.title == "" {
+		return out, fmt.Errorf("%w: title is required", database.ErrBuyRequestInvalid)
+	}
+	if utf8.RuneCountInString(out.title) > orders.BuyerRequestMaxTitleLength {
+		return out, fmt.Errorf("%w: title must be at most %d characters",
+			database.ErrBuyRequestInvalid, orders.BuyerRequestMaxTitleLength)
+	}
+	out.description = strings.TrimSpace(in.description)
+	if utf8.RuneCountInString(out.description) > orders.BuyerRequestMaxDescriptionLength {
+		return out, fmt.Errorf("%w: description must be at most %d characters",
+			database.ErrBuyRequestInvalid, orders.BuyerRequestMaxDescriptionLength)
+	}
+	// productType is optional. The board indexes it so a seller can filter by
+	// the products they already publish, but a buyer who does not know the
+	// taxonomy is not made to invent one.
+	out.productType = strings.TrimSpace(in.productType)
+	if utf8.RuneCountInString(out.productType) > orders.BuyerRequestMaxProductTypeLength {
+		return out, fmt.Errorf("%w: productType must be at most %d characters",
+			database.ErrBuyRequestInvalid, orders.BuyerRequestMaxProductTypeLength)
+	}
+	out.quantity = in.quantity
+	if out.quantity < 1 || out.quantity > orders.BuyerRequestMaxQuantity {
+		return out, fmt.Errorf("%w: quantity must be between 1 and %d",
+			database.ErrBuyRequestInvalid, orders.BuyerRequestMaxQuantity)
+	}
+
+	// A budget is a whole number of the currency's smallest unit, never a
+	// decimal: the same rule listing prices follow.
+	out.budgetAmount = strings.TrimSpace(in.budgetAmount)
+	if out.budgetAmount == "" {
+		return out, fmt.Errorf("%w: budget.amount is required", database.ErrBuyRequestInvalid)
+	}
+	if !isPositiveInteger(out.budgetAmount) || len(out.budgetAmount) > orders.BuyerRequestMaxBudgetDigits {
+		return out, fmt.Errorf("%w: budget.amount must be a positive integer in the "+
+			"currency's smallest unit, at most %d digits",
+			database.ErrBuyRequestInvalid, orders.BuyerRequestMaxBudgetDigits)
+	}
+	out.budgetCurrency = normalizeCode(in.budgetCurrency)
+	if out.budgetCurrency == "" {
+		return out, fmt.Errorf("%w: budget.currency is required", database.ErrBuyRequestInvalid)
+	}
+
+	out.currencies = normalizeCurrencies(in.acceptedCurrencies)
+	if len(out.currencies) == 0 {
+		// A buyer who states a budget but no accepted currency obviously means
+		// the budget currency, so default to it instead of rejecting.
+		out.currencies = []string{out.budgetCurrency}
+	}
+
+	// shipTo is optional: a buyer who will take the goods wherever they come
+	// from is not asked to name a country. When it is given it must be valid.
+	out.shipTo = normalizeCode(in.shipTo)
+	if out.shipTo != "" && !isCountryCode(out.shipTo) {
+		return out, fmt.Errorf("%w: shipTo must be a two-letter country code", database.ErrBuyRequestInvalid)
+	}
+
+	if in.expiresAt.IsZero() {
+		return out, fmt.Errorf("%w: expiresAt is required", database.ErrBuyRequestInvalid)
+	}
+	out.expiresAt = in.expiresAt.UTC()
+	if !out.expiresAt.After(now.UTC()) {
+		return out, fmt.Errorf("%w: expiresAt must be in the future", database.ErrBuyRequestInvalid)
+	}
+	if out.expiresAt.Sub(now.UTC()) > orders.BuyerRequestMaxLifetime {
+		return out, fmt.Errorf("%w: a request may stay open for at most %d days",
+			database.ErrBuyRequestInvalid, int(orders.BuyerRequestMaxLifetime.Hours()/24))
+	}
+
+	images, err := normalizeBuyRequestImages(in.images)
+	if err != nil {
+		return out, err
+	}
+	out.images = images
+	return out, nil
 }
 
 // normalizeBuyRequestImages trims each hash set and drops entries that carry no
@@ -232,6 +478,7 @@ func (s *BuyRequestAppService) Cancel(ctx context.Context, buyerPeerID, slugStr 
 	if err := s.store.UpdateRequest(ctx, request); err != nil {
 		return nil, err
 	}
+	s.announce(request.Slug, false)
 	return request, nil
 }
 
@@ -353,7 +600,44 @@ func (s *BuyRequestAppService) AcceptOffer(ctx context.Context, buyerPeerID, slu
 	if err := s.store.RejectPendingOffers(ctx, request.Slug, offer.ID); err != nil {
 		return nil, nil, err
 	}
+	s.announceOfferOutcomes(ctx, request, offer.ID)
+	// A locked request is off the open board: the deal has moved to the order.
+	s.announce(request.Slug, false)
 	return request, offer, nil
+}
+
+// announceOfferOutcomes tells the sellers what the buyer decided. Sellers on
+// this node already see it on the board, so the notice is only sent to peers.
+//
+// It is deliberately best effort: the decision is already stored here, on the
+// only node that owns the request, so a notice that cannot be delivered must
+// not turn a successful acceptance into an error.
+func (s *BuyRequestAppService) announceOfferOutcomes(ctx context.Context, request *models.BuyRequest, acceptedOfferID string) {
+	if s.notifier == nil || request == nil {
+		return
+	}
+	offers, err := s.store.ListOffers(ctx, request.Slug)
+	if err != nil {
+		log.Warningf("BuyRequest: cannot list offers to announce a decision on %s: %s", request.Slug, err)
+		return
+	}
+	payload, err := json.Marshal(contracts.NewBuyRequestDetailDTO(request, offers))
+	if err != nil {
+		log.Warningf("BuyRequest: cannot encode the decision on %s: %s", request.Slug, err)
+		return
+	}
+	for _, offer := range offers {
+		if offer == nil {
+			continue
+		}
+		accepted := offer.ID == acceptedOfferID
+		if err := s.notifier.NotifyOfferOutcome(ctx, offer.SellerPeerID, request.Slug, accepted, payload); err != nil {
+			// The seller will still see the decision when it next reads the
+			// request, so a failed notice is worth a line but not an error.
+			log.Warningf("BuyRequest: cannot tell %s about offer %s on %s: %s",
+				offer.SellerPeerID, offer.ID, request.Slug, err)
+		}
+	}
 }
 
 // closeExpired flips open requests past their deadline to cancelled and reports
@@ -445,9 +729,38 @@ func (s *BuyRequestAppService) closeExpired(ctx context.Context, requests []*mod
 			// Best effort: a failed sweep must not break the read.
 			continue
 		}
+		s.announce(r.Slug, false)
 		closed++
 	}
 	return closed
+}
+
+// isPositiveInteger reports whether a string is a run of digits that is not all
+// zeroes. A budget counts the currency's smallest unit and may be far larger
+// than a 64-bit integer, so it is never parsed into one.
+func isPositiveInteger(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return strings.Trim(value, "0") != ""
+}
+
+// isCountryCode accepts the two-letter country goods must reach.
+func isCountryCode(code string) bool {
+	if len(code) != 2 {
+		return false
+	}
+	for _, r := range code {
+		if r < 'A' || r > 'Z' {
+			return false
+		}
+	}
+	return true
 }
 
 func parseCondition(raw string) (models.BuyRequestCondition, error) {

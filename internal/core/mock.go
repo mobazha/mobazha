@@ -197,6 +197,7 @@ func MockNode() (*MobazhaNode, error) {
 
 	node.initProfileService()
 	node.initModerationService()
+	initBuyRequestSubsystem(node)
 	initStorePolicySubsystem(node)
 	initSellerAffiliateSubsystem(node)
 	initShippingSubsystem(node)
@@ -212,6 +213,7 @@ func MockNode() (*MobazhaNode, error) {
 	node.initRatingsService()
 	node.initNotificationService()
 	node.initFollowService()
+	node.initBuyRequestRelay()
 	node.initPostsService()
 	node.initShoppingCartService()
 	node.registerPaymentStrategies()
@@ -413,6 +415,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 
 		node.initProfileService()
 		node.initModerationService()
+		initBuyRequestSubsystem(node)
 		initStorePolicySubsystem(node)
 		initSellerAffiliateSubsystem(node)
 		initShippingSubsystem(node)
@@ -428,6 +431,7 @@ func NewMocknet(numNodes int) (*Mocknet, error) {
 		node.initRatingsService()
 		node.initNotificationService()
 		node.initFollowService()
+		node.initBuyRequestRelay()
 		node.initPostsService()
 		node.initShoppingCartService()
 		node.registerPaymentStrategies()

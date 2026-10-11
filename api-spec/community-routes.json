@@ -203,6 +203,10 @@
       "path": "/v1/buy-requests/{slug}"
     },
     {
+      "method": "PUT",
+      "path": "/v1/buy-requests/{slug}"
+    },
+    {
       "method": "POST",
       "path": "/v1/buy-requests/{slug}/accept"
     },
@@ -1517,6 +1521,10 @@
     {
       "method": "POST",
       "path": "/v1/system/update-trigger"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/translate"
     },
     {
       "method": "GET",

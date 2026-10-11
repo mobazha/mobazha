@@ -5567,6 +5567,16 @@
               "description": "Buy request slug.",
               "type": "string"
             }
+          },
+          {
+            "description": "Peer ID of the node that owns the request.",
+            "explode": false,
+            "in": "query",
+            "name": "peer",
+            "schema": {
+              "description": "Peer ID of the node that owns the request.",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5592,6 +5602,70 @@
           }
         },
         "summary": "Get a buy request with its offers",
+        "tags": [
+          "buy-requests"
+        ]
+      },
+      "put": {
+        "description": "Only the buyer may edit a request, and only while it is still open. The same body as publishing, and the edit moves the record's revision forward so the search index keeps the newest copy.",
+        "operationId": "buy-requests-update",
+        "parameters": [
+          {
+            "description": "Buy request slug.",
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "description": "Buy request slug.",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "security": [
+          {
+            "basicAuth": []
+          },
+          {
+            "bearerJWT": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminSession": []
+          }
+        ],
+        "summary": "Edit a buy request",
         "tags": [
           "buy-requests"
         ]
@@ -5677,6 +5751,16 @@
               "description": "Buy request slug.",
               "type": "string"
             }
+          },
+          {
+            "description": "Peer ID of the node that owns the request.",
+            "explode": false,
+            "in": "query",
+            "name": "peer",
+            "schema": {
+              "description": "Peer ID of the node that owns the request.",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -5717,6 +5801,16 @@
             "required": true,
             "schema": {
               "description": "Buy request slug.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Peer ID of the node that owns the request.",
+            "explode": false,
+            "in": "query",
+            "name": "peer",
+            "schema": {
+              "description": "Peer ID of the node that owns the request.",
               "type": "string"
             }
           }
@@ -5783,6 +5877,16 @@
             "required": true,
             "schema": {
               "description": "Buy request slug.",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Peer ID of the node that owns the request.",
+            "explode": false,
+            "in": "query",
+            "name": "peer",
+            "schema": {
+              "description": "Peer ID of the node that owns the request.",
               "type": "string"
             }
           }
@@ -24131,6 +24235,46 @@
         "summary": "Ask launcher/native updater to action",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/v1/translate": {
+      "post": {
+        "description": "Translates product titles, descriptions and wanted requests into the language a visitor reads. Texts the node cannot translate come back unchanged with translated=false, so a caller can render them as they are. The node's engine, if any, is the node owner's choice; with none configured this returns the caller's own text.",
+        "operationId": "translate-text",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Success envelope inner data."
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeError"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Translate content into a language",
+        "tags": [
+          "translate"
         ]
       }
     },

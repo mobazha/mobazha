@@ -1,0 +1,37 @@
+syntax = "proto3";
+option go_package = "../mbzpb";
+package mbzpb;
+
+import "common.proto";
+import "google/protobuf/timestamp.proto";
+
+// BuyerRequest is one entry on the "wanted" board: a buyer states what they are
+// looking for so sellers on other nodes can find it.
+//
+// The owning node assigns the identifier, signs the record, and is the only
+// writer. The hosted index keeps a public copy for discovery and search, and
+// reuses common.proto's CurrencyValue and Image so a request carries money and
+// pictures the same way a listing does.
+message BuyerRequest {
+    string requestID                  = 1;
+    // revision starts at 1 and increases with every edit; the index accepts only
+    // an increasing revision so an older record cannot overwrite a newer one.
+    uint32 revision                   = 2;
+    // peerID is the node that owns the request, and the identity it is public
+    // under, together with the delivery country and the budget.
+    string peerID                     = 3;
+    string title                      = 4;
+    uint32 quantity                   = 5;
+    CurrencyValue budget              = 6;
+    repeated string acceptedCurrencies = 7;
+    string shipTo                     = 8;
+    // productType reuses the listing taxonomy so sellers can filter by the
+    // products they already sell.
+    string productType                = 9;
+    string description                = 10;
+    repeated Image images             = 11;
+    // status is "open" or "closed", matching how a listing carries its status.
+    string status                     = 12;
+    google.protobuf.Timestamp createdAt = 13;
+    google.protobuf.Timestamp expiresAt = 14;
+}

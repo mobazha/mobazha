@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 fengzie and the respective contributors.
+
 // Package buyrequestmock is a local stand-in for the hosted index's buyer
 // request endpoints (RFC-0017, "Index interfaces").
 //
